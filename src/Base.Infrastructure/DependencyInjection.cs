@@ -181,7 +181,7 @@ public static class DependencyInjection
         if (options.LocalDisk is not null || environment.IsDevelopment())
         {
             var root = options.LocalDisk?.RootPath ?? new FileStorageOptions.LocalDiskOptions().RootPath;
-            var fullRoot = Path.IsPathRooted(root) ? root : Path.Combine(environment.ContentRootPath, root);
+            var fullRoot = Path.IsPathRooted(root) ? root : Path.Join(environment.ContentRootPath, root);
             services.AddSingleton<IFileStorageProvider>(new LocalDiskFileStorageProvider(fullRoot));
         }
 

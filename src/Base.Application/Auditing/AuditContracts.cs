@@ -28,6 +28,7 @@ public sealed record AuditRecord(
     string? TraceId,
     IReadOnlyList<AuditChange> Changes);
 
+/// <summary>Filters for <see cref="IAuditTrail.SearchAsync"/>. Every filter is optional; results are newest first.</summary>
 /// <param name="EntityId">Matches the record itself and rows keyed under it (a user's role assignments and claims).</param>
 /// <param name="To">Exclusive upper bound.</param>
 public sealed record AuditQuery(

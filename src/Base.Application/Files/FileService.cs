@@ -47,7 +47,7 @@ internal sealed partial class FileService(
 
         // Spool to a temp file while hashing and measuring, so we never trust Content-Length and never hold the file in memory.
         await using var spool = new FileStream(
-            Path.Combine(Path.GetTempPath(), Path.GetRandomFileName()),
+            Path.Join(Path.GetTempPath(), Path.GetRandomFileName()),
             FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, BufferSize,
             FileOptions.Asynchronous | FileOptions.DeleteOnClose);
 

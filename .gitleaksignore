@@ -1,0 +1,6 @@
+# Reviewed false positives, one fingerprint per line (commit:file:rule:line).
+# Add a line only after confirming the match is not a secret, and never quote the matched text here.
+# 1. generic-api-key on a doc comment describing storage providers (no secret).
+a511449fdb3f98d08d356b72af27450fec41a153:src/Base.Application/Files/IFileStorageProvider.cs:generic-api-key:6
+# 2. generic-api-key on the first version of this file, which quoted that doc comment.
+0f98f51110a57e3cd839b089a6c486c63212339b:.gitleaksignore:generic-api-key:2

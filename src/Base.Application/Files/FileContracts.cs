@@ -1,5 +1,6 @@
 namespace Base.Application.Files;
 
+/// <summary>A file to store through <see cref="IFileService"/>. The stream is read once and not disposed.</summary>
 /// <param name="Category">What the file is for (<c>avatar</c>, <c>invoice</c>, ...). Lower-case letters, digits and dashes.</param>
 public sealed record FileUploadRequest(Stream Content, string FileName, string? ContentType, string Category, DateTimeOffset? ExpiresAt = null);
 

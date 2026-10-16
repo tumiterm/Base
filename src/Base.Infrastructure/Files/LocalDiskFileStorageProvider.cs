@@ -34,7 +34,14 @@ internal sealed class LocalDiskFileStorageProvider(string rootPath) : IFileStora
 
     private string Resolve(string objectKey)
     {
-        var path = Path.GetFullPath(Path.Combine(_root, objectKey));
+        // Keys are always relative (see ObjectKeys); an absolute one is a bug or an attack.
+        if (Path.IsPathRooted(objectKey))
+        {
+            throw new ArgumentException("Object keys must be relative.", nameof(objectKey));
+        }
+
+        // Join (unlike Combine) never discards the root; the check below catches "..".
+        var path = Path.GetFullPath(Path.Join(_root, objectKey));
         if (!path.StartsWith(_root + Path.DirectorySeparatorChar, StringComparison.Ordinal))
         {
             throw new ArgumentException("Object key escapes the storage root.", nameof(objectKey));
