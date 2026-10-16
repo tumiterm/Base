@@ -1,5 +1,4 @@
 using Base.Application.Common.Persistence;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Base.Infrastructure.Persistence;
