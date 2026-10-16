@@ -1,0 +1,12 @@
+# Extends the default rules. Only the throwaway local-container password used by docker-compose,
+# appsettings.Development.json and the design-time factory is allow-listed.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Local development container credentials (not secrets)"
+regexes = [
+  '''Base_Dev_Password1!''',
+  '''base-dev-password''',
+  '''Base_Dev_Password1!''',
+]

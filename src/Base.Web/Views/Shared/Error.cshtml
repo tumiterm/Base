@@ -1,0 +1,22 @@
+@model ErrorViewModel
+@{
+    ViewData["Title"] = Model.Title;
+}
+<h1 class="h3">@Model.Title</h1>
+@if (Model.StatusCode >= 500)
+{
+    <p>The team has been notified.</p>
+}
+else if (Model.StatusCode == 404)
+{
+    <p>The page you asked for doesn't exist or has moved.</p>
+}
+else if (Model.StatusCode == 403)
+{
+    <p>You don't have permission to see this.</p>
+}
+@if (!string.IsNullOrEmpty(Model.Ticket))
+{
+    <p>If you contact support, quote reference <strong>@Model.Ticket</strong>.</p>
+}
+<a asp-controller="Home" asp-action="Index">Back to the home page</a>

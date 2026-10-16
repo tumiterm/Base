@@ -1,0 +1,16 @@
+P:System.DateTime.Now;Inject TimeProvider and use GetUtcNow(). Store UTC; convert to local time only in the UI.
+P:System.DateTime.UtcNow;Inject TimeProvider and use GetUtcNow() so time is testable.
+P:System.DateTime.Today;Inject TimeProvider.
+P:System.DateTimeOffset.Now;Inject TimeProvider and use GetUtcNow().
+P:System.DateTimeOffset.UtcNow;Inject TimeProvider and use GetUtcNow() so time is testable.
+M:Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.ExecuteSqlRaw(Microsoft.EntityFrameworkCore.Infrastructure.DatabaseFacade,System.String,System.Object[]);Use ExecuteSqlInterpolated / ExecuteSql with FormattableString.
+M:Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.ExecuteSqlRawAsync(Microsoft.EntityFrameworkCore.Infrastructure.DatabaseFacade,System.String,System.Threading.CancellationToken);Use ExecuteSqlAsync with FormattableString.
+M:Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.ExecuteSqlRawAsync(Microsoft.EntityFrameworkCore.Infrastructure.DatabaseFacade,System.String,System.Object[]);Use ExecuteSqlAsync with FormattableString.
+M:Microsoft.EntityFrameworkCore.RelationalQueryableExtensions.FromSqlRaw``1(Microsoft.EntityFrameworkCore.DbSet{``0},System.String,System.Object[]);Use FromSql with FormattableString.
+M:System.Threading.Thread.Sleep(System.Int32);Use await Task.Delay(..., cancellationToken).
+M:System.Threading.Thread.Sleep(System.TimeSpan);Use await Task.Delay(..., cancellationToken).
+T:System.Net.Mail.SmtpClient;Use IEmailSender (MailKit implementation).
+T:Newtonsoft.Json.JsonConvert;Use System.Text.Json.
+M:System.Security.Cryptography.MD5.Create;MD5 is broken. Use SHA256.
+M:System.Security.Cryptography.SHA1.Create;SHA1 is broken. Use SHA256.
+T:System.Random;Use RandomNumberGenerator for anything security-related, or Random.Shared with a justification.

@@ -1,36 +1,44 @@
-# Base — .NET 10 starter solution
+# Base: .NET 10 starter solution
 
-This repo is the reusable base for every new .NET 10 project. The full design memory, with what to keep, what to
-improve and what is banned, is in **[docs/base-project-blueprint.md](docs/base-project-blueprint.md)**. Read it
-before you change the solution's shape, add a cross-cutting feature or add a package.
+This repo is the reusable base for every new .NET 10 project. Read these before changing structure, adding a
+cross-cutting feature or adding a package:
+- [docs/architecture.md](docs/architecture.md): how it fits together (layers, pipeline order, persistence, tenancy)
+- [docs/adr/](docs/adr/): why it is built this way
+- [docs/base-project-blueprint.md](docs/base-project-blueprint.md): what was kept from FO16, and what is banned
 
-## Non-negotiables (summary of the blueprint)
+## Commands
 
-- Clean Architecture: `Domain` ← `Application` ← `Infrastructure` ← `Web`. Domain references nothing. Ports
-  (repository/service interfaces) live in Application. Program.cs only composes (`AddApplication`,
-  `AddInfrastructure`, `AddWeb`).
-- One entity base: `EntityBase<Guid>` (Guid v7) with audit + soft delete + row version. `Code`/`Name` are opt-in.
-- Audit/tenant/soft-delete come from the interceptor + `ApplyEntityConventions` (one combined query filter,
-  backed by a model test). Current user comes from `ICurrentUser` (claims). Time comes from an injected
-  `TimeProvider`, stored as UTC `DateTimeOffset`.
-- Repositories never call `SaveChanges`; only `IUnitOfWork.SaveAsync` commits. Soft delete by default. No
-  per-table UoW properties.
-- Results use one immutable `ValidationResponse` / `ValidationResponse<T>` with `IsSuccess` and factories.
-- File bytes go to object storage (S3-compatible / Azure Blob), never SQL. SQL holds a `StoredFile` metadata row. Every
-  download goes through an access check.
-- Settings and permissions are catalogue-driven (constants + catalogue + seeder + both-ways test). Never use string
-  literals for permission checks.
-- `dotnet ef migrations` must always work. CI fails on pending model changes.
-- `Directory.Build.props` (Nullable, ImplicitUsings, TreatWarningsAsErrors) + `Directory.Packages.props`
-  (central versions, no pre-release). The build has zero warnings and tests are green on `main`.
-- Secrets never go in committed files: user-secrets locally, env/Key Vault in prod. Use Data Protection for reversible
-  encryption.
-- xUnit only. Integration tests run against real SQL (Testcontainers), not EF InMemory.
+- Build: `dotnet build` (warnings are errors; NuGet audit fails on vulnerable packages)
+- Test: `dotnet test` (all), `dotnet test --project tests/Base.UnitTests` (one). Integration tests need Docker.
+- Style: `dotnet format --verify-no-changes`
+- Migration: `dotnet ef migrations add <Name> --project src/Base.Infrastructure --startup-project src/Base.Infrastructure --output-dir Persistence/Migrations`
+- Drift check: `dotnet ef migrations has-pending-model-changes --project src/Base.Infrastructure --startup-project src/Base.Infrastructure`
+- New project from this base: `dotnet run scripts/new-project.cs -- Acme.Payroll ../Acme.Payroll`
 
-## Banned (see blueprint §11 and §13)
+## Rules
 
-Session-stored users, static mutable request state (`Helper.loggedInUser`), static `Helper` god-classes,
-`ViewBag` as a contract, `DateTime.Now`, hard-coded keys/IVs/licence keys, `catch (Exception) { throw; }`,
-empty `catch { }`, fire-and-forget work that captures `HttpContext`, `ExecuteSqlRaw` with concatenation,
-`EnsureCreated` outside tests, duplicate classes with the same name in different layers, per-file author/date
-banners, licensed report engines as base dependencies, repo-root clutter.
+- Layers: Domain ← Application ← Infrastructure ← Web. Domain references nothing. Ports live in Application.
+  Controllers never touch `AppDbContext`. Architecture tests enforce this.
+- Entities derive from `EntityBase` (audit, soft delete, row version, domain events). `INamedEntity` and
+  `ITenantOwned` are opt-in. Keys are SQL Server-sequential GUIDs (`SequentialGuid`), not v7 (ADR 0003).
+- Time comes from the injected `TimeProvider` and is stored as UTC `DateTimeOffset`. `DateTime.Now`/`UtcNow` are banned at compile time.
+- The current user comes from `ICurrentUser` (claims). Tenant isolation is the `Tenant` named filter and fails
+  closed; cross-tenant work needs `BeginSystemScope()`.
+- Repositories stage, `IUnitOfWork.SaveAsync` commits. Use `ExecuteInTransactionAsync` for multi-step transactions.
+  `Remove` soft-deletes. Raw SQL is `FormattableString` only.
+- Use cases return `ValidationResponse`/`ValidationResponse<T>`; Web maps them with `ToActionResult` / `AddToModelState`.
+- New permission = constant in `PermissionCodes` + `PermissionCatalog` entry; gate with `[HasPermission]`.
+  New setting = constant in `SettingCodes` + `SettingCatalog` entry (no migration). Secrets are never settings.
+- Files only through `IFileService`: bytes go to object storage, never SQL.
+- Side effects after a commit go through domain events + `IDomainEventHandler<T>` (outbox; handlers idempotent).
+- Every schema change ships a generated migration. Never hand-write migrations or edit the snapshot.
+- Package versions live only in `Directory.Packages.props`. No pre-release packages.
+- Integration tests use real SQL Server (Testcontainers), never EF InMemory. Main stays green.
+
+## Banned (blueprint §11, §13)
+
+Session-stored users and static mutable request state; static `Helper` god-classes; `ViewBag` as a contract;
+local-time timestamps; hard-coded keys, IVs or licence keys; secrets in committed config;
+`catch (Exception) { throw; }` and empty `catch { }`; fire-and-forget work that captures `HttpContext`; string-built SQL;
+`EnsureCreated` outside tests; duplicate type names across layers; per-file author/date banners; licensed report
+engines as base dependencies; repo-root clutter (documents and generators go in `/docs` or `/scripts`).
