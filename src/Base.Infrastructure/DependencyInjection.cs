@@ -4,6 +4,8 @@ using Azure.Storage.Blobs;
 using Base.Application.Common.Abstractions;
 using Base.Application.Common.Persistence;
 using Base.Application.Files;
+using Base.Application.Messaging;
+using Base.Application.Users;
 using Base.Infrastructure.Email;
 using Base.Infrastructure.Files;
 using Base.Infrastructure.Identity;
@@ -111,7 +113,12 @@ public static class DependencyInjection
         services.AddIdentityCore<ApplicationUser>(options =>
             {
                 options.User.RequireUniqueEmail = false; // uniqueness is per tenant (database index)
+                // NIST SP 800-63B: length over composition rules, so passphrases work.
                 options.Password.RequiredLength = 12;
+                options.Password.RequiredUniqueChars = 4;
+                options.Password.RequireDigit = false;
+                options.Password.RequireLowercase = false;
+                options.Password.RequireUppercase = false;
                 options.Password.RequireNonAlphanumeric = false;
                 options.Lockout.MaxFailedAccessAttempts = 5;
                 options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
@@ -121,10 +128,19 @@ public static class DependencyInjection
             .AddEntityFrameworkStores<AppDbContext>()
             .AddSignInManager()
             .AddDefaultTokenProviders()
+            .AddTokenProvider<InviteTokenProvider>(InviteTokenProvider.ProviderName)
             .AddClaimsPrincipalFactory<AppUserClaimsPrincipalFactory>();
 
         // Password-reset and similar tokens: hashed by the token provider, short-lived.
         services.Configure<DataProtectionTokenProviderOptions>(o => o.TokenLifespan = TimeSpan.FromHours(1));
+
+        services.AddScoped<IdentityQueries>();
+        services.AddScoped<IUserAdministration, UserAdministrationService>();
+        services.AddScoped<IRoleAdministration, RoleAdministrationService>();
+        services.AddScoped<IAccountService, AccountService>();
+        services.AddScoped<IdentityEmailHandlers>();
+        services.AddScoped<IDomainEventHandler<UserInvited>>(sp => sp.GetRequiredService<IdentityEmailHandlers>());
+        services.AddScoped<IDomainEventHandler<PasswordResetRequested>>(sp => sp.GetRequiredService<IdentityEmailHandlers>());
     }
 
     private static void AddFileStorage(IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)

@@ -4,9 +4,22 @@ using Microsoft.AspNetCore.Identity;
 namespace Base.Infrastructure.Identity;
 
 /// <summary>An account. Belongs to one tenant; user names and emails are unique per tenant.</summary>
-public sealed class ApplicationUser : IdentityUser<Guid>, ITenantOwned, IAuditable
+public sealed class ApplicationUser : IdentityUser<Guid>, ITenantOwned, IAuditable, IHasDomainEvents
 {
     public const int DisplayNameMaxLength = 200;
+
+    private readonly List<IDomainEvent> _domainEvents = [];
+
+    public IReadOnlyCollection<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
+
+    /// <summary>Queues an event; it is written to the outbox by the next save that includes this user.</summary>
+    public void Raise(IDomainEvent domainEvent) => _domainEvents.Add(domainEvent);
+
+    public void ClearDomainEvents() => _domainEvents.Clear();
+
+    public bool HasPassword => PasswordHash is not null;
+
+    public bool IsLockedOut(DateTimeOffset now) => LockoutEnd is { } end && end > now;
 
     public Guid TenantId { get; set; }
 

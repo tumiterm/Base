@@ -30,6 +30,9 @@ cross-cutting feature or adding a package:
 - New permission = constant in `PermissionCodes` + `PermissionCatalog` entry; gate with `[HasPermission]`.
   New setting = constant in `SettingCodes` + `SettingCatalog` entry (no migration). Secrets are never settings.
 - Files only through `IFileService`: bytes go to object storage, never SQL.
+- User and role changes go through `IUserAdministration`/`IRoleAdministration` (never `UserManager` from Web), which
+  enforce `PermissionGuard`: nobody grants or manages access they don't hold. Emails with links are sent from outbox
+  handlers and build links from the `General.PublicBaseUrl` setting, never the request host.
 - Side effects after a commit go through domain events + `IDomainEventHandler<T>` (outbox; handlers idempotent).
 - Every schema change ships a generated migration. Never hand-write migrations or edit the snapshot.
 - Package versions live only in `Directory.Packages.props`. No pre-release packages.

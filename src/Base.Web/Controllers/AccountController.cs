@@ -1,4 +1,6 @@
+using Base.Application.Users;
 using Base.Infrastructure.Identity;
+using Base.Web.Results;
 using Base.Web.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -11,6 +13,7 @@ namespace Base.Web.Controllers;
 public sealed partial class AccountController(
     SignInManager<ApplicationUser> signInManager,
     UserManager<ApplicationUser> userManager,
+    IAccountService accounts,
     TimeProvider time,
     ILogger<AccountController> logger) : Controller
 {
@@ -57,6 +60,90 @@ public sealed partial class AccountController(
     public async Task<IActionResult> Logout()
     {
         await signInManager.SignOutAsync();
+        return RedirectToAction(nameof(HomeController.Index), "Home");
+    }
+
+    [AllowAnonymous]
+    [HttpGet("forgot-password")]
+    public IActionResult ForgotPassword() => View(new ForgotPasswordViewModel());
+
+    [AllowAnonymous]
+    [EnableRateLimiting(WebApplicationExtensions.AuthRateLimitPolicy)]
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword(ForgotPasswordViewModel model, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        if (!ModelState.IsValid)
+        {
+            return View(model);
+        }
+
+        // Same answer whether or not the account exists.
+        this.Flash(await accounts.RequestPasswordResetAsync(model.Email, cancellationToken));
+        return RedirectToAction(nameof(Login));
+    }
+
+    /// <summary>Target of invite and reset emails.</summary>
+    [AllowAnonymous]
+    [HttpGet("set-password")]
+    public IActionResult SetPassword(Guid userId, string token, PasswordTokenKind kind = PasswordTokenKind.Reset)
+    {
+        // The token is in the URL: keep the page out of caches.
+        Response.Headers.CacheControl = "no-store";
+        return View(new SetPasswordViewModel { UserId = userId, Token = token, Kind = kind });
+    }
+
+    [AllowAnonymous]
+    [EnableRateLimiting(WebApplicationExtensions.AuthRateLimitPolicy)]
+    [HttpPost("set-password")]
+    public async Task<IActionResult> SetPassword(SetPasswordViewModel model, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        Response.Headers.CacheControl = "no-store";
+        if (!ModelState.IsValid)
+        {
+            return View(model);
+        }
+
+        var result = await accounts.SetPasswordAsync(
+            new SetPasswordRequest(model.UserId, model.Token, model.Kind, model.NewPassword, model.ConfirmPassword), cancellationToken);
+        if (result.IsSuccess)
+        {
+            this.Flash(result);
+            return RedirectToAction(nameof(Login));
+        }
+
+        result.AddToModelState(ModelState);
+        return View(model);
+    }
+
+    [HttpGet("password")]
+    public IActionResult ChangePassword() => View(new ChangePasswordViewModel());
+
+    [HttpPost("password")]
+    public async Task<IActionResult> ChangePassword(ChangePasswordViewModel model, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        if (!ModelState.IsValid)
+        {
+            return View(model);
+        }
+
+        var result = await accounts.ChangePasswordAsync(new ChangePasswordRequest(model.CurrentPassword, model.NewPassword, model.ConfirmPassword), cancellationToken);
+        if (!result.IsSuccess)
+        {
+            result.AddToModelState(ModelState);
+            return View(model);
+        }
+
+        // The password change rotated the security stamp; re-issue this browser's cookie so it stays signed in.
+        // Other sessions are signed out at their next principal refresh.
+        if (await userManager.GetUserAsync(User) is { } user)
+        {
+            await signInManager.RefreshSignInAsync(user);
+        }
+
+        this.Flash(result);
         return RedirectToAction(nameof(HomeController.Index), "Home");
     }
 

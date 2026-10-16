@@ -132,6 +132,65 @@ public sealed partial class WebTests(SqlServerFixture sql) : IAsyncLifetime
         withToken.StatusCode.ShouldBe(HttpStatusCode.NoContent);
     }
 
+    [Fact]
+    public async Task Administration_screens_render_for_an_administrator()
+    {
+        var client = Client();
+        await SignInAsync(client);
+        var me = await client.GetFromJsonAsync<JsonElement>("/api/me", TestContext.Current.CancellationToken);
+        var myId = me.GetProperty("userId").GetString();
+
+        foreach (var path in new[] { "/admin/users", "/admin/users/invite", $"/admin/users/{myId}", "/admin/roles", "/admin/roles/new", "/account/password" })
+        {
+            var response = await client.GetAsync(path, TestContext.Current.CancellationToken);
+            response.StatusCode.ShouldBe(HttpStatusCode.OK, path);
+        }
+
+        (await client.GetStringAsync("/admin/users", TestContext.Current.CancellationToken)).ShouldContain(WebAppFactory.AdminEmail);
+        (await client.GetStringAsync("/admin/roles", TestContext.Current.CancellationToken)).ShouldContain("Administrator");
+    }
+
+    [Fact]
+    public async Task Administration_screens_require_sign_in()
+    {
+        var response = await Client().GetAsync("/admin/users", TestContext.Current.CancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Redirect);
+        response.Headers.Location!.ToString().ShouldContain("/account/login");
+    }
+
+    [Fact]
+    public async Task Users_can_be_invited_and_found_through_the_api()
+    {
+        var client = Client();
+        await SignInAsync(client);
+        var token = await GetMetaTokenAsync(client);
+
+        using var invite = new HttpRequestMessage(HttpMethod.Post, "/api/users")
+        {
+            Content = JsonContent.Create(new { email = "api.invitee@example.com", displayName = "Api Invitee", roles = new[] { "User" } }),
+        };
+        invite.Headers.Add("X-CSRF-TOKEN", token);
+        var created = await client.SendAsync(invite, TestContext.Current.CancellationToken);
+        created.StatusCode.ShouldBe(HttpStatusCode.Created, await created.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+
+        var found = await client.GetFromJsonAsync<JsonElement>("/api/users?search=invitee", TestContext.Current.CancellationToken);
+        found.GetProperty("total").GetInt32().ShouldBe(1);
+        found.GetProperty("items")[0].GetProperty("hasPassword").GetBoolean().ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Password_pages_are_anonymous_and_set_password_is_never_cached()
+    {
+        var client = Client();
+
+        (await client.GetAsync("/account/forgot-password", TestContext.Current.CancellationToken)).StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var setPassword = await client.GetAsync($"/account/set-password?kind=invite&userId={Guid.NewGuid()}&token=abc", TestContext.Current.CancellationToken);
+        setPassword.StatusCode.ShouldBe(HttpStatusCode.OK);
+        setPassword.Headers.CacheControl!.NoStore.ShouldBeTrue();
+    }
+
     private HttpClient Client() => _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = true });
 
     private static async Task SignInAsync(HttpClient client)

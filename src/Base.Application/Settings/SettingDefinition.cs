@@ -11,6 +11,7 @@ public enum SettingDataType
     Boolean = 3,
     TimeZone = 4,
     StringList = 5,
+    Url = 6,
 }
 
 public enum SettingScope
@@ -63,6 +64,10 @@ public sealed record SettingDefinition(
             SettingDataType.TimeZone => TimeZoneInfo.TryFindSystemTimeZoneById(value, out _)
                 ? ValidationResponse.Success()
                 : Fail("Must be a known time zone id, e.g. Africa/Johannesburg."),
+            SettingDataType.Url => Uri.TryCreate(value, UriKind.Absolute, out var uri) && (string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.Ordinal) || string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.Ordinal))
+                    && string.IsNullOrEmpty(uri.Query) && string.IsNullOrEmpty(uri.Fragment)
+                ? ValidationResponse.Success()
+                : Fail("Must be an absolute http(s) URL without query string, e.g. https://portal.example.com."),
             _ => ValidationResponse.Success(),
         };
     }

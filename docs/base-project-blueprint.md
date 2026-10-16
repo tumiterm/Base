@@ -304,4 +304,7 @@ and Dependabot; a Dockerfile (chiseled image) and docker-compose; `scripts/new-p
 
 Not yet built (candidates for the next round): the public `/verify/{code}` document register (QRCoder), the System
 Health / operations dashboard UI, the subscription/licence gate module, an entity change-history (audit trail)
-table, user/role management screens, the purge job for soft-deleted files, and an Aspire AppHost.
+table, the purge job for soft-deleted files, and an Aspire AppHost.
+
+**Round 2 (Oct 2026): user and role management.** Admin screens and API for users and roles; invite-only onboarding;
+forgot, reset and change password; escalation guard; last-administrator protection; NIST password policy (ADR 0009).

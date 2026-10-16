@@ -21,6 +21,12 @@
             <div class="container">
                 <a class="navbar-brand" asp-controller="Home" asp-action="Index">@appName</a>
                 <ul class="navbar-nav me-auto">
+                    <li class="nav-item" asp-permission="@PermissionCodes.Users.View">
+                        <a class="nav-link" asp-controller="UserAdmin" asp-action="Index">Users</a>
+                    </li>
+                    <li class="nav-item" asp-permission="@PermissionCodes.Roles.Manage">
+                        <a class="nav-link" asp-controller="RoleAdmin" asp-action="Index">Roles</a>
+                    </li>
                     <li class="nav-item" asp-permission="@PermissionCodes.Settings.View">
                         <a class="nav-link" href="/api/settings">Settings (API)</a>
                     </li>
@@ -31,7 +37,7 @@
                 <div class="d-flex align-items-center gap-2">
                     @if (CurrentUser.IsAuthenticated)
                     {
-                        <span class="navbar-text">@CurrentUser.AuditName</span>
+                        <a class="navbar-text text-decoration-none" asp-controller="Account" asp-action="ChangePassword" title="Change password">@CurrentUser.AuditName</a>
                         <form asp-controller="Account" asp-action="Logout" method="post">
                             <button type="submit" class="btn btn-outline-light btn-sm">Sign out</button>
                         </form>
@@ -45,6 +51,7 @@
         </nav>
     </header>
     <main class="container pb-5" role="main">
+        <partial name="_StatusMessage" />
         @RenderBody()
     </main>
     <script src="~/lib/jquery/dist/jquery.min.js"></script>

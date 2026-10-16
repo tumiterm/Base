@@ -13,3 +13,4 @@ otherwise have to reverse-engineer. Format: context → decision → consequence
 | [0006](0006-catalogue-driven-permissions-and-settings.md) | Catalogue-driven permissions and settings |
 | [0007](0007-transactional-outbox.md) | Transactional outbox for domain events |
 | [0008](0008-real-sql-in-tests.md) | Integration tests on real SQL Server |
+| [0009](0009-invite-only-onboarding-and-escalation-guard.md) | Invite-only onboarding, escalation guard, NIST passwords |

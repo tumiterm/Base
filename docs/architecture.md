@@ -69,6 +69,26 @@ The security stamp validator rebuilds the principal every minute, so permission 
 without a logout. Gate endpoints with `[HasPermission(PermissionCodes.X.Y)]` and UI elements with
 `asp-permission="..."`. An unknown permission throws instead of silently denying.
 
+## Users and roles
+
+`IUserAdministration`, `IRoleAdministration` and `IAccountService` are ports in Application, implemented in
+`Infrastructure/Identity` on top of ASP.NET Core Identity. Screens live at `/admin/users` and `/admin/roles`, and
+the API at `/api/users`, `/api/roles` and `/api/permissions`.
+
+- **Invite-only onboarding.** Administrators never set passwords. An invite creates the account without a password
+  and raises `UserInvited`; the outbox handler generates a 72-hour token at send time and emails a link built from
+  the `General.PublicBaseUrl` setting. Tokens embed the security stamp, so a link works once.
+- **Self-service.** Forgot password always answers the same way, whether or not the account exists. Reset tokens
+  last 1 hour. Changing a password rotates the security stamp: other sessions end within a minute, and the current
+  one is refreshed.
+- **Escalation guard** (`PermissionGuard`). You can only assign roles, create or edit roles, or manage users
+  (update, lock, reset) when you hold every permission involved. A user with `Users.Manage` cannot touch an administrator.
+- **Safety rails.** You can't lock yourself. The last active administrator can't be locked or demoted. System roles
+  (`Administrator`, `User`) can't be renamed or deleted, and Administrator always holds every permission. A role
+  still assigned to users can't be deleted. Locking rotates the security stamp, which signs the user out everywhere.
+- **Passwords** follow NIST SP 800-63B: at least 12 characters, at least 4 distinct, no forced digits or symbols, and
+  lockout after 5 failures.
+
 ## Results and errors
 
 Use cases return `ValidationResponse` / `ValidationResponse<T>` (immutable, `IsSuccess`, `ErrorType`, field
@@ -101,6 +121,6 @@ can't be saved, the object is deleted. Reads use the provider recorded on the fi
 | --- | --- | --- |
 | UnitTests | Domain rules, catalogues (codes ↔ catalogue), ValidationResponse, file validation | Milliseconds |
 | ArchitectureTests | Layer dependencies, single entity base, immutable events | Milliseconds |
-| IntegrationTests | Real SQL Server (Testcontainers): filters, tenancy, audit, concurrency, transactions, outbox, settings, migrations; the full web pipeline via `WebApplicationFactory` | ~30 s |
+| IntegrationTests | Real SQL Server (Testcontainers): filters, tenancy, audit, concurrency, transactions, outbox, settings, migrations, user/role administration and the emailed invite and reset links; the full web pipeline via `WebApplicationFactory` | ~40 s |
 
 EF InMemory is not used: it ignores the SQL translation of filters, row versions, transactions and unique indexes.

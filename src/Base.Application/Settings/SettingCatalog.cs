@@ -14,6 +14,8 @@ public static class SettingCatalog
             "Shown in the page title, emails and the navigation bar."),
         new(SettingCodes.General.DisplayTimeZone, "Display time zone", SettingDataType.TimeZone, "Africa/Johannesburg", "General",
             "Time zone used to display dates. Data is always stored in UTC."),
+        new(SettingCodes.General.PublicBaseUrl, "Public address", SettingDataType.Url, "https://localhost:7262", "General",
+            "The address users reach the application at. Used to build links in emails (invites, password resets)."),
 
         new(SettingCodes.Files.MaxUploadSizeMb, "Maximum upload size (MB)", SettingDataType.Integer, "10", "Files",
             "Largest file a user may upload.", Min: 1, Max: 500),

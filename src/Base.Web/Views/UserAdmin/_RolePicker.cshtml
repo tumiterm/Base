@@ -1,0 +1,19 @@
+@model (IReadOnlyList<Base.Application.Users.RoleSummary> Available, IList<string> Selected)
+<fieldset class="mb-3">
+    <legend class="form-label fs-6">Roles</legend>
+    @foreach (var role in Model.Available)
+    {
+        var id = "role-" + role.Id.ToString("N");
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="Roles" value="@role.Name" id="@id" checked="@Model.Selected.Contains(role.Name, StringComparer.OrdinalIgnoreCase)" />
+            <label class="form-check-label" for="@id">
+                @role.Name
+                @if (!string.IsNullOrEmpty(role.Description))
+                {
+                    <span class="text-muted small">: @role.Description</span>
+                }
+            </label>
+        </div>
+    }
+    <span class="text-danger small" data-valmsg-for="Roles">@Html.ValidationMessage("Roles")</span>
+</fieldset>

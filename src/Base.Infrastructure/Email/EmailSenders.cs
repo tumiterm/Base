@@ -24,26 +24,20 @@ internal sealed partial class MailKitEmailSender(IOptions<SmtpOptions> options, 
         mime.Subject = message.Subject;
         mime.Body = new BodyBuilder { HtmlBody = message.HtmlBody, TextBody = message.TextBody }.ToMessageBody();
 
-        try
+        using var client = new SmtpClient();
+        await client.ConnectAsync(settings.Host!, settings.Port, settings.UseStartTls ? SecureSocketOptions.StartTls : SecureSocketOptions.Auto, cancellationToken);
+        if (!string.IsNullOrEmpty(settings.UserName))
         {
-            using var client = new SmtpClient();
-            await client.ConnectAsync(settings.Host!, settings.Port, settings.UseStartTls ? SecureSocketOptions.StartTls : SecureSocketOptions.Auto, cancellationToken);
-            if (!string.IsNullOrEmpty(settings.UserName))
-            {
-                await client.AuthenticateAsync(settings.UserName, settings.Password ?? string.Empty, cancellationToken);
-            }
+            await client.AuthenticateAsync(settings.UserName, settings.Password ?? string.Empty, cancellationToken);
+        }
 
-            await client.SendAsync(mime, cancellationToken);
-            await client.DisconnectAsync(quit: true, cancellationToken);
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            LogSendFailed(logger, exception, message.Subject, message.To.Count);
-        }
+        await client.SendAsync(mime, cancellationToken);
+        await client.DisconnectAsync(quit: true, cancellationToken);
+        LogSent(logger, message.Subject, message.To.Count);
     }
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "Failed to send email '{Subject}' to {RecipientCount} recipient(s)")]
-    private static partial void LogSendFailed(ILogger logger, Exception exception, string subject, int recipientCount);
+    [LoggerMessage(Level = LogLevel.Information, Message = "Sent email '{Subject}' to {RecipientCount} recipient(s)")]
+    private static partial void LogSent(ILogger logger, string subject, int recipientCount);
 }
 
 /// <summary>Development fallback when no SMTP host is configured. Logs the subject and recipients, never the body.</summary>

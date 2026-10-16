@@ -71,6 +71,11 @@ scripts/new-project.cs  Creates a renamed copy for a new project.
   `[HasPermission]` backed by a permission catalogue; secure-by-default fallback policy; antiforgery on every
   unsafe request (API included); rate-limited sign-in; CSP and security headers; Data Protection keys in the
   database; secrets only from user-secrets/environment.
+- **Users and roles:** admin screens and API to search, invite, edit, lock and unlock users and to manage roles
+  with grouped permission checkboxes. Users are onboarded by emailed invite (they choose their own password), and
+  there are forgot, reset and change password flows. Nobody can grant or manage access they don't hold, the last
+  active administrator is protected, and system roles are locked down. Passwords follow NIST SP 800-63B
+  (length over composition rules).
 - **Multi-tenancy (optional):** host-based resolution, per-tenant users and settings, cross-tenant writes blocked
   in the interceptor. Single-tenant deployments run as one default tenant.
 - **Settings:** a typed, validated catalogue; tenant → platform → default resolution; HybridCache with tag
@@ -99,6 +104,9 @@ scripts/new-project.cs  Creates a renamed copy for a new project.
 | `Hangfire` | Optional job server and dashboard (`Enabled: false` by default). |
 | `Seed` | First administrator (`AdminEmail`; `AdminPassword` from user-secrets only). |
 | `Serilog`, `OTEL_EXPORTER_OTLP_ENDPOINT` | Logging and telemetry export. |
+
+Set the `General.PublicBaseUrl` setting to the address users reach the app at: invite and reset emails link to it.
+It is a setting, not the request's `Host` header, so a forged header can't redirect those links.
 
 Business settings (application name, upload limits, alert recipients…) are not configuration. They live in
 the settings catalogue and can be changed at runtime through `/api/settings`.

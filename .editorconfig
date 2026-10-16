@@ -96,6 +96,9 @@ dotnet_diagnostic.CA1062.severity = none
 dotnet_diagnostic.xUnit1051.severity = suggestion   # false positives on NSubstitute Received()/DidNotReceive() checks
 dotnet_diagnostic.MA0040.severity = suggestion  # forwarding CancellationToken: production code only
 dotnet_diagnostic.MA0002.severity = suggestion  # string comparers: production code only
+dotnet_diagnostic.MA0006.severity = suggestion  # string.Equals: production code only
+dotnet_diagnostic.MA0016.severity = suggestion  # collection abstractions on test doubles
+dotnet_diagnostic.CA1859.severity = suggestion  # return-type micro-optimisations
 
 [**/Migrations/**.cs]
 generated_code = true

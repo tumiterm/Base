@@ -9,6 +9,9 @@ public static class SettingCodes
 
         /// <summary>IANA zone used to display UTC timestamps (storage is always UTC).</summary>
         public const string DisplayTimeZone = "General.DisplayTimeZone";
+
+        /// <summary>Absolute URL used in emailed links. Never derived from the request's Host header (link hijacking).</summary>
+        public const string PublicBaseUrl = "General.PublicBaseUrl";
     }
 
     public static class Files
