@@ -1,3 +1,4 @@
+using Base.Application.Auditing;
 using Base.Application.Files;
 using Base.Application.Settings;
 using FluentValidation;
@@ -15,6 +16,7 @@ public static class DependencyInjection
 
         services.AddScoped<IApplicationSettingService, ApplicationSettingService>();
         services.AddScoped<IFileService, FileService>();
+        services.AddScoped<IAuditTrail, AuditTrailService>();
         services.TryAddScoped<IStoredFileAccessPolicy, DefaultStoredFileAccessPolicy>();
 
         return services;

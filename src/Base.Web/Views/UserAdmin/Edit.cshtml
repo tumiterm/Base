@@ -9,6 +9,10 @@
     else if (!Model.HasPassword) { <span class="badge text-bg-warning">Invitation pending</span> }
     else { <span class="badge text-bg-success">Active</span> }
     · Last sign-in: @if (Model.LastSignInAt is { } at) { <local-time value="@at" /> } else { <span>never</span> }
+    <span asp-permission="@PermissionCodes.Audit.View">
+        · <a asp-controller="AuditAdmin" asp-action="Index" asp-route-EntityId="@Model.Id">History</a>
+        · <a asp-controller="AuditAdmin" asp-action="Index" asp-route-UserId="@Model.Id">Changes made by this user</a>
+    </span>
 </p>
 
 <div class="row g-4">

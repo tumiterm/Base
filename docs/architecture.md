@@ -89,6 +89,27 @@ the API at `/api/users`, `/api/roles` and `/api/permissions`.
 - **Passwords** follow NIST SP 800-63B: at least 12 characters, at least 4 distinct, no forced digits or symbols, and
   lockout after 5 failures.
 
+## Audit trail
+
+`AuditTrailInterceptor` (the last interceptor in the chain) turns each audited insert, update, soft delete, restore and
+hard delete into an `AuditEntry` in the same SaveChanges, so a change and its record commit or roll back together.
+
+- **What is audited** (`AuditPolicy`): every `IAuditable` entity, which means all `EntityBase` types and users, plus
+  roles, role assignments, role and user claims, and external logins. Identity tokens are never audited. Opt a type or
+  property out with `[NotAudited]`; record that a property changed without its values with `[AuditRedacted]`
+  (`PasswordHash` and `SecurityStamp` are redacted already).
+- **What is recorded:** entity type and key, action, changed properties with old and new values (only real
+  differences; bookkeeping columns such as `DateModified`, `RowVersion` and sign-in counters are skipped), user id and
+  name, trace id, UTC time.
+- **Keys:** composite keys start with their owner (`userId|roleId`), and claims are recorded against their role or
+  user, so filtering by a user's or role's id shows its whole history.
+- **Isolation and integrity:** a named `Tenant` filter shows a tenant only its own entries; platform entries (tenants,
+  platform settings) need system scope. The interceptor rejects any update or delete of an entry.
+- **Retention:** `AuditRetentionService` deletes entries older than the `Audit.RetentionDays` setting (default 730)
+  once a day, in batches.
+- **Limitation:** diffs use the change tracker's original values. An entity attached detached and marked modified
+  records an update without values. Load, then change, is the pattern everywhere in the base.
+
 ## Results and errors
 
 Use cases return `ValidationResponse` / `ValidationResponse<T>` (immutable, `IsSuccess`, `ErrorType`, field

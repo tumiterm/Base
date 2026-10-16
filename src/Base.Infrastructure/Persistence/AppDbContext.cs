@@ -1,4 +1,5 @@
 using Base.Application.Common.Abstractions;
+using Base.Domain.Auditing;
 using Base.Domain.Files;
 using Base.Domain.Settings;
 using Base.Domain.Tenancy;
@@ -28,6 +29,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
 
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
+    public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
     /// <summary>Read by the tenant query filter on every query (EF parameterises context members).</summary>
@@ -43,6 +46,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
 
         // Last, so conventions see every entity: row version, audit defaults, named soft-delete + tenant filters.
         builder.ApplyEntityConventions(this);
+
+        // Audit entries aren't ITenantOwned (platform changes have no tenant), so they get their own Tenant filter:
+        // a tenant sees its own entries; platform entries (TenantId null) are visible only in system scope.
+        builder.Entity<AuditEntry>().HasQueryFilter(QueryFilters.Tenant, e => IsSystemScope || e.TenantId == CurrentTenantId);
     }
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)

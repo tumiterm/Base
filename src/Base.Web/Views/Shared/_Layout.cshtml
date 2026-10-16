@@ -27,6 +27,9 @@
                     <li class="nav-item" asp-permission="@PermissionCodes.Roles.Manage">
                         <a class="nav-link" asp-controller="RoleAdmin" asp-action="Index">Roles</a>
                     </li>
+                    <li class="nav-item" asp-permission="@PermissionCodes.Audit.View">
+                        <a class="nav-link" asp-controller="AuditAdmin" asp-action="Index">Audit</a>
+                    </li>
                     <li class="nav-item" asp-permission="@PermissionCodes.Settings.View">
                         <a class="nav-link" href="/api/settings">Settings (API)</a>
                     </li>

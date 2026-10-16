@@ -6,6 +6,7 @@ using Base.Application.Common.Persistence;
 using Base.Application.Files;
 using Base.Application.Messaging;
 using Base.Application.Users;
+using Base.Infrastructure.Auditing;
 using Base.Infrastructure.Email;
 using Base.Infrastructure.Files;
 using Base.Infrastructure.Identity;
@@ -61,6 +62,9 @@ public static class DependencyInjection
             services.AddHostedService<OutboxProcessor>();
         }
 
+        services.AddSingleton<AuditedEntityTypes>();
+        services.AddHostedService<AuditRetentionService>();
+
         services.AddScoped<IStartupTask, MigrateDatabaseTask>();
         services.AddScoped<IStartupTask, DefaultTenantSeedTask>();
         services.AddScoped<IStartupTask, SettingsSeedTask>();
@@ -79,6 +83,7 @@ public static class DependencyInjection
 
         services.AddScoped<AuditingInterceptor>();
         services.AddScoped<DomainEventOutboxInterceptor>();
+        services.AddScoped<AuditTrailInterceptor>();
 
         services.AddDbContext<AppDbContext>((provider, options) =>
         {
@@ -91,7 +96,8 @@ public static class DependencyInjection
             });
             options.AddInterceptors(
                 provider.GetRequiredService<DomainEventOutboxInterceptor>(),
-                provider.GetRequiredService<AuditingInterceptor>());
+                provider.GetRequiredService<AuditingInterceptor>(),
+                provider.GetRequiredService<AuditTrailInterceptor>()); // last: sees final ids, stamps and tenants
 
             if (environment.IsDevelopment())
             {

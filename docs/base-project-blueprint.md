@@ -303,8 +303,11 @@ CSP and security headers; correlation ids; OpenTelemetry; HybridCache; startup t
 and Dependabot; a Dockerfile (chiseled image) and docker-compose; `scripts/new-project.cs`.
 
 Not yet built (candidates for the next round): the public `/verify/{code}` document register (QRCoder), the System
-Health / operations dashboard UI, the subscription/licence gate module, an entity change-history (audit trail)
-table, the purge job for soft-deleted files, and an Aspire AppHost.
+Health / operations dashboard UI, the subscription/licence gate module, the purge job for soft-deleted files, and an
+Aspire AppHost.
 
 **Round 2 (Oct 2026): user and role management.** Admin screens and API for users and roles; invite-only onboarding;
 forgot, reset and change password; escalation guard; last-administrator protection; NIST password policy (ADR 0009).
+
+**Round 3 (Oct 2026): audit trail.** Interceptor-written, same-transaction change history with before/after values,
+redaction, append-only entries, tenant isolation, retention, the `/admin/audit` screen and API (ADR 0010).

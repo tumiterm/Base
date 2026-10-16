@@ -5,6 +5,10 @@
     var action = isNew ? "Create" : "Edit";
 }
 <h1 class="h3 mb-3">@ViewData["Title"]</h1>
+@if (!isNew)
+{
+    <p asp-permission="@PermissionCodes.Audit.View"><a asp-controller="AuditAdmin" asp-action="Index" asp-route-EntityId="@Model.Id">History</a></p>
+}
 <form asp-action="@action" asp-route-id="@Model.Id" method="post">
     <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
     <div class="row g-3 mb-3">

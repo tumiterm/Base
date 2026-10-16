@@ -33,6 +33,8 @@ cross-cutting feature or adding a package:
 - User and role changes go through `IUserAdministration`/`IRoleAdministration` (never `UserManager` from Web), which
   enforce `PermissionGuard`: nobody grants or manages access they don't hold. Emails with links are sent from outbox
   handlers and build links from the `General.PublicBaseUrl` setting, never the request host.
+- Changes are audited automatically (`AuditTrailInterceptor`). Mark personal or secret fields `[AuditRedacted]` and
+  noise `[NotAudited]`. `ExecuteUpdate`/`ExecuteDelete` bypass auditing: don't use them on business data.
 - Side effects after a commit go through domain events + `IDomainEventHandler<T>` (outbox; handlers idempotent).
 - Every schema change ships a generated migration. Never hand-write migrations or edit the snapshot.
 - Package versions live only in `Directory.Packages.props`. No pre-release packages.

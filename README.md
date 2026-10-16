@@ -76,6 +76,11 @@ scripts/new-project.cs  Creates a renamed copy for a new project.
   there are forgot, reset and change password flows. Nobody can grant or manage access they don't hold, the last
   active administrator is protected, and system roles are locked down. Passwords follow NIST SP 800-63B
   (length over composition rules).
+- **Audit trail:** every change to an audited record (every `EntityBase` entity, users, roles, role assignments and
+  permission grants) is stored with who, when, the trace id and before/after values, in the same transaction as
+  the change. Secrets are recorded as "changed" without values. Entries are append-only, tenant-isolated and
+  kept for a configurable retention period. Browse them at `/admin/audit`, from a user's or role's History link,
+  or through `/api/audit`.
 - **Multi-tenancy (optional):** host-based resolution, per-tenant users and settings, cross-tenant writes blocked
   in the interceptor. Single-tenant deployments run as one default tenant.
 - **Settings:** a typed, validated catalogue; tenant → platform → default resolution; HybridCache with tag

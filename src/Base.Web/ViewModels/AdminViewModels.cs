@@ -104,3 +104,22 @@ public sealed class ChangePasswordViewModel
     [Display(Name = "Confirm new password")]
     public string ConfirmPassword { get; set; } = string.Empty;
 }
+
+public sealed class AuditFilterViewModel
+{
+    public string? EntityType { get; set; }
+
+    public string? EntityId { get; set; }
+
+    public Guid? UserId { get; set; }
+
+    /// <summary>UTC calendar day.</summary>
+    public DateOnly? From { get; set; }
+
+    /// <summary>UTC calendar day, inclusive.</summary>
+    public DateOnly? To { get; set; }
+
+    public int Page { get; set; } = 1;
+}
+
+public sealed record AuditListViewModel(PagedResult<Application.Auditing.AuditRecord> Entries, AuditFilterViewModel Filter, IReadOnlyList<string> EntityTypes);

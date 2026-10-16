@@ -22,6 +22,11 @@ public static class SettingCodes
         public const string DownloadLinkMinutes = "Files.DownloadLinkMinutes";
     }
 
+    public static class Audit
+    {
+        public const string RetentionDays = "Audit.RetentionDays";
+    }
+
     public static class Notifications
     {
         public const string ErrorAlertRecipients = "Notifications.ErrorAlertRecipients";

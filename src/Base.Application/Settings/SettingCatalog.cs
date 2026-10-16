@@ -27,6 +27,10 @@ public static class SettingCatalog
         new(SettingCodes.Files.DownloadLinkMinutes, "Download link lifetime (minutes)", SettingDataType.Integer, "5", "Files",
             "How long a pre-signed download link stays valid.", Min: 1, Max: 60),
 
+        new(SettingCodes.Audit.RetentionDays, "Audit retention (days)", SettingDataType.Integer, "730", "Audit",
+            "Audit entries older than this are deleted by a daily job. Check your legal retention obligations first.",
+            SettingScope.Platform, Min: 30, Max: 3650),
+
         new(SettingCodes.Notifications.ErrorAlertRecipients, "Error alert recipients", SettingDataType.StringList, null, "Notifications",
             "Comma-separated addresses that receive unhandled-error alerts. Empty disables alerts.", SettingScope.Platform, IsRequired: false),
         new(SettingCodes.Notifications.ErrorAlertThrottleMinutes, "Error alert throttle (minutes)", SettingDataType.Integer, "15", "Notifications",

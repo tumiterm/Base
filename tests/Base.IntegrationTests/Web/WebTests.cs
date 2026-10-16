@@ -151,6 +151,20 @@ public sealed partial class WebTests(SqlServerFixture sql) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Audit_trail_is_browsable_by_administrators()
+    {
+        var client = Client();
+        await SignInAsync(client);
+
+        var page = await client.GetAsync("/admin/audit?EntityType=User", TestContext.Current.CancellationToken);
+        page.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await page.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).ShouldContain(WebAppFactory.AdminEmail);
+
+        var api = await client.GetFromJsonAsync<JsonElement>("/api/audit?entityType=User", TestContext.Current.CancellationToken);
+        api.GetProperty("total").GetInt32().ShouldBeGreaterThan(0);
+    }
+
+    [Fact]
     public async Task Administration_screens_require_sign_in()
     {
         var response = await Client().GetAsync("/admin/users", TestContext.Current.CancellationToken);
