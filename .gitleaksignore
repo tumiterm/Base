@@ -1,0 +1,3 @@
+# Reviewed false positives (fingerprint = commit:file:rule:line). Add a line only after confirming it is not a secret.
+# generic-api-key matched the doc comment "object key. Implementations: S3-compatible (...)".
+a511449fdb3f98d08d356b72af27450fec41a153:src/Base.Application/Files/IFileStorageProvider.cs:generic-api-key:6
