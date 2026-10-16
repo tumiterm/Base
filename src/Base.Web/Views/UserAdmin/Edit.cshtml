@@ -1,0 +1,56 @@
+@model EditUserViewModel
+@{
+    ViewData["Title"] = Model.DisplayName;
+}
+<h1 class="h3">@Model.DisplayName</h1>
+<p class="text-muted">
+    @Model.Email ·
+    @if (Model.IsLockedOut) { <span class="badge text-bg-danger">Locked</span> }
+    else if (!Model.HasPassword) { <span class="badge text-bg-warning">Invitation pending</span> }
+    else { <span class="badge text-bg-success">Active</span> }
+    · Last sign-in: @if (Model.LastSignInAt is { } at) { <local-time value="@at" /> } else { <span>never</span> }
+    <span asp-permission="@PermissionCodes.Audit.View">
+        · <a asp-controller="AuditAdmin" asp-action="Index" asp-route-EntityId="@Model.Id">History</a>
+        · <a asp-controller="AuditAdmin" asp-action="Index" asp-route-UserId="@Model.Id">Changes made by this user</a>
+    </span>
+</p>
+
+<div class="row g-4">
+    <form asp-action="Edit" asp-route-id="@Model.Id" method="post" class="col-md-6">
+        <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+        <input type="hidden" asp-for="Email" />
+        <div class="mb-3">
+            <label asp-for="DisplayName" class="form-label"></label>
+            <input asp-for="DisplayName" class="form-control" />
+            <span asp-validation-for="DisplayName" class="text-danger"></span>
+        </div>
+        <partial name="_RolePicker" model="(Model.AvailableRoles, Model.Roles)" />
+        <div asp-permission="@PermissionCodes.Users.Manage">
+            <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+        <a asp-action="Index" class="btn btn-link px-0">Back to users</a>
+    </form>
+
+    <div class="col-md-6" asp-permission="@PermissionCodes.Users.Manage">
+        <h2 class="h5">Access</h2>
+        <form asp-action="SendPasswordReset" asp-route-id="@Model.Id" method="post" class="mb-2">
+            <button type="submit" class="btn btn-outline-secondary">@(Model.HasPassword ? "Email a password reset link" : "Resend invitation")</button>
+        </form>
+        @if (Model.IsLockedOut)
+        {
+            <form asp-action="Unlock" asp-route-id="@Model.Id" method="post">
+                <button type="submit" class="btn btn-outline-success">Unlock account</button>
+            </form>
+        }
+        else
+        {
+            <form asp-action="Lock" asp-route-id="@Model.Id" method="post">
+                <button type="submit" class="btn btn-outline-danger">Lock account</button>
+                <div class="form-text">Locking signs the user out everywhere within a minute.</div>
+            </form>
+        }
+    </div>
+</div>
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

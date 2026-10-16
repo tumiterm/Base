@@ -1,0 +1,65 @@
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@inject ICurrentUser CurrentUser
+@inject Base.Application.Settings.IApplicationSettingService Settings
+@{
+    var appName = await Settings.GetAsync(Base.Application.Settings.SettingCodes.General.ApplicationName) ?? "Base";
+    var csrf = Antiforgery.GetAndStoreTokens(Context).RequestToken;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="csrf-token" content="@csrf" />
+    <title>@ViewData["Title"] · @appName</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    <header>
+        <nav class="navbar navbar-expand-sm navbar-dark bg-dark mb-4">
+            <div class="container">
+                <a class="navbar-brand" asp-controller="Home" asp-action="Index">@appName</a>
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item" asp-permission="@PermissionCodes.Users.View">
+                        <a class="nav-link" asp-controller="UserAdmin" asp-action="Index">Users</a>
+                    </li>
+                    <li class="nav-item" asp-permission="@PermissionCodes.Roles.Manage">
+                        <a class="nav-link" asp-controller="RoleAdmin" asp-action="Index">Roles</a>
+                    </li>
+                    <li class="nav-item" asp-permission="@PermissionCodes.Audit.View">
+                        <a class="nav-link" asp-controller="AuditAdmin" asp-action="Index">Audit</a>
+                    </li>
+                    <li class="nav-item" asp-permission="@PermissionCodes.Settings.View">
+                        <a class="nav-link" href="/api/settings">Settings (API)</a>
+                    </li>
+                    <li class="nav-item" asp-permission="@PermissionCodes.System.HealthView">
+                        <a class="nav-link" href="/health/ready">Health</a>
+                    </li>
+                </ul>
+                <div class="d-flex align-items-center gap-2">
+                    @if (CurrentUser.IsAuthenticated)
+                    {
+                        <a class="navbar-text text-decoration-none" asp-controller="Account" asp-action="ChangePassword" title="Change password">@CurrentUser.AuditName</a>
+                        <form asp-controller="Account" asp-action="Logout" method="post">
+                            <button type="submit" class="btn btn-outline-light btn-sm">Sign out</button>
+                        </form>
+                    }
+                    else
+                    {
+                        <a class="btn btn-outline-light btn-sm" asp-controller="Account" asp-action="Login">Sign in</a>
+                    }
+                </div>
+            </div>
+        </nav>
+    </header>
+    <main class="container pb-5" role="main">
+        <partial name="_StatusMessage" />
+        @RenderBody()
+    </main>
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

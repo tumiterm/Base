@@ -1,0 +1,14 @@
+**/bin/
+**/obj/
+**/.data/
+**/logs/
+**/node_modules/
+**/*.user
+.git/
+.github/
+.vs/
+.vscode/
+.idea/
+tests/
+docs/
+*.md

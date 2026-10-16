@@ -1,0 +1,59 @@
+@model UserListViewModel
+@{
+    ViewData["Title"] = "Users";
+    var results = Model.Users;
+}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">Users</h1>
+    <a class="btn btn-primary" asp-action="Invite" asp-permission="@PermissionCodes.Users.Manage">Invite user</a>
+</div>
+<form method="get" class="mb-3" role="search">
+    <div class="input-group">
+        <input name="search" value="@Model.Search" class="form-control" placeholder="Search by name or email" aria-label="Search users" />
+        <button class="btn btn-outline-secondary" type="submit">Search</button>
+    </div>
+</form>
+@if (results.Total == 0)
+{
+    <p class="text-muted">No users match.</p>
+}
+else
+{
+    <table class="table table-hover align-middle">
+        <thead>
+            <tr><th>Name</th><th>Email</th><th>Roles</th><th>Status</th><th>Last sign-in</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var user in results.Items)
+            {
+                <tr>
+                    <td><a asp-action="Edit" asp-route-id="@user.Id">@user.DisplayName</a></td>
+                    <td>@user.Email</td>
+                    <td>@string.Join(", ", user.Roles)</td>
+                    <td>
+                        @if (user.IsLockedOut)
+                        {
+                            <span class="badge text-bg-danger">Locked</span>
+                        }
+                        else if (!user.HasPassword)
+                        {
+                            <span class="badge text-bg-warning">Invited</span>
+                        }
+                        else
+                        {
+                            <span class="badge text-bg-success">Active</span>
+                        }
+                    </td>
+                    <td>@if (user.LastSignInAt is { } at) { <local-time value="@at" /> } else { <span class="text-muted">Never</span> }</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <nav aria-label="Pages" class="d-flex justify-content-between align-items-center">
+        <span class="text-muted small">@results.Total user(s), page @results.Page of @results.TotalPages</span>
+        <div class="btn-group">
+            <a class="btn btn-outline-secondary btn-sm @(results.HasPrevious ? "" : "disabled")" asp-route-page="@(results.Page - 1)" asp-route-search="@Model.Search">Previous</a>
+            <a class="btn btn-outline-secondary btn-sm @(results.HasNext ? "" : "disabled")" asp-route-page="@(results.Page + 1)" asp-route-search="@Model.Search">Next</a>
+        </div>
+    </nav>
+}

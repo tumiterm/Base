@@ -1,0 +1,124 @@
+@model AuditListViewModel
+@using Base.Domain.Auditing
+@{
+    ViewData["Title"] = "Audit trail";
+    var results = Model.Entries;
+    var f = Model.Filter;
+}
+<h1 class="h3 mb-3">Audit trail</h1>
+<form method="get" class="row g-2 align-items-end mb-3">
+    <div class="col-md-2">
+        <label class="form-label small" for="EntityType">Type</label>
+        <select class="form-select" id="EntityType" name="EntityType">
+            <option value="">All</option>
+            @foreach (var type in Model.EntityTypes)
+            {
+                <option value="@type" selected="@(type == f.EntityType)">@type</option>
+            }
+        </select>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label small" for="EntityId">Record id</label>
+        <input class="form-control" id="EntityId" name="EntityId" value="@f.EntityId" />
+    </div>
+    <div class="col-md-2">
+        <label class="form-label small" for="From">From (UTC)</label>
+        <input class="form-control" type="date" id="From" name="From" value="@f.From?.ToString("yyyy-MM-dd")" />
+    </div>
+    <div class="col-md-2">
+        <label class="form-label small" for="To">To (UTC)</label>
+        <input class="form-control" type="date" id="To" name="To" value="@f.To?.ToString("yyyy-MM-dd")" />
+    </div>
+    @if (f.UserId is { } userId)
+    {
+        <input type="hidden" name="UserId" value="@userId" />
+    }
+    <div class="col-md-3 d-flex gap-2">
+        <button class="btn btn-primary" type="submit">Filter</button>
+        <a class="btn btn-link" asp-action="Index">Clear</a>
+    </div>
+</form>
+@if (f.UserId is not null)
+{
+    <p class="small">Showing changes made by one user. <a asp-action="Index" asp-route-EntityType="@f.EntityType" asp-route-EntityId="@f.EntityId">Show everyone</a></p>
+}
+
+@if (results.Total == 0)
+{
+    <p class="text-muted">No changes match.</p>
+}
+else
+{
+    <table class="table table-sm align-top">
+        <thead>
+            <tr><th>When</th><th>Who</th><th>What</th><th>Changes</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var entry in results.Items)
+            {
+                var badge = entry.Action switch
+                {
+                    AuditAction.Created => "text-bg-success",
+                    AuditAction.Deleted or AuditAction.Purged => "text-bg-danger",
+                    AuditAction.Restored => "text-bg-info",
+                    _ => "text-bg-secondary",
+                };
+                <tr>
+                    <td class="text-nowrap"><local-time value="@entry.OccurredAt" format="dd MMM yyyy HH:mm:ss" /></td>
+                    <td>
+                        @if (entry.UserId is { } who)
+                        {
+                            <a asp-action="Index" asp-route-UserId="@who" title="Everything this user changed">@entry.UserName</a>
+                        }
+                        else
+                        {
+                            @entry.UserName
+                        }
+                    </td>
+                    <td>
+                        <span class="badge @badge">@entry.Action</span>
+                        <a asp-action="Index" asp-route-EntityType="@entry.EntityType" asp-route-EntityId="@entry.EntityId" title="History of this record">@entry.EntityType</a>
+                        <div class="small text-muted text-break">@entry.EntityId</div>
+                    </td>
+                    <td>
+                        @if (entry.Changes.Count == 0)
+                        {
+                            <span class="text-muted small">No field values</span>
+                        }
+                        else
+                        {
+                            <table class="table table-borderless table-sm small mb-0">
+                                @foreach (var change in entry.Changes)
+                                {
+                                    <tr>
+                                        <th class="fw-semibold pe-2">@change.Property</th>
+                                        @if (change.Redacted)
+                                        {
+                                            <td colspan="2" class="text-muted fst-italic">changed (value hidden)</td>
+                                        }
+                                        else
+                                        {
+                                            <td class="text-danger text-break">@(change.Old ?? "")</td>
+                                            <td class="text-success text-break">@(change.New ?? "")</td>
+                                        }
+                                    </tr>
+                                }
+                            </table>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <nav aria-label="Pages" class="d-flex justify-content-between align-items-center">
+        <span class="text-muted small">@results.Total change(s), page @results.Page of @results.TotalPages</span>
+        <div class="btn-group">
+            <a class="btn btn-outline-secondary btn-sm @(results.HasPrevious ? "" : "disabled")"
+               asp-route-Page="@(results.Page - 1)" asp-route-EntityType="@f.EntityType" asp-route-EntityId="@f.EntityId"
+               asp-route-UserId="@f.UserId" asp-route-From="@f.From?.ToString("yyyy-MM-dd")" asp-route-To="@f.To?.ToString("yyyy-MM-dd")">Previous</a>
+            <a class="btn btn-outline-secondary btn-sm @(results.HasNext ? "" : "disabled")"
+               asp-route-Page="@(results.Page + 1)" asp-route-EntityType="@f.EntityType" asp-route-EntityId="@f.EntityId"
+               asp-route-UserId="@f.UserId" asp-route-From="@f.From?.ToString("yyyy-MM-dd")" asp-route-To="@f.To?.ToString("yyyy-MM-dd")">Next</a>
+        </div>
+    </nav>
+}

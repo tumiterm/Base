@@ -36,7 +36,8 @@ From `ForekOnline.Domain/Shared`:
 
 Improvements for the base:
 - Make `Code`/`Name` opt-in (`INamedEntity`) rather than forcing them on every table.
-- Default key `Guid` (v7 via `Guid.CreateVersion7()` in .NET 9+ — sequential, index-friendly).
+- Default key `Guid`. ~~v7 via `Guid.CreateVersion7()` — sequential, index-friendly~~ **Corrected during the build:** v7 is
+  *not* sequential in SQL Server's `uniqueidentifier` order, so the base uses SQL Server-sequential GUIDs (ADR 0003).
 - **Only one entity base.** FO16 has a legacy `Base` class (string `CreatedOn`, `IsActive`, 27 entities) living
   beside `EntityBase` — never again.
 
@@ -274,3 +275,39 @@ from the newer FO16 source when building the base.
   Namespaces must match the folder and project (enforce with an `.editorconfig` rule / IDE0130).
 - Test project targets packages from four eras (ASP.NET Core 2.3 / 5.0 packages, MSTest 4 + xUnit 2, Moq).
   The base uses xUnit v3 + NSubstitute or Moq (pick one), with no ASP.NET Core 2.x package references.
+
+---
+
+## 14. Implementation status (scaffold, Oct 2026)
+
+Implemented in this repository. See `docs/architecture.md` for how the pieces fit together, and `docs/adr` for the reasons.
+
+| Blueprint item | Where |
+| --- | --- |
+| §1 four projects + tests | `src/*`, `tests/*` (unit, architecture, integration) |
+| §2 entity base, opt-in `INamedEntity`, `ITenantOwned`, `[SkipAudit]` | `Base.Domain/Common` |
+| §3 interceptor, conventions, `TimeProvider`/UTC, configurations, migrations + drift check | `Base.Infrastructure/Persistence`, CI |
+| §4 repository/unit of work with every listed fix | `IRepository`, `Repository`, `UnitOfWork` |
+| §5 immutable `ValidationResponse<T>` + MVC/API mapping | `Application/Common/Results`, `Web/Results` |
+| §6 provider-agnostic storage (S3/R2/MinIO, Azure Blob, LocalDisk), guard, magic bytes, SHA-256 | `Application/Files`, `Infrastructure/Files` |
+| §7 settings catalogue + seeder | `Application/Settings`, `SettingsSeedTask` |
+| §8 permission catalogue, policy provider, tag helper | `Application/Security`, `Web/Security`, `Web/TagHelpers` |
+| §9 exception handling, tenancy, rate limit, principal freshness, Hangfire, `PlaceholderText`, health | `Web/*`, `Infrastructure/*` |
+| §10 xUnit only, real SQL, model/catalogue tests | `tests/*` |
+| §11 "never" list | `BannedSymbols.txt`, analyzers, architecture tests, CLAUDE.md |
+| §12 package set | `Directory.Packages.props` |
+| §13 FO defects | addressed. Ticket from the trace id; alerts are queued, not fire-and-forget. |
+
+Added beyond the blueprint: transactional outbox; named query filters; fail-closed tenancy; Data Protection keys in SQL;
+CSP and security headers; correlation ids; OpenTelemetry; HybridCache; startup tasks; CI with secret scanning, CodeQL
+and Dependabot; a Dockerfile (chiseled image) and docker-compose; `scripts/new-project.cs`.
+
+Not yet built (candidates for the next round): the public `/verify/{code}` document register (QRCoder), the System
+Health / operations dashboard UI, the subscription/licence gate module, the purge job for soft-deleted files, and an
+Aspire AppHost.
+
+**Round 2 (Oct 2026): user and role management.** Admin screens and API for users and roles; invite-only onboarding;
+forgot, reset and change password; escalation guard; last-administrator protection; NIST password policy (ADR 0009).
+
+**Round 3 (Oct 2026): audit trail.** Interceptor-written, same-transaction change history with before/after values,
+redaction, append-only entries, tenant isolation, retention, the `/admin/audit` screen and API (ADR 0010).
