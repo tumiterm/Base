@@ -2,8 +2,11 @@
 @{
     ViewData["Title"] = "Imports";
 }
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h1 class="h3 mb-0">Imports</h1>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Imports</h1>
+        <p class="page-subtitle">Bring data in from a spreadsheet.</p>
+    </div>
     <a class="btn btn-link" asp-controller="Exports" asp-action="Index">My exports</a>
 </div>
 @if (Model.Importers.Count == 0)

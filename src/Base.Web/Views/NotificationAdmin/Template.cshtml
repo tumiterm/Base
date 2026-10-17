@@ -4,7 +4,9 @@
     ViewData["Title"] = d.Name;
     var variables = d.Variables.Concat(Base.Application.Notifications.NotificationCatalog.BuiltInVariables).Order(StringComparer.Ordinal);
 }
-<h1 class="h3">@d.Name</h1>
+<div class="page-header">
+    <h1 class="page-title">@d.Name</h1>
+</div>
 <p class="text-muted">@d.Description</p>
 <p class="small">Variables: @foreach (var v in variables) { <code class="me-2">{{@v}}</code> }</p>
 @if (d.WhatsApp is { } wa)

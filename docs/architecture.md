@@ -221,6 +221,19 @@ streaming).
 - Commands slower than `Database:SlowQueryThresholdMs` are logged with their SQL and trace id and counted as
   `base.db.slow_commands`. EF Core's meter is exported too.
 
+## UI and branding
+
+- `wwwroot/css/design-system.css` holds the tokens (light and dark) and the components. Bootstrap 5.3 is only the
+  behaviour layer: its `--bs-*` variables point at our tokens. Pages use the components and `var(--…)`, never raw colours.
+- `_Layout` is the app shell (sidebar from `_Sidebar`, topbar, command palette, toasts); `_AuthLayout` wraps the
+  sign-in pages. Behaviour is wired in `site.js` through data attributes. `theme-init.js` runs in `<head>` to set the
+  light or dark theme before first paint.
+- Branding is three tenant settings (`Branding.PrimaryColor`, `DefaultTheme`, `LogoFileId`) read by
+  `IBrandingService`. `/theme.css?v={version}` (`ThemePalette`) turns the colour into the accent ramp with WCAG
+  contrast text; `/branding/logo` serves the logo. Both are anonymous, so the sign-in page is branded too.
+- The CSP stays strict: no inline scripts or styles. Dynamic values are set with `style.setProperty` from script
+  or served as CSS.
+
 ## Testing strategy
 
 | Project | Scope | Speed |

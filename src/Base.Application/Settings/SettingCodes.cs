@@ -14,6 +14,18 @@ public static class SettingCodes
         public const string PublicBaseUrl = "General.PublicBaseUrl";
     }
 
+    public static class Branding
+    {
+        /// <summary>The tenant's accent colour: buttons, links, the active navigation item, focus rings.</summary>
+        public const string PrimaryColor = "Branding.PrimaryColor";
+
+        /// <summary>system, light or dark: the theme a user gets until they pick one.</summary>
+        public const string DefaultTheme = "Branding.DefaultTheme";
+
+        /// <summary>The stored file id of the tenant's logo; set through <c>IBrandingService</c>, not by hand.</summary>
+        public const string LogoFileId = "Branding.LogoFileId";
+    }
+
     public static class Files
     {
         public const string MaxUploadSizeMb = "Files.MaxUploadSizeMb";

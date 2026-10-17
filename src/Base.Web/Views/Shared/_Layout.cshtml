@@ -1,72 +1,117 @@
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @inject ICurrentUser CurrentUser
-@inject Base.Application.Settings.IApplicationSettingService Settings
+@inject Base.Application.Branding.IBrandingService Branding
 @{
-    var appName = await Settings.GetAsync(Base.Application.Settings.SettingCodes.General.ApplicationName) ?? "Base";
+    var theme = await Branding.GetAsync();
     var csrf = Antiforgery.GetAndStoreTokens(Context).RequestToken;
+    var initials = string.Concat(CurrentUser.AuditName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(w => char.ToUpperInvariant(w[0])));
 }
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-default-theme="@theme.DefaultTheme">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="csrf-token" content="@csrf" />
-    <title>@ViewData["Title"] · @appName</title>
+    <meta name="color-scheme" content="light dark" />
+    <title>@ViewData["Title"] · @theme.ApplicationName</title>
+    <script src="~/js/theme-init.js" asp-append-version="true"></script>
+    <link rel="preload" href="~/lib/inter/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/design-system.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/theme.css?v=@theme.Version" />
 </head>
 <body>
-    <header>
-        <nav class="navbar navbar-expand-sm navbar-dark bg-dark mb-4">
-            <div class="container">
-                <a class="navbar-brand" asp-controller="Home" asp-action="Index">@appName</a>
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item" asp-permission="@PermissionCodes.Users.View">
-                        <a class="nav-link" asp-controller="UserAdmin" asp-action="Index">Users</a>
-                    </li>
-                    <li class="nav-item" asp-permission="@PermissionCodes.Roles.Manage">
-                        <a class="nav-link" asp-controller="RoleAdmin" asp-action="Index">Roles</a>
-                    </li>
-                    <li class="nav-item" asp-permission="@PermissionCodes.Documents.Create">
-                        <a class="nav-link" asp-controller="Documents" asp-action="Index">Documents</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" asp-controller="Imports" asp-action="Index">Data</a>
-                    </li>
-                    <li class="nav-item" asp-permission="@PermissionCodes.Notifications.View">
-                        <a class="nav-link" asp-controller="NotificationAdmin" asp-action="Index">Messages</a>
-                    </li>
-                    <li class="nav-item" asp-permission="@PermissionCodes.Audit.View">
-                        <a class="nav-link" asp-controller="AuditAdmin" asp-action="Index">Audit</a>
-                    </li>
-                    <li class="nav-item" asp-permission="@PermissionCodes.Settings.View">
-                        <a class="nav-link" href="/api/settings">Settings (API)</a>
-                    </li>
-                    <li class="nav-item" asp-permission="@PermissionCodes.System.HealthView">
-                        <a class="nav-link" asp-controller="SystemAdmin" asp-action="Index">System</a>
-                    </li>
-                </ul>
-                <div class="d-flex align-items-center gap-2">
-                    @if (CurrentUser.IsAuthenticated)
+    <a class="visually-hidden-focusable" href="#content">Skip to content</a>
+    <div class="app" id="app">
+        <aside class="app-sidebar" id="sidebar" aria-label="Main navigation">
+            <div class="sidebar-brand">
+                <a asp-controller="Home" asp-action="Index" title="@theme.ApplicationName">
+                    @if (theme.LogoFileId is not null)
                     {
-                        @await Component.InvokeAsync("NotificationBell")
-                        <a class="navbar-text text-decoration-none" asp-controller="Account" asp-action="ChangePassword" title="Change password">@CurrentUser.AuditName</a>
-                        <form asp-controller="Account" asp-action="Logout" method="post">
-                            <button type="submit" class="btn btn-outline-light btn-sm">Sign out</button>
-                        </form>
+                        <img class="brand-logo" src="~/branding/logo?v=@theme.Version" alt="@theme.ApplicationName" />
                     }
                     else
                     {
-                        <a class="btn btn-outline-light btn-sm" asp-controller="Account" asp-action="Login">Sign in</a>
+                        <span class="brand-mark" aria-hidden="true">@(theme.ApplicationName.Length > 0 ? char.ToUpperInvariant(theme.ApplicationName[0]) : 'B')</span>
+                        <span class="brand-name">@theme.ApplicationName</span>
                     }
-                </div>
+                </a>
             </div>
-        </nav>
-    </header>
-    <main class="container pb-5" role="main">
-        <partial name="_StatusMessage" />
-        @RenderBody()
-    </main>
+            <partial name="_Sidebar" />
+            @if (CurrentUser.IsAuthenticated)
+            {
+                <div class="sidebar-footer dropup">
+                    <button class="user-chip" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Account menu for @CurrentUser.AuditName">
+                        <span class="avatar" aria-hidden="true">@initials</span>
+                        <span class="user-chip-text">
+                            <span class="user-chip-name d-block">@CurrentUser.AuditName</span>
+                            <span class="user-chip-sub d-block">@theme.ApplicationName</span>
+                        </span>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><h6 class="dropdown-header">Theme</h6></li>
+                        <li class="px-2 pb-2">
+                            <div class="segmented w-100" role="radiogroup" aria-label="Theme">
+                                <input type="radio" name="theme-choice" id="theme-system" value="system" data-theme-choice /><label class="flex-fill justify-content-center" for="theme-system"><icon name="monitor" class="icon-sm" /> Auto</label>
+                                <input type="radio" name="theme-choice" id="theme-light" value="light" data-theme-choice /><label class="flex-fill justify-content-center" for="theme-light"><icon name="sun" class="icon-sm" /> Light</label>
+                                <input type="radio" name="theme-choice" id="theme-dark" value="dark" data-theme-choice /><label class="flex-fill justify-content-center" for="theme-dark"><icon name="moon" class="icon-sm" /> Dark</label>
+                            </div>
+                        </li>
+                        <li><hr class="dropdown-divider" /></li>
+                        <li><a class="dropdown-item" asp-controller="Account" asp-action="ChangePassword"><icon name="key-round" /> Change password</a></li>
+                        <li><a class="dropdown-item" asp-controller="Notifications" asp-action="Preferences"><icon name="bell" /> Notification preferences</a></li>
+                        <li><hr class="dropdown-divider" /></li>
+                        <li>
+                            <form asp-controller="Account" asp-action="Logout" method="post">
+                                <button type="submit" class="dropdown-item"><icon name="log-out" /> Sign out</button>
+                            </form>
+                        </li>
+                    </ul>
+                </div>
+            }
+        </aside>
+        <div class="sidebar-backdrop" data-nav-close></div>
+        <div class="app-main">
+            <header class="app-topbar">
+                <button class="icon-btn topbar-menu" type="button" data-nav-open aria-label="Open navigation" aria-controls="sidebar"><icon name="menu" /></button>
+                <button class="icon-btn sidebar-collapse d-none d-lg-inline-grid" type="button" data-nav-collapse aria-label="Collapse navigation"><icon name="panel-left" /></button>
+                @if (CurrentUser.IsAuthenticated)
+                {
+                    <button class="topbar-search" type="button" data-palette-open aria-label="Search and jump to (Ctrl+K)">
+                        <icon name="search" />
+                        <span class="search-label">Search or jump to…</span>
+                        <kbd>Ctrl K</kbd>
+                    </button>
+                }
+                <div class="topbar-spacer"></div>
+                <button class="icon-btn" type="button" data-theme-toggle aria-label="Switch theme"><icon name="sun" class="theme-icon-light" /><icon name="moon" class="theme-icon-dark" /></button>
+                @if (CurrentUser.IsAuthenticated)
+                {
+                    @await Component.InvokeAsync("NotificationBell")
+                }
+                else
+                {
+                    <a class="btn btn-primary btn-sm" asp-controller="Account" asp-action="Login">Sign in</a>
+                }
+            </header>
+            <main class="app-content" id="content" role="main" tabindex="-1">
+                @RenderBody()
+            </main>
+        </div>
+    </div>
+    <partial name="_StatusMessage" />
+    <div class="palette" id="palette" role="dialog" aria-modal="true" aria-label="Search and jump to">
+        <div class="palette-box">
+            <div class="palette-input">
+                <icon name="search" />
+                <input type="text" id="palette-input" placeholder="Search pages and actions…" autocomplete="off" role="combobox" aria-controls="palette-list" aria-expanded="true" />
+                <kbd>Esc</kbd>
+            </div>
+            <ul class="palette-list" id="palette-list" role="listbox"></ul>
+            <div class="palette-footer"><span><kbd>↑</kbd> <kbd>↓</kbd> to move</span><span><kbd>Enter</kbd> to open</span></div>
+        </div>
+    </div>
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>

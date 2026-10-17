@@ -41,6 +41,10 @@ public sealed class SettingCatalogTests
     [InlineData(SettingDataType.Boolean, "true", true)]
     [InlineData(SettingDataType.TimeZone, "Mars/Olympus", false)]
     [InlineData(SettingDataType.TimeZone, "Africa/Johannesburg", true)]
+    [InlineData(SettingDataType.Color, "#0f766E", true)]
+    [InlineData(SettingDataType.Color, "#fff", false)]
+    [InlineData(SettingDataType.Color, "red", false)]
+    [InlineData(SettingDataType.Color, "#12345g", false)]
     public void Validate_checks_type_and_range(SettingDataType type, string value, bool valid)
     {
         var definition = new SettingDefinition("Test.Code", "Test", type, null, "Test", "Test", Min: 1, Max: 10);

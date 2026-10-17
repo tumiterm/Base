@@ -3,9 +3,12 @@
     ViewData["Title"] = "Users";
     var results = Model.Users;
 }
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h1 class="h3 mb-0">Users</h1>
-    <div class="d-flex gap-2">
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Users</h1>
+        <p class="page-subtitle">People with access to this organisation.</p>
+    </div>
+    <div class="page-actions">
         <partial name="_ExportButtons" model='new ExportButtonsViewModel("users", PermissionCodes.Users.View)' />
         <a class="btn btn-outline-primary" asp-controller="Imports" asp-action="Index" asp-permission="@PermissionCodes.Users.Manage">Import</a>
         <a class="btn btn-primary" asp-action="Invite" asp-permission="@PermissionCodes.Users.Manage">Invite user</a>

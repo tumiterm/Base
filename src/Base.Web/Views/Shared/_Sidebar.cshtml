@@ -1,0 +1,26 @@
+@{
+    var controller = ViewContext.RouteData.Values["controller"] as string ?? string.Empty;
+    string Active(params string[] controllers) => controllers.Contains(controller, StringComparer.OrdinalIgnoreCase) ? "active" : "";
+    string? Current(params string[] controllers) => controllers.Contains(controller, StringComparer.OrdinalIgnoreCase) ? "page" : null;
+}
+<nav class="sidebar-nav">
+    <div class="nav-section">
+        <div class="nav-section-label">Workspace</div>
+        <a class="nav-link-app @Active("Home")" aria-current="@Current("Home")" asp-controller="Home" asp-action="Index" title="Home" data-palette-label="Home"><icon name="layout-dashboard" /><span class="nav-label">Home</span></a>
+        <a class="nav-link-app @Active("Documents")" aria-current="@Current("Documents")" asp-controller="Documents" asp-action="Index" asp-permission="@PermissionCodes.Documents.Create" title="Documents"><icon name="file-text" /><span class="nav-label">Documents</span></a>
+        <a class="nav-link-app @Active("Imports", "Exports")" aria-current="@Current("Imports", "Exports")" asp-controller="Imports" asp-action="Index" title="Import and export"><icon name="database" /><span class="nav-label">Import &amp; export</span></a>
+        <a class="nav-link-app @Active("Notifications")" aria-current="@Current("Notifications")" asp-controller="Notifications" asp-action="Index" title="Inbox"><icon name="inbox" /><span class="nav-label">Inbox</span></a>
+    </div>
+    <div class="nav-section">
+        <div class="nav-section-label">Administration</div>
+        <a class="nav-link-app @Active("UserAdmin")" aria-current="@Current("UserAdmin")" asp-controller="UserAdmin" asp-action="Index" asp-permission="@PermissionCodes.Users.View" title="Users"><icon name="users" /><span class="nav-label">Users</span></a>
+        <a class="nav-link-app @Active("RoleAdmin")" aria-current="@Current("RoleAdmin")" asp-controller="RoleAdmin" asp-action="Index" asp-permission="@PermissionCodes.Roles.Manage" title="Roles"><icon name="shield-check" /><span class="nav-label">Roles</span></a>
+        <a class="nav-link-app @Active("NotificationAdmin")" aria-current="@Current("NotificationAdmin")" asp-controller="NotificationAdmin" asp-action="Index" asp-permission="@PermissionCodes.Notifications.View" title="Messages"><icon name="mail" /><span class="nav-label">Messages</span></a>
+        <a class="nav-link-app @Active("AuditAdmin")" aria-current="@Current("AuditAdmin")" asp-controller="AuditAdmin" asp-action="Index" asp-permission="@PermissionCodes.Audit.View" title="Audit trail"><icon name="history" /><span class="nav-label">Audit trail</span></a>
+        <a class="nav-link-app @Active("Appearance")" aria-current="@Current("Appearance")" asp-controller="Appearance" asp-action="Index" asp-permission="@PermissionCodes.Settings.Edit" title="Appearance"><icon name="palette" /><span class="nav-label">Appearance</span></a>
+    </div>
+    <div class="nav-section" asp-permission="@PermissionCodes.System.HealthView">
+        <div class="nav-section-label">Platform</div>
+        <a class="nav-link-app @Active("SystemAdmin")" aria-current="@Current("SystemAdmin")" asp-controller="SystemAdmin" asp-action="Index" title="System"><icon name="activity" /><span class="nav-label">System</span></a>
+    </div>
+</nav>

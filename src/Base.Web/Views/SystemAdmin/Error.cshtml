@@ -4,7 +4,7 @@
     ViewData["Title"] = error.Ticket;
 }
 <nav class="mb-2"><a asp-action="Errors">&larr; Errors</a></nav>
-<h1 class="h3 mb-1">@error.Ticket</h1>
+<h1 class="page-title mb-1">@error.Ticket</h1>
 <p class="text-muted small"><local-time value="@error.OccurredAt" /> · @error.Method @error.Path · @(error.User ?? "anonymous")</p>
 <div class="d-flex gap-2 mb-3">
     @if (Model.TraceUrl is { } trace) { <a class="btn btn-sm btn-outline-primary" href="@trace" target="_blank" rel="noopener">Open the trace</a> }

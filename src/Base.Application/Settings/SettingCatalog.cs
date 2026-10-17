@@ -18,6 +18,13 @@ public static class SettingCatalog
         new(SettingCodes.General.PublicBaseUrl, "Public address", SettingDataType.Url, "https://localhost:7262", "General",
             "The address users reach the application at. Used to build links in emails (invites, password resets)."),
 
+        new(SettingCodes.Branding.PrimaryColor, "Accent colour", SettingDataType.Color, "#4f5bd5", "Branding",
+            "Used for buttons, links, the active menu item and focus rings. Text on it is picked automatically for contrast."),
+        new(SettingCodes.Branding.DefaultTheme, "Default theme", SettingDataType.String, "system", "Branding",
+            "What users see until they choose: follow their device, or always light or dark.", AllowedValues: ["system", "light", "dark"]),
+        new(SettingCodes.Branding.LogoFileId, "Logo", SettingDataType.String, null, "Branding",
+            "Set from the Appearance page. Shown in the sidebar and on the sign-in page.", IsRequired: false),
+
         new(SettingCodes.Files.MaxUploadSizeMb, "Maximum upload size (MB)", SettingDataType.Integer, "10", "Files",
             "Largest file a user may upload.", Min: 1, Max: 500),
         new(SettingCodes.Files.AllowedExtensions, "Allowed file types", SettingDataType.StringList, ".pdf,.png,.jpg,.jpeg,.docx,.xlsx", "Files",

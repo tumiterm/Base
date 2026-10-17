@@ -2,7 +2,9 @@
 @{
     ViewData["Title"] = Model.DisplayName;
 }
-<h1 class="h3">@Model.DisplayName</h1>
+<div class="page-header">
+    <h1 class="page-title">@Model.DisplayName</h1>
+</div>
 <p class="text-muted">
     @Model.Email ·
     @if (Model.IsLockedOut) { <span class="badge text-bg-danger">Locked</span> }

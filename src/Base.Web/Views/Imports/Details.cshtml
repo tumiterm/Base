@@ -5,7 +5,7 @@
     var finished = Model.Status is ImportStatus.Completed or ImportStatus.CompletedWithErrors or ImportStatus.Failed;
 }
 <nav class="mb-2"><a asp-action="Index">&larr; Imports</a></nav>
-<h1 class="h3 mb-1">@Model.ImporterName <partial name="_StatusBadge" model="Model.Status" /></h1>
+<h1 class="page-title mb-1">@Model.ImporterName <partial name="_StatusBadge" model="Model.Status" /></h1>
 <p class="text-muted small">@Model.FileName · uploaded <local-time value="@Model.UploadedAt" /></p>
 
 <div class="row g-3 mb-3">

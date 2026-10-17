@@ -2,7 +2,9 @@
 @{
     ViewData["Title"] = "Invite user";
 }
-<h1 class="h3 mb-3">Invite user</h1>
+<div class="page-header">
+    <h1 class="page-title">Invite user</h1>
+</div>
 <p class="text-muted">They'll get an email with a link to choose their own password. The link is valid for 3 days.</p>
 <form asp-action="Invite" method="post" class="col-md-6">
     <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>

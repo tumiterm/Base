@@ -2,11 +2,21 @@
     var success = TempData[Base.Web.Controllers.StatusMessage.SuccessKey] as string;
     var error = TempData[Base.Web.Controllers.StatusMessage.ErrorKey] as string;
 }
-@if (!string.IsNullOrEmpty(success))
-{
-    <div class="alert alert-success" role="status">@success</div>
-}
-@if (!string.IsNullOrEmpty(error))
-{
-    <div class="alert alert-danger" role="alert">@error</div>
-}
+<div class="toast-stack" aria-live="polite">
+    @if (!string.IsNullOrEmpty(success))
+    {
+        <div class="toast-item toast-success" role="status" data-autohide>
+            <icon name="circle-check" />
+            <div class="toast-body">@success</div>
+            <button type="button" class="icon-btn toast-close" data-toast-close aria-label="Dismiss"><icon name="x" class="icon-sm" /></button>
+        </div>
+    }
+    @if (!string.IsNullOrEmpty(error))
+    {
+        <div class="toast-item toast-error" role="alert">
+            <icon name="circle-alert" />
+            <div class="toast-body">@error</div>
+            <button type="button" class="icon-btn toast-close" data-toast-close aria-label="Dismiss"><icon name="x" class="icon-sm" /></button>
+        </div>
+    }
+</div>

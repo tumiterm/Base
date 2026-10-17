@@ -1,0 +1,42 @@
+@inject Base.Application.Branding.IBrandingService Branding
+@{
+    var theme = await Branding.GetAsync();
+}
+<!DOCTYPE html>
+<html lang="en" data-default-theme="@theme.DefaultTheme">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>@ViewData["Title"] · @theme.ApplicationName</title>
+    <script src="~/js/theme-init.js" asp-append-version="true"></script>
+    <link rel="preload" href="~/lib/inter/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/design-system.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/theme.css?v=@theme.Version" />
+</head>
+<body>
+    <main class="auth" role="main">
+        <div class="auth-card">
+            <div class="auth-brand">
+                @if (theme.LogoFileId is not null)
+                {
+                    <img class="brand-logo" src="~/branding/logo?v=@theme.Version" alt="@theme.ApplicationName" />
+                }
+                else
+                {
+                    <span class="brand-mark" aria-hidden="true">@(theme.ApplicationName.Length > 0 ? char.ToUpperInvariant(theme.ApplicationName[0]) : 'B')</span>
+                    <span>@theme.ApplicationName</span>
+                }
+            </div>
+            @RenderBody()
+        </div>
+    </main>
+    <partial name="_StatusMessage" />
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

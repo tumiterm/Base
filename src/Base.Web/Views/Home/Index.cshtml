@@ -1,10 +1,62 @@
+@inject ICurrentUser CurrentUser
+@inject Base.Application.Branding.IBrandingService Branding
 @{
     ViewData["Title"] = "Home";
+    var theme = await Branding.GetAsync(Context.RequestAborted);
+    var shortcuts = new (string Icon, string Title, string Hint, string Controller, string? Permission)[]
+    {
+        ("file-text", "Documents", "Versioned files linked to any record", "Documents", PermissionCodes.Documents.Create),
+        ("database", "Import & export", "Bring data in, take lists out", "Imports", null),
+        ("inbox", "Inbox", "Messages sent to you", "Notifications", null),
+        ("users", "Users", "Invite people and manage access", "UserAdmin", PermissionCodes.Users.View),
+        ("shield-check", "Roles", "Group permissions into roles", "RoleAdmin", PermissionCodes.Roles.Manage),
+        ("history", "Audit trail", "Who changed what, and when", "AuditAdmin", PermissionCodes.Audit.View),
+        ("palette", "Appearance", "Colour, logo and default theme", "Appearance", PermissionCodes.Settings.Edit),
+        ("activity", "System", "Health, jobs, storage and errors", "SystemAdmin", PermissionCodes.System.HealthView),
+    };
+    var visible = shortcuts.Where(s => s.Permission is null || CurrentUser.HasPermission(s.Permission)).ToList();
 }
-<h1 class="h3">Welcome</h1>
-<p class="lead">This is the Base starter. Replace this page with your product.</p>
-<ul>
-    <li><a href="/health/ready">Readiness probe</a> (anonymous)</li>
-    <li><a href="/api/me">/api/me</a>: who you are and what you may do</li>
-    <li>Development only: <a href="/scalar">API reference</a></li>
-</ul>
+
+@if (!CurrentUser.IsAuthenticated)
+{
+    <div class="empty-state home-signed-out">
+        <icon name="key-round" />
+        <div class="empty-state-title">Sign in to @theme.ApplicationName</div>
+        <p class="mb-2">Access is by invitation. Use the link in your invite email, or sign in below.</p>
+        <a class="btn btn-primary" asp-controller="Account" asp-action="Login">Sign in</a>
+    </div>
+    return;
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Welcome back, @CurrentUser.AuditName</h1>
+        <p class="page-subtitle">Jump to what you need, or press <kbd>Ctrl</kbd> <kbd>K</kbd> to search.</p>
+    </div>
+</div>
+
+<section class="panel" aria-labelledby="shortcuts-title">
+    <div class="panel-header">
+        <h2 class="panel-title" id="shortcuts-title">Shortcuts</h2>
+        <span class="text-muted small">@visible.Count available to you</span>
+    </div>
+    <div class="shortcut-grid">
+        @foreach (var s in visible)
+        {
+            <a class="shortcut" asp-controller="@s.Controller" asp-action="Index">
+                <span class="shortcut-icon"><icon name="@s.Icon" /></span>
+                <span class="shortcut-text">
+                    <span class="shortcut-title">@s.Title</span>
+                    <span class="shortcut-hint">@s.Hint</span>
+                </span>
+                <icon name="chevron-right" class="shortcut-chevron" />
+            </a>
+        }
+    </div>
+</section>
+
+<p class="home-dev-links small text-muted">
+    <a href="/api/me">/api/me</a> shows who you are and what you may do ·
+    <a href="/health/ready">readiness probe</a>
+    <environment include="Development"> · <a href="/scalar">API reference</a></environment>
+</p>

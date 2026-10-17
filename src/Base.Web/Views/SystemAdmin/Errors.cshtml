@@ -4,7 +4,9 @@
     var results = Model.Errors;
 }
 <nav class="mb-2"><a asp-action="Index">&larr; System</a></nav>
-<h1 class="h3 mb-3">Errors</h1>
+<div class="page-header">
+    <h1 class="page-title">Errors</h1>
+</div>
 <form method="get" class="mb-3" role="search">
     <div class="input-group">
         <input name="search" value="@Model.Search" class="form-control" placeholder="Ticket (E-...), exception type or message" aria-label="Search errors" />

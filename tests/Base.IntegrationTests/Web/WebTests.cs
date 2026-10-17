@@ -340,6 +340,87 @@ public sealed partial class WebTests(SqlServerFixture sql) : IAsyncLifetime
         (await Client().GetAsync("/api/system/health", TestContext.Current.CancellationToken)).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 
+    [Theory]
+    [InlineData("/css/design-system.css")]
+    [InlineData("/js/site.js")]
+    [InlineData("/img/icons.svg")]
+    [InlineData("/theme.css")]
+    public async Task Static_assets_are_served_to_anonymous_visitors(string path)
+    {
+        var response = await Client().GetAsync(path, TestContext.Current.CancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK, path);
+    }
+
+    [Fact]
+    public async Task Appearance_changes_the_tenant_theme_and_logo()
+    {
+        var client = Client();
+        await SignInAsync(client);
+        var home = await client.GetStringAsync("/", TestContext.Current.CancellationToken);
+        home.ShouldContain("Shortcuts");
+
+        var token = await GetFormTokenAsync(client, "/admin/appearance");
+        var saved = await client.PostAsync(
+            "/admin/appearance",
+            new FormUrlEncodedContent(new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["primaryColor"] = "#0F766E",
+                ["defaultTheme"] = "dark",
+                ["__RequestVerificationToken"] = token,
+            }),
+            TestContext.Current.CancellationToken);
+        saved.StatusCode.ShouldBe(HttpStatusCode.Redirect);
+
+        try
+        {
+            var page = await client.GetStringAsync("/", TestContext.Current.CancellationToken);
+            page.ShouldContain("data-default-theme=\"dark\"");
+            var href = ThemeHref().Match(page).Groups["href"].Value.Replace("&amp;", "&", StringComparison.Ordinal);
+            href.ShouldStartWith("/theme.css?v=");
+
+            var css = await Client().GetAsync(href, TestContext.Current.CancellationToken);
+            css.Content.Headers.ContentType!.MediaType.ShouldBe("text/css");
+            css.Headers.CacheControl!.MaxAge.ShouldBe(TimeSpan.FromDays(365));
+            (await css.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).ShouldContain("--accent: #0f766e;");
+            (await Client().GetAsync("/theme.css?v=stale", TestContext.Current.CancellationToken)).Headers.CacheControl!.NoCache.ShouldBeTrue();
+
+            using var upload = new MultipartFormDataContent
+            {
+                { new StringContent(await GetFormTokenAsync(client, "/admin/appearance")), "__RequestVerificationToken" },
+                { new ByteArrayContent([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2]), "logo", "logo.png" },
+            };
+            (await client.PostAsync("/admin/appearance/logo", upload, TestContext.Current.CancellationToken)).StatusCode.ShouldBe(HttpStatusCode.Redirect);
+            var logo = await Client().GetAsync("/branding/logo", TestContext.Current.CancellationToken);
+            logo.StatusCode.ShouldBe(HttpStatusCode.OK);
+            logo.Content.Headers.ContentType!.MediaType.ShouldBe("image/png");
+
+            using var svg = new MultipartFormDataContent
+            {
+                { new StringContent(await GetFormTokenAsync(client, "/admin/appearance")), "__RequestVerificationToken" },
+                { new StringContent("<svg onload=\"alert(1)\"/>"), "logo", "logo.svg" },
+            };
+            await client.PostAsync("/admin/appearance/logo", svg, TestContext.Current.CancellationToken);
+            (await Client().GetAsync("/branding/logo", TestContext.Current.CancellationToken)).Content.Headers.ContentType!.MediaType.ShouldBe("image/png");
+        }
+        finally
+        {
+            var reset = await GetFormTokenAsync(client, "/admin/appearance");
+            await client.PostAsync("/admin/appearance/logo/remove", new FormUrlEncodedContent(new Dictionary<string, string>(StringComparer.Ordinal) { ["__RequestVerificationToken"] = reset }), TestContext.Current.CancellationToken);
+            await client.PostAsync(
+                "/admin/appearance",
+                new FormUrlEncodedContent(new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["primaryColor"] = "#4f5bd5",
+                    ["defaultTheme"] = "system",
+                    ["__RequestVerificationToken"] = await GetFormTokenAsync(client, "/admin/appearance"),
+                }),
+                TestContext.Current.CancellationToken);
+        }
+
+        (await Client().GetAsync("/branding/logo", TestContext.Current.CancellationToken)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
     [Fact]
     public async Task Password_pages_are_anonymous_and_set_password_is_never_cached()
     {
@@ -384,6 +465,9 @@ public sealed partial class WebTests(SqlServerFixture sql) : IAsyncLifetime
 
     [GeneratedRegex("name=\"__RequestVerificationToken\" type=\"hidden\" value=\"(?<value>[^\"]+)\"", RegexOptions.None, 1000)]
     private static partial Regex FormToken();
+
+    [GeneratedRegex("href=\"(?<href>/theme\\.css\\?v=[^\"]+)\"", RegexOptions.None, 1000)]
+    private static partial Regex ThemeHref();
 
     [GeneratedRegex("<meta name=\"csrf-token\" content=\"(?<value>[^\"]+)\"", RegexOptions.None, 1000)]
     private static partial Regex MetaToken();

@@ -5,6 +5,7 @@ using Base.Web.Errors;
 using Base.Web.Http;
 using Base.Web.Security;
 using Base.Web.Tenancy;
+using Base.Web.Theming;
 using Hangfire;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -143,7 +144,7 @@ internal static class WebApplicationExtensions
         app.UseMiddleware<SecurityHeadersMiddleware>();
         app.UseMiddleware<CorrelationIdMiddleware>();
         app.UseSerilogRequestLogging();
-        app.MapStaticAssets();
+        app.MapStaticAssets().AllowAnonymous(); // the fallback policy would otherwise send the sign-in page unstyled
 
         app.UseRouting();
         app.UseRateLimiter();
@@ -151,6 +152,7 @@ internal static class WebApplicationExtensions
         app.UseAuthentication();
         app.UseAuthorization();
 
+        app.MapBranding();
         app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false }).AllowAnonymous();
         app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = c => c.Tags.Contains("ready") }).AllowAnonymous();
 

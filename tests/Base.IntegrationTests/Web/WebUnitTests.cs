@@ -1,6 +1,7 @@
 using Base.Application.Security;
 using Base.Web.Errors;
 using Base.Web.Security;
+using Base.Web.Theming;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
@@ -9,6 +10,25 @@ namespace Base.IntegrationTests.Web;
 
 public sealed class WebUnitTests
 {
+    [Theory]
+    [InlineData("#facc15", "#0b0d12")]
+    [InlineData("#1e3a8a", "#ffffff")]
+    [InlineData("#ffffff", "#0b0d12")]
+    public void Accent_text_picks_the_higher_contrast(string accent, string text)
+    {
+        ThemePalette.ContrastText(ThemePalette.Rgb.Parse(accent)).ShouldBe(text);
+    }
+
+    [Fact]
+    public void Theme_css_derives_light_and_dark_ramps_and_rejects_bad_colours()
+    {
+        var css = ThemePalette.From("#0F766E").Css();
+
+        css.ShouldContain("--accent: #0f766e;");
+        css.ShouldContain("[data-bs-theme=\"dark\"]");
+        ThemePalette.From("red; } body { display:none").Accent.ShouldBe("#4f5bd5");
+    }
+
     [Fact]
     public void Sensitive_query_values_are_masked()
     {

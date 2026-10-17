@@ -84,6 +84,11 @@ scripts/new-project.cs  Creates a renamed copy for a new project.
 
 ## What you get
 
+- **UI:** a design system of our own (tokens for light and dark, Inter, Lucide icons, all self-hosted) on Bootstrap's
+  behaviour. It provides an app shell with a collapsible sidebar, a phone drawer, a command palette (Ctrl/Cmd+K),
+  toasts, and tables that become cards on phones. Each tenant sets its accent colour, logo and default theme at
+  Administration → Appearance, and readable text colours are derived automatically. The bar for every screen is in
+  [docs/ui-design-direction.md](docs/ui-design-direction.md).
 - **Persistence:** a single `EntityBase` (audit, soft delete, row version, domain events); SQL Server-sequential
   GUID keys; UTC timestamps from `TimeProvider`; named query filters for soft delete and tenant isolation
   (fail closed); a repository that never commits; a small unit of work with retry-safe transactions; paging and

@@ -1,0 +1,112 @@
+@model Base.Application.Branding.BrandingTheme
+@{
+    ViewData["Title"] = "Appearance";
+    (string Name, string Hex)[] presets =
+    [
+        ("Indigo", "#4f5bd5"), ("Ocean", "#1d6fd8"), ("Teal", "#0f8a7e"), ("Forest", "#2f7d4f"),
+        ("Amber", "#c47a0b"), ("Crimson", "#c2333a"), ("Plum", "#8a3fb0"), ("Graphite", "#3b414c"),
+    ];
+}
+<header class="page-header">
+    <div>
+        <h1 class="page-title">Appearance</h1>
+        <p class="page-subtitle">How the application looks for everyone in this organisation.</p>
+    </div>
+</header>
+
+<form asp-action="Save" method="post" class="panel mb-4" id="appearance-form">
+    <div class="panel-body">
+        <section class="form-section">
+            <div>
+                <h2 class="form-section-title">Accent colour</h2>
+                <p class="form-section-desc">Buttons, links, the selected menu item and focus rings. Text on it switches between light and dark to stay readable.</p>
+            </div>
+            <div>
+                <div class="swatch-grid mb-3" role="radiogroup" aria-label="Preset colours">
+                    @foreach (var (name, hex) in presets)
+                    {
+                        var id = "preset-" + name.ToLowerInvariant();
+                        <input type="radio" class="swatch-input" name="preset" id="@id" value="@hex" checked="@string.Equals(hex, Model.PrimaryColor, StringComparison.OrdinalIgnoreCase)" data-accent-preset />
+                        <label class="swatch-card" for="@id">
+                            <span class="swatch" data-swatch="@hex"></span>
+                            <span>@name</span>
+                        </label>
+                    }
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <label class="form-label mb-0" for="primaryColor">Custom</label>
+                    <input type="color" class="form-control form-control-color" id="accent-picker" value="@Model.PrimaryColor" aria-label="Pick a colour" />
+                    <input type="text" class="form-control w-auto font-monospace" id="primaryColor" name="primaryColor" value="@Model.PrimaryColor" pattern="#[0-9a-fA-F]{6}" maxlength="7" size="8" required />
+                </div>
+            </div>
+        </section>
+        <section class="form-section">
+            <div>
+                <h2 class="form-section-title">Default theme</h2>
+                <p class="form-section-desc">What people see until they choose their own in the account menu.</p>
+            </div>
+            <div>
+                <div class="segmented" role="radiogroup" aria-label="Default theme">
+                    <input type="radio" name="defaultTheme" id="dt-system" value="system" checked="@(Model.DefaultTheme == "system")" /><label for="dt-system"><icon name="monitor" class="icon-sm" /> Follow device</label>
+                    <input type="radio" name="defaultTheme" id="dt-light" value="light" checked="@(Model.DefaultTheme == "light")" /><label for="dt-light"><icon name="sun" class="icon-sm" /> Light</label>
+                    <input type="radio" name="defaultTheme" id="dt-dark" value="dark" checked="@(Model.DefaultTheme == "dark")" /><label for="dt-dark"><icon name="moon" class="icon-sm" /> Dark</label>
+                </div>
+            </div>
+        </section>
+        <section class="form-section">
+            <div>
+                <h2 class="form-section-title">Preview</h2>
+                <p class="form-section-desc">Updates as you pick; nothing changes for others until you save.</p>
+            </div>
+            <div class="preview" id="accent-preview">
+                <div class="preview-nav">
+                    <span class="nav-link-app active"><icon name="users" /><span class="nav-label">Selected item</span></span>
+                    <span class="nav-link-app"><icon name="file-text" /><span class="nav-label">Other item</span></span>
+                </div>
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <span class="btn btn-primary btn-sm"><icon name="plus" class="icon-sm" /> Primary</span>
+                    <span class="btn btn-secondary btn-sm">Secondary</span>
+                    <span class="badge text-bg-primary">Badge</span>
+                    <a href="#appearance-form">A link</a>
+                    <span class="chip is-active">Selected chip</span>
+                </div>
+            </div>
+        </section>
+    </div>
+    <div class="panel-footer d-flex justify-content-end gap-2">
+        <button class="btn btn-primary" type="submit"><icon name="check" class="icon-sm" /> Save appearance</button>
+    </div>
+</form>
+
+<div class="panel">
+    <div class="panel-body">
+        <section class="form-section">
+            <div>
+                <h2 class="form-section-title">Logo</h2>
+                <p class="form-section-desc">PNG, JPG or WebP up to 512 KB, about 32 px high. Shown in the sidebar and on the sign-in page instead of the name.</p>
+            </div>
+            <div class="d-flex flex-wrap align-items-start gap-3">
+                <div class="logo-well">
+                    @if (Model.LogoFileId is not null)
+                    {
+                        <img src="~/branding/logo?v=@Model.Version" alt="Current logo" class="brand-logo" />
+                    }
+                    else
+                    {
+                        <span class="text-muted small">No logo</span>
+                    }
+                </div>
+                <form asp-action="Logo" method="post" enctype="multipart/form-data" class="d-flex flex-wrap gap-2 align-items-center">
+                    <input class="form-control w-auto" type="file" name="logo" accept=".png,.jpg,.jpeg,.webp" required aria-label="Logo image" />
+                    <button class="btn btn-secondary" type="submit"><icon name="upload" class="icon-sm" /> Upload</button>
+                </form>
+                @if (Model.LogoFileId is not null)
+                {
+                    <form asp-action="RemoveLogo" method="post">
+                        <button class="btn btn-ghost" type="submit"><icon name="trash-2" class="icon-sm" /> Remove</button>
+                    </form>
+                }
+            </div>
+        </section>
+    </div>
+</div>

@@ -5,6 +5,7 @@ cross-cutting feature or adding a package:
 - [docs/architecture.md](docs/architecture.md): how it fits together (layers, pipeline order, persistence, tenancy)
 - [docs/adr/](docs/adr/): why it is built this way
 - [docs/base-project-blueprint.md](docs/base-project-blueprint.md): what was kept from FO16, and what is banned
+- [docs/ui-design-direction.md](docs/ui-design-direction.md): the minimum bar for every screen (read before any UI work)
 
 ## Commands
 
@@ -57,6 +58,9 @@ cross-cutting feature or adding a package:
 - Side effects after a commit go through domain events + `IDomainEventHandler<T>` (outbox; handlers idempotent).
 - Every schema change ships a generated migration. Never hand-write migrations or edit the snapshot.
 - Package versions live only in `Directory.Packages.props`. No pre-release packages.
+- UI is built from the design system (`design-system.css` tokens, `<icon>`, the shell in `_Layout`) and must meet
+  `docs/ui-design-direction.md`: no stock Bootstrap look, no inline scripts or styles (strict CSP), light and dark,
+  phone layouts. Brand colours come from `var(--accent*)` (per-tenant `Branding.*` settings), never hard-coded.
 - Integration tests use real SQL Server (Testcontainers), never EF InMemory. Main stays green.
 
 ## Banned (blueprint §11, §13)

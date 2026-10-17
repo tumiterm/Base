@@ -1,4 +1,5 @@
 using Base.Application.Auditing;
+using Base.Application.Branding;
 using Base.Application.DataExchange;
 using Base.Application.Documents;
 using Base.Application.Documents.Generation;
@@ -28,6 +29,7 @@ public static class DependencyInjection
         services.AddScoped<IFileService>(sp => sp.GetRequiredService<FileService>());
         services.AddScoped<IAuditTrail, AuditTrailService>();
 
+        services.AddScoped<IBrandingService, BrandingService>();
         services.AddScoped<ExportService>();
         services.AddScoped<IExportService>(sp => sp.GetRequiredService<ExportService>());
         services.AddScoped<ImportService>();

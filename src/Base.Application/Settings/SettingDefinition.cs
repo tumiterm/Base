@@ -12,6 +12,9 @@ public enum SettingDataType
     TimeZone = 4,
     StringList = 5,
     Url = 6,
+
+    /// <summary>A <c>#rrggbb</c> colour.</summary>
+    Color = 7,
 }
 
 public enum SettingScope
@@ -27,7 +30,7 @@ public enum SettingScope
 /// Everything about a setting except its stored value. Secrets are never settings: keep them in configuration
 /// (user-secrets locally, environment / Key Vault in production).
 /// </summary>
-public sealed record SettingDefinition(
+public sealed partial record SettingDefinition(
     string Code,
     string Name,
     SettingDataType DataType,
@@ -68,6 +71,9 @@ public sealed record SettingDefinition(
                     && string.IsNullOrEmpty(uri.Query) && string.IsNullOrEmpty(uri.Fragment)
                 ? ValidationResponse.Success()
                 : Fail("Must be an absolute http(s) URL without query string, e.g. https://portal.example.com."),
+            SettingDataType.Color => HexColor().IsMatch(value)
+                ? ValidationResponse.Success()
+                : Fail("Must be a colour like #4f5bd5."),
             _ => ValidationResponse.Success(),
         };
     }
@@ -88,4 +94,7 @@ public sealed record SettingDefinition(
     }
 
     private ValidationResponse Fail(string message) => ValidationResponse.Failure(new ValidationError(Code, message, "setting.invalid"));
+
+    [System.Text.RegularExpressions.GeneratedRegex("^#[0-9a-fA-F]{6}$", System.Text.RegularExpressions.RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 100)]
+    private static partial System.Text.RegularExpressions.Regex HexColor();
 }

@@ -6,13 +6,18 @@
     var results = Model.Documents;
     var f = Model.Filter;
 }
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h1 class="h3 mb-0">Documents</h1>
-    <partial name="_ExportButtons" model='new ExportButtonsViewModel("documents", PermissionCodes.Documents.Create)' />
-    @if (Model.CanCreate)
-    {
-        <a class="btn btn-outline-primary" asp-action="Generate">Generate from a template</a>
-    }
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Documents</h1>
+        <p class="page-subtitle">Versioned files, generated or uploaded, linked to records.</p>
+    </div>
+    <div class="page-actions">
+        <partial name="_ExportButtons" model='new ExportButtonsViewModel("documents", PermissionCodes.Documents.Create)' />
+        @if (Model.CanCreate)
+        {
+            <a class="btn btn-outline-primary" asp-action="Generate">Generate from a template</a>
+        }
+    </div>
 </div>
 @if (Model.CanCreate)
 {
