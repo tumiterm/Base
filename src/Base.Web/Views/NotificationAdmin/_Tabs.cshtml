@@ -1,0 +1,5 @@
+@model string
+<nav class="tabs" aria-label="Messages">
+    <a class="@(Model == "log" ? "active" : "")" aria-current="@(Model == "log" ? "page" : null)" asp-action="Index"><icon name="inbox" class="icon-sm" /> Delivery log</a>
+    <a class="@(Model == "templates" ? "active" : "")" aria-current="@(Model == "templates" ? "page" : null)" asp-action="Templates"><icon name="file-text" class="icon-sm" /> Templates</a>
+</nav>

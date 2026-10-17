@@ -466,3 +466,28 @@ document.querySelectorAll('input[type="file"][data-fill-title]').forEach((input)
     if (!target || !file || target.value.trim()) return;
     target.value = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
 }));
+
+// <button data-check-all="#group">: ticks every checkbox in the group (or clears them when all are ticked); groups
+// with [data-check-count] keep their "n of m" up to date.
+(() => {
+    const refresh = (group) => {
+        const boxes = [...group.querySelectorAll('input[type="checkbox"]')];
+        const ticked = boxes.filter((b) => b.checked).length;
+        const count = group.querySelector('[data-check-count]');
+        if (count) count.textContent = `${ticked} of ${boxes.length}`;
+        const button = group.querySelector('[data-check-all]');
+        if (button) button.textContent = ticked === boxes.length ? 'Clear all' : 'Select all';
+    };
+    document.querySelectorAll('[data-check-all]').forEach((button) => {
+        const group = document.querySelector(button.dataset.checkAll);
+        if (!group) return;
+        refresh(group);
+        group.addEventListener('change', () => refresh(group));
+        button.addEventListener('click', () => {
+            const boxes = [...group.querySelectorAll('input[type="checkbox"]')];
+            const all = boxes.every((b) => b.checked);
+            boxes.forEach((b) => { b.checked = !all; });
+            refresh(group);
+        });
+    });
+})();

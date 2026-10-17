@@ -122,7 +122,26 @@ public sealed class AuditFilterViewModel
     public int Page { get; set; } = 1;
 }
 
-public sealed record AuditListViewModel(PagedResult<Application.Auditing.AuditRecord> Entries, AuditFilterViewModel Filter, IReadOnlyList<string> EntityTypes);
+public sealed record AuditListViewModel(
+    PagedResult<Application.Auditing.AuditRecord> Entries,
+    AuditFilterViewModel Filter,
+    IReadOnlyList<string> EntityTypes,
+    IReadOnlyDictionary<Application.Common.Records.RecordRef, Application.Common.Records.ResolvedRecord> Records)
+{
+    /// <summary>The record an entry is about (a claim's user or role), named for display.</summary>
+    public Application.Common.Records.ResolvedRecord? RecordOf(Application.Auditing.AuditRecord entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        var (type, id) = Infrastructure.Auditing.AuditRecordOwners.OwnerOf(entry.EntityType, entry.EntityId);
+        return Records.GetValueOrDefault(new Application.Common.Records.RecordRef(type, id));
+    }
+
+    public Application.Common.Records.ResolvedRecord? Actor =>
+        Filter.UserId is { } id ? Records.GetValueOrDefault(new Application.Common.Records.RecordRef("User", id.ToString())) : null;
+
+    public Application.Common.Records.ResolvedRecord? Filtered =>
+        Filter.EntityType is { } type && Filter.EntityId is { } id ? Records.GetValueOrDefault(new Application.Common.Records.RecordRef(type, id)) : null;
+}
 
 public sealed class NotificationLogFilterViewModel
 {

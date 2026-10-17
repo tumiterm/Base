@@ -14,7 +14,10 @@ public static class RecordLinks
     private static readonly FrozenDictionary<string, (string Controller, string Action, string Icon)> Pages =
         new Dictionary<string, (string Controller, string Action, string Icon)>(StringComparer.OrdinalIgnoreCase)
         {
-            [nameof(Person)] = ("People", "Details", "user"),
+            [nameof(Person)] = ("People", "Details", "contact"),
+            ["Document"] = ("Documents", "Details", "file-text"),
+            ["User"] = ("UserAdmin", "Edit", "user"),
+            ["Role"] = ("RoleAdmin", "Edit", "shield-check"),
         }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 
     public static string Icon(string entityType) => Pages.TryGetValue(entityType, out var page) ? page.Icon : "link";

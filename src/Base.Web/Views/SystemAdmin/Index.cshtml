@@ -2,154 +2,187 @@
 @inject TimeProvider Time
 @inject IWebHostEnvironment Env
 @inject Microsoft.Extensions.Options.IOptions<Base.Infrastructure.Jobs.HangfireOptions> Hangfire
+@using Base.Application.Operations
 @{
     ViewData["Title"] = "System";
     var now = Time.GetUtcNow();
+    var attention = Model.Jobs.Count(j => j.NeedsAttention(now));
+    var outbox = Model.Outbox;
 }
 <div class="page-header">
     <div>
-        <h1 class="page-title">System <partial name="_HealthBadge" model="Model.Health.State" /></h1>
-        <p class="page-subtitle" title="@Base.Application.Operations.AppVersion.Informational">Version @Base.Application.Operations.AppVersion.Describe() · .NET @Environment.Version · @Env.EnvironmentName</p>
+        <h1 class="page-title">System</h1>
+        <p class="page-subtitle" title="@AppVersion.Informational">Version @AppVersion.Describe() · .NET @Environment.Version · @Env.EnvironmentName</p>
     </div>
     <div class="page-actions">
-        <a class="btn btn-outline-secondary" asp-action="Errors">Errors</a>
+        <a class="btn btn-secondary" asp-action="Errors"><icon name="circle-alert" class="icon-sm" /> Errors</a>
         @if (Hangfire.Value.Enabled)
         {
-            <a class="btn btn-outline-secondary" href="@Url.Content("~" + Hangfire.Value.DashboardPath)" asp-permission="@PermissionCodes.System.JobsManage">Hangfire</a>
+            <a class="btn btn-ghost" href="@Url.Content("~" + Hangfire.Value.DashboardPath)" asp-permission="@PermissionCodes.System.JobsManage"><icon name="external-link" class="icon-sm" /> Hangfire</a>
         }
     </div>
 </div>
 
-<h2 class="h5">Health</h2>
-<p class="small text-muted">Checked just now in @Model.Health.Duration.TotalMilliseconds.ToString("N0") ms. <code>/health/ready</code> (for load balancers) only checks the database.</p>
-<table class="table table-sm align-top mb-4">
-    <thead><tr><th>Check</th><th>Status</th><th>Details</th><th class="text-end">Time</th></tr></thead>
-    <tbody>
-        @foreach (var check in Model.Health.Checks)
-        {
-            <tr>
-                <td class="text-nowrap">@check.Name</td>
-                <td><partial name="_HealthBadge" model="check.State" /></td>
-                <td class="small">
-                    @check.Description
-                    @if (check.Data.Count > 0)
-                    {
-                        <div class="text-muted">@string.Join(" · ", check.Data.Select(d => $"{d.Key}: {d.Value}"))</div>
-                    }
-                </td>
-                <td class="text-end small text-nowrap">@check.Duration.TotalMilliseconds.ToString("N0") ms</td>
-            </tr>
-        }
-    </tbody>
-</table>
+<div class="stat-grid">
+    <div class="panel stat-tile @(Model.Health.State == HealthState.Healthy ? "" : Model.Health.State == HealthState.Degraded ? "is-warning" : "is-alert")">
+        <span class="file-tile" aria-hidden="true"><icon name="activity" /></span>
+        <div class="stat"><span class="stat-label">Health</span><span class="stat-value">@Model.Health.State</span><span class="stat-sub">@Model.Health.Checks.Count checks in @Model.Health.Duration.TotalMilliseconds.ToString("N0") ms</span></div>
+    </div>
+    <div class="panel stat-tile @(attention > 0 ? "is-warning" : "")">
+        <span class="file-tile" aria-hidden="true"><icon name="clock" /></span>
+        <div class="stat"><span class="stat-label">Scheduled jobs</span><span class="stat-value">@Model.Jobs.Count</span><span class="stat-sub">@(attention == 0 ? "All on schedule" : $"{attention} need{(attention == 1 ? "s" : "")} attention")</span></div>
+    </div>
+    <div class="panel stat-tile @(outbox.DeadLettered > 0 ? "is-alert" : "")">
+        <span class="file-tile" aria-hidden="true"><icon name="send" /></span>
+        <div class="stat"><span class="stat-label">Outbox</span><span class="stat-value">@outbox.Pending waiting</span><span class="stat-sub">@(outbox.DeadLettered == 0 ? "Nothing failed" : $"{outbox.DeadLettered} failed for good")@(outbox.OldestPendingAge is { } age ? $" · oldest {age.TotalMinutes:N0} min" : "")</span></div>
+    </div>
+    <a class="panel stat-tile @(Model.RecentErrors.Total > 0 ? "is-alert" : "")" asp-action="Errors">
+        <span class="file-tile" aria-hidden="true"><icon name="circle-alert" /></span>
+        <div class="stat"><span class="stat-label">Errors recorded</span><span class="stat-value">@Model.RecentErrors.Total.ToString("N0")</span><span class="stat-sub">Kept by ticket number</span></div>
+    </a>
+</div>
 
-<h2 class="h5">Scheduled jobs</h2>
-<table class="table table-sm align-middle mb-4">
-    <thead><tr><th>Job</th><th>Last run</th><th>Result</th><th>Next</th><th></th></tr></thead>
-    <tbody>
-        @foreach (var job in Model.Jobs)
-        {
-            <tr class="@(job.NeedsAttention(now) ? "table-warning" : "")">
-                <td>@job.Name<div class="small text-muted">@job.Description (@Every(job.Interval))</div></td>
-                <td class="small text-nowrap">
-                    @if (job.LastRun is { } run) { <local-time value="@run.StartedAt" /><div class="text-muted">@run.Duration.TotalSeconds.ToString("N1") s</div> } else { <span class="text-muted">not yet</span> }
-                </td>
-                <td class="small">
-                    @if (job.IsRunning) { <span class="badge text-bg-info">running</span> }
-                    else if (job.LastRun is { } last) { <span class="badge @(last.Succeeded ? "text-bg-success" : "text-bg-danger")">@(last.Succeeded ? "OK" : "Failed")</span> <span>@last.Message</span> }
-                </td>
-                <td class="small text-nowrap">@if (job.NextRunAt is { } next) { <local-time value="@next" /> }</td>
-                <td>
-                    <form asp-action="RunJob" asp-route-code="@job.Code" method="post" asp-permission="@PermissionCodes.System.JobsManage">
-                        <button class="btn btn-sm btn-outline-secondary text-nowrap" type="submit" disabled="@job.IsRunning">Run now</button>
-                    </form>
-                </td>
-            </tr>
-        }
-    </tbody>
-</table>
+<div class="detail-grid">
+    <div class="stack">
+        <section class="panel" aria-labelledby="health-title">
+            <div class="panel-header">
+                <h2 class="panel-title" id="health-title">Health</h2>
+                <partial name="_HealthBadge" model="Model.Health.State" />
+            </div>
+            <ul class="item-list">
+                @foreach (var check in Model.Health.Checks)
+                {
+                    <li>
+                        <span class="state-dot @(check.State == HealthState.Healthy ? "is-ok" : check.State == HealthState.Degraded ? "is-warning" : "is-alert")" aria-hidden="true"></span>
+                        <div class="item-main">
+                            <div class="item-title">@check.Name <span class="visually-hidden">@check.State</span></div>
+                            @if (check.Description is not null) {<div class="item-sub">@check.Description</div>}
+                            @if (check.Data.Count > 0) {<div class="item-sub">@string.Join(" · ", check.Data.Select(d => $"{d.Key}: {d.Value}"))</div>}
+                        </div>
+                        <div class="item-aside">@check.Duration.TotalMilliseconds.ToString("N0") ms</div>
+                    </li>
+                }
+            </ul>
+            <div class="panel-footer small text-muted"><span class="mono">/health/ready</span> (for load balancers) checks only the database; <span class="mono">/health/live</span> only that the process answers.</div>
+        </section>
 
-<div class="row g-4 mb-4">
-    <div class="col-lg-6">
-        <h2 class="h5">Database</h2>
-        <p class="small mb-2">Data @Mb(Model.Database.DataMb) · Log @Mb(Model.Database.LogMb)</p>
-        @if (Model.Database.LargestTables.Count == 0)
-        {
-            <p class="small text-muted">Table sizes need the VIEW DATABASE STATE permission.</p>
-        }
-        else
-        {
-            <table class="table table-sm">
-                <thead><tr><th>Largest tables</th><th class="text-end">Rows</th><th class="text-end">Size</th></tr></thead>
-                <tbody>
+        <section class="panel" aria-labelledby="jobs-title">
+            <div class="panel-header"><h2 class="panel-title" id="jobs-title">Scheduled jobs</h2><span class="text-muted small">Re-runnable; one instance runs each at a time</span></div>
+            <ul class="item-list">
+                @foreach (var job in Model.Jobs)
+                {
+                    var needs = job.NeedsAttention(now);
+                    <li class="@(needs ? "is-attention" : "")">
+                        <span class="state-dot @(job.IsRunning ? "is-info" : job.LastRun is null ? "" : job.LastRun.Succeeded && !needs ? "is-ok" : needs && job.LastRun.Succeeded ? "is-warning" : "is-alert")" aria-hidden="true"></span>
+                        <div class="item-main">
+                            <div class="item-title">@job.Name</div>
+                            <div class="item-sub">@job.Description · @Every(job.Interval)</div>
+                            <div class="item-sub">
+                                @if (job.IsRunning) {<span class="badge text-bg-info">Running</span>}
+                                else if (job.LastRun is { } last)
+                                {
+                                    <text>Last run </text><local-time value="last.StartedAt" format="d MMM, HH:mm" /><text> (@last.Duration.TotalSeconds.ToString("N1") s)</text>
+                                    @if (!last.Succeeded) {<span class="text-danger"> · failed: @last.Message</span>}
+                                    else if (!string.IsNullOrEmpty(last.Message)) {<text> · @last.Message</text>}
+                                }
+                                else {<text>Not run yet</text>}
+                                @if (job.NextRunAt is { } next) {<text> · next </text><local-time value="next" format="d MMM, HH:mm" />}
+                            </div>
+                        </div>
+                        <form asp-action="RunJob" asp-route-code="@job.Code" method="post" asp-permission="@PermissionCodes.System.JobsManage">
+                            <button class="btn btn-secondary btn-sm text-nowrap" type="submit" disabled="@job.IsRunning"><icon name="circle-play" class="icon-sm" /> Run now</button>
+                        </form>
+                    </li>
+                }
+            </ul>
+        </section>
+
+        <section class="panel" aria-labelledby="errors-title">
+            <div class="panel-header">
+                <h2 class="panel-title" id="errors-title">Recent errors</h2>
+                <a class="btn btn-ghost btn-sm" asp-action="Errors">All errors <icon name="chevron-right" class="icon-sm" /></a>
+            </div>
+            <partial name="_ErrorTable" model="Model.RecentErrors.Items" />
+        </section>
+    </div>
+
+    <aside class="stack">
+        <section class="panel" aria-labelledby="db-title">
+            <div class="panel-header"><h2 class="panel-title" id="db-title">Database</h2></div>
+            <div class="panel-body"><dl class="kv"><dt>Data</dt><dd>@Mb(Model.Database.DataMb)</dd><dt>Log</dt><dd>@Mb(Model.Database.LogMb)</dd></dl></div>
+            @if (Model.Database.LargestTables.Count == 0)
+            {
+                <div class="panel-footer small text-muted">Table sizes need the VIEW DATABASE STATE permission.</div>
+            }
+            else
+            {
+                <ul class="item-list">
                     @foreach (var table in Model.Database.LargestTables)
                     {
-                        <tr><td class="small">@table.Table</td><td class="text-end small">@table.Rows.ToString("N0")</td><td class="text-end small">@Mb(table.ReservedMb)</td></tr>
+                        <li><div class="item-main"><div class="item-title mono">@table.Table</div><div class="item-sub">@table.Rows.ToString("N0") rows</div></div><div class="item-aside">@Mb(table.ReservedMb)</div></li>
                     }
-                </tbody>
-            </table>
-        }
-    </div>
-    <div class="col-lg-6">
-        <h2 class="h5">File storage</h2>
-        @if (Model.Storage.Count == 0)
-        {
-            <p class="small text-muted">No files stored yet.</p>
-        }
-        else
-        {
-            <table class="table table-sm">
-                <thead><tr><th>Tenant</th><th>Provider</th><th class="text-end">Files</th><th class="text-end">Size</th></tr></thead>
-                <tbody>
+                </ul>
+            }
+        </section>
+
+        <section class="panel" aria-labelledby="storage-title">
+            <div class="panel-header"><h2 class="panel-title" id="storage-title">File storage</h2></div>
+            @if (Model.Storage.Count == 0)
+            {
+                <div class="panel-body text-muted small">No files stored yet.</div>
+            }
+            else
+            {
+                <ul class="item-list">
                     @foreach (var usage in Model.Storage)
                     {
-                        <tr>
-                            <td class="small">@usage.Tenant</td>
-                            <td class="small">@usage.Provider</td>
-                            <td class="text-end small">@usage.Files.ToString("N0")@if (usage.DeletedFiles > 0) { <div class="text-muted">+@usage.DeletedFiles deleted</div> }</td>
-                            <td class="text-end small">@Size(usage.Bytes)</td>
-                        </tr>
+                        <li>
+                            <div class="item-main">
+                                <div class="item-title">@usage.Tenant</div>
+                                <div class="item-sub">@usage.Provider · @usage.Files.ToString("N0") file@(usage.Files == 1 ? "" : "s")@(usage.DeletedFiles > 0 ? $" · {usage.DeletedFiles} deleted, awaiting purge" : "")</div>
+                            </div>
+                            <div class="item-aside">@FileDisplay.Size(usage.Bytes)</div>
+                        </li>
                     }
-                </tbody>
-            </table>
-        }
-    </div>
-</div>
-
-<h2 class="h5">Outbox</h2>
-<p class="small">@Model.Outbox.Pending pending@(Model.Outbox.OldestPendingAge is { } age ? $", oldest {age.TotalMinutes:N0} min" : "") · @Model.Outbox.DeadLettered dead-lettered</p>
-@if (Model.Outbox.DeadLetters.Count > 0)
-{
-    <table class="table table-sm align-top mb-4">
-        <thead><tr><th>Event</th><th>Raised</th><th>Attempts</th><th>Last error</th><th></th></tr></thead>
-        <tbody>
-            @foreach (var message in Model.Outbox.DeadLetters)
-            {
-                <tr>
-                    <td class="small">@message.Type</td>
-                    <td class="small text-nowrap"><local-time value="@message.OccurredAt" /></td>
-                    <td class="small">@message.Attempts</td>
-                    <td class="small text-break text-danger">@message.LastError</td>
-                    <td>
-                        <form asp-action="RetryOutbox" asp-route-id="@message.Id" method="post" asp-permission="@PermissionCodes.System.JobsManage">
-                            <button class="btn btn-sm btn-outline-secondary" type="submit">Retry</button>
-                        </form>
-                    </td>
-                </tr>
+                </ul>
             }
-        </tbody>
-    </table>
-}
+        </section>
 
-<div class="d-flex justify-content-between align-items-center">
-    <h2 class="h5 mb-0">Recent errors</h2>
-    <a asp-action="Errors" class="small">All errors (@Model.RecentErrors.Total)</a>
+        <section class="panel" aria-labelledby="outbox-title">
+            <div class="panel-header"><h2 class="panel-title" id="outbox-title">Outbox</h2><span class="text-muted small">Side effects after a save</span></div>
+            <div class="panel-body">
+                <dl class="kv">
+                    <dt>Waiting</dt><dd>@outbox.Pending@(outbox.OldestPendingAge is { } oldest ? $" (oldest {oldest.TotalMinutes:N0} min)" : "")</dd>
+                    <dt>Failed for good</dt><dd>@outbox.DeadLettered</dd>
+                </dl>
+            </div>
+            @if (outbox.DeadLetters.Count > 0)
+            {
+                <ul class="item-list">
+                    @foreach (var message in outbox.DeadLetters)
+                    {
+                        <li>
+                            <span class="state-dot is-alert" aria-hidden="true"></span>
+                            <div class="item-main">
+                                <div class="item-title mono">@message.Type.Split('.')[^1]</div>
+                                <div class="item-sub"><local-time value="message.OccurredAt" format="d MMM, HH:mm" /> · @message.Attempts attempts</div>
+                                <div class="item-sub text-danger">@message.LastError</div>
+                            </div>
+                            <form asp-action="RetryOutbox" asp-route-id="@message.Id" method="post" asp-permission="@PermissionCodes.System.JobsManage">
+                                <button class="btn btn-secondary btn-sm" type="submit"><icon name="rotate-cw" class="icon-sm" /> Retry</button>
+                            </form>
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
+    </aside>
 </div>
-<partial name="_ErrorTable" model="Model.RecentErrors.Items" />
 @functions {
     private static string Mb(decimal? value) => value is null ? "n/a" : $"{value:N1} MB";
 
-    private static string Size(long bytes) => bytes >= 1024 * 1024 ? $"{bytes / 1024.0 / 1024.0:N1} MB" : $"{bytes / 1024.0:N0} KB";
-
-    private static string Every(TimeSpan interval) => interval.TotalDays >= 1 ? $"every {interval.TotalDays:0} day(s)" : $"every {interval.TotalHours:0} hour(s)";
+    private static string Every(TimeSpan interval) =>
+        interval.TotalDays >= 1 ? (interval.TotalDays == 1 ? "daily" : $"every {interval.TotalDays:0} days")
+        : interval.TotalHours >= 1 ? (interval.TotalHours == 1 ? "hourly" : $"every {interval.TotalHours:0} hours")
+        : $"every {interval.TotalMinutes:0} minutes";
 }

@@ -1,51 +1,121 @@
 @model GenerateDocumentViewModel
+@using Base.Application.Documents
 @{
     ViewData["Title"] = "Generate a document";
 }
-<nav class="mb-2"><a asp-action="Index">&larr; Documents</a></nav>
+@functions {
+    private static string Label(string variable)
+    {
+        var builder = new System.Text.StringBuilder();
+        foreach (var c in variable)
+        {
+            if (char.IsUpper(c) && builder.Length > 0)
+            {
+                builder.Append(' ');
+            }
+
+            builder.Append(builder.Length == 0 ? c : char.ToLowerInvariant(c));
+        }
+
+        return builder.ToString();
+    }
+
+    private static bool IsLong(string variable) => variable is "Body" or "Message" or "Notes" || variable.EndsWith("Text", StringComparison.Ordinal);
+}
+<nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-action="Index">Documents</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">Generate</span></nav>
 <div class="page-header">
-    <h1 class="page-title">Generate a document</h1>
-</div>
-<form method="get" class="row g-2 align-items-end mb-4">
-    <div class="col-md-6">
-        <label class="form-label small" for="template">Template</label>
-        <select class="form-select" id="template" name="template">
-            <option value="">Choose…</option>
-            @foreach (var t in Model.Templates) { <option value="@t.Code" selected="@(t.Code == Model.Selected?.Code)">@t.Name</option> }
-        </select>
+    <div>
+        <h1 class="page-title">Generate a document</h1>
+        <p class="page-subtitle">Pick a template, fill in the blanks, and it's saved as a versioned document.</p>
     </div>
-    <div class="col-md-2"><button class="btn btn-outline-primary" type="submit">Use template</button></div>
+</div>
+
+<form method="get" class="mb-4">
+    <div class="choice-grid" role="radiogroup" aria-label="Template">
+        @foreach (var t in Model.Templates)
+        {
+            <label class="choice-card">
+                <input type="radio" name="template" value="@t.Code" checked="@(t.Code == Model.Selected?.Code)" data-autosubmit />
+                <span class="choice-check"><icon name="check" /></span>
+                <span class="choice-title d-flex align-items-center gap-2"><icon name="file-text" class="icon-sm text-muted" /> @t.Name</span>
+                <span class="choice-desc">@t.Description</span>
+                <span class="choice-meta">@(DocumentTypeCatalog.Find(t.DocumentType)?.Name ?? t.DocumentType) · @t.Variables.Count field@(t.Variables.Count == 1 ? "" : "s")</span>
+            </label>
+        }
+    </div>
+    <noscript><button class="btn btn-secondary mt-2" type="submit">Use this template</button></noscript>
 </form>
+
 @if (Model.Selected is { } template)
 {
-    <div asp-validation-summary="All" class="alert alert-danger" role="alert"></div>
-    <p class="text-muted">@template.Description</p>
-    <form method="post" asp-action="Generate">
+    <form method="post" asp-action="Generate" class="panel" novalidate>
         <input type="hidden" name="template" value="@template.Code" />
-        <div class="row g-2 mb-3">
-            <div class="col-md-6"><label class="form-label small" for="title">Document title</label><input class="form-control" id="title" name="title" value="@(Model.Title ?? template.Name)" maxlength="200" /></div>
-            <div class="col-md-3">
-                <label class="form-label small" for="format">Format</label>
-                <select class="form-select" id="format" name="format">
-                    @foreach (var format in Model.Formats) { <option value="@format" selected="@(format == Model.Format)">@format.ToUpperInvariant()</option> }
-                </select>
-            </div>
+        <div class="panel-body">
+            @if (!ViewData.ModelState.IsValid)
+            {
+                <div asp-validation-summary="All" class="alert alert-danger" role="alert"></div>
+            }
+            <section class="form-section">
+                <div>
+                    <h2 class="form-section-title">Document</h2>
+                    <p class="form-section-desc">How it's filed. @Model.Formats.Count format@(Model.Formats.Count == 1 ? " is" : "s are") installed.</p>
+                </div>
+                <div class="stack">
+                    <div>
+                        <label class="form-label" for="title">Title</label>
+                        <input class="form-control" id="title" name="title" value="@(Model.Title ?? template.Name)" maxlength="200" />
+                    </div>
+                    <div>
+                        <div class="form-label">Format</div>
+                        <div class="segmented" role="radiogroup" aria-label="Format">
+                            @foreach (var format in Model.Formats)
+                            {
+                                <input type="radio" name="format" id="fmt-@format" value="@format" checked="@(format == Model.Format)" /><label for="fmt-@format">@format.ToUpperInvariant()</label>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <section class="form-section">
+                <div>
+                    <h2 class="form-section-title">Content</h2>
+                    <p class="form-section-desc">Filled in for you: @string.Join(", ", Base.Application.Documents.Generation.DocumentTemplateCatalog.BuiltInVariables.Select(Label)).</p>
+                </div>
+                <div class="stack">
+                    @foreach (var variable in template.Variables)
+                    {
+                        <div>
+                            <label class="form-label" for="v-@variable">@Label(variable)</label>
+                            @if (IsLong(variable))
+                            {
+                                <textarea class="form-control" id="v-@variable" name="values[@variable]" rows="6">@Model.Values.GetValueOrDefault(variable)</textarea>
+                            }
+                            else
+                            {
+                                <input class="form-control" id="v-@variable" name="values[@variable]" value="@Model.Values.GetValueOrDefault(variable)" />
+                            }
+                        </div>
+                    }
+                </div>
+            </section>
+            <section class="form-section">
+                <div>
+                    <h2 class="form-section-title">When it's saved</h2>
+                    <p class="form-section-desc">Final documents are locked against new versions until someone reopens them.</p>
+                </div>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="finalize" name="finalize" value="true" checked="@Model.Finalize" />
+                    <label class="form-check-label" for="finalize">Mark as final straight away</label>
+                </div>
+            </section>
         </div>
-        @foreach (var variable in template.Variables)
-        {
-            <div class="mb-3">
-                <label class="form-label" for="v-@variable">@variable</label>
-                <textarea class="form-control" id="v-@variable" name="values[@variable]" rows="@(variable == "Body" ? 6 : 1)">@Model.Values.GetValueOrDefault(variable)</textarea>
-            </div>
-        }
-        <div class="form-check mb-3">
-            <input class="form-check-input" type="checkbox" id="finalize" name="finalize" value="true" checked="@Model.Finalize" />
-            <label class="form-check-label" for="finalize">Mark as final (locked) straight away</label>
+        <div class="panel-footer d-flex flex-wrap justify-content-end gap-2">
+            <button class="btn btn-ghost" type="submit" name="preview" value="true"><icon name="download" class="icon-sm" /> Download a preview</button>
+            <button class="btn btn-primary" type="submit"><icon name="sparkles" class="icon-sm" /> Generate and save</button>
         </div>
-        <div class="d-flex gap-2">
-            <button class="btn btn-primary" type="submit">Generate and save</button>
-            <button class="btn btn-outline-secondary" type="submit" name="preview" value="true">Preview</button>
-        </div>
-        <p class="small text-muted mt-3">Filled in automatically: @string.Join(", ", Base.Application.Documents.Generation.DocumentTemplateCatalog.BuiltInVariables).</p>
     </form>
+}
+else
+{
+    <div class="empty-state"><icon name="file-text" /><div class="empty-state-title">Choose a template above</div><p class="mb-0">Its fields appear here.</p></div>
 }

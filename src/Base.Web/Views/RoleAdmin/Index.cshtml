@@ -1,36 +1,57 @@
 @model IReadOnlyList<Base.Application.Users.RoleSummary>
+@inject ICurrentUser CurrentUser
 @{
     ViewData["Title"] = "Roles";
+    var canManage = CurrentUser.HasPermission(PermissionCodes.Roles.Manage);
 }
 <div class="page-header">
     <div>
         <h1 class="page-title">Roles</h1>
-        <p class="page-subtitle">Permissions grouped for assigning to people.</p>
+        <p class="page-subtitle">Bundles of permissions you give to people. Shared by every organisation on the platform.</p>
     </div>
-    <a class="btn btn-primary" asp-action="Create">New role</a>
+    <div class="page-actions">
+        <a class="btn btn-primary" asp-action="Create" asp-permission="@PermissionCodes.Roles.Manage"><icon name="plus" class="icon-sm" /> New role</a>
+    </div>
 </div>
-<table class="table table-hover align-middle">
-    <thead>
-        <tr><th>Role</th><th>Permissions</th><th>Users</th><th></th></tr>
-    </thead>
+<table class="table table-entity align-middle">
+    <thead><tr><th>Role</th><th>Permissions</th><th>People</th><th><span class="visually-hidden">Actions</span></th></tr></thead>
     <tbody>
         @foreach (var role in Model)
         {
             <tr>
                 <td>
-                    <a asp-action="Edit" asp-route-id="@role.Id">@role.Name</a>
-                    @if (role.IsSystem) { <span class="badge text-bg-secondary ms-1">System</span> }
-                    @if (!string.IsNullOrEmpty(role.Description)) { <div class="small text-muted">@role.Description</div> }
+                    <a class="entity text-decoration-none" asp-action="Edit" asp-route-id="@role.Id">
+                        <span class="file-tile @(role.IsSystem ? "is-code" : "")" aria-hidden="true"><icon name="shield-check" /></span>
+                        <span class="entity-text">
+                            <span class="entity-name">@role.Name</span>
+                            <span class="entity-sub">@(role.IsSystem ? "Built in · " : "")@(string.IsNullOrEmpty(role.Description) ? "No description" : role.Description)</span>
+                        </span>
+                    </a>
                 </td>
-                <td>@role.Permissions.Count</td>
-                <td>@role.UserCount</td>
-                <td class="text-end">
-                    @if (!role.IsSystem && role.UserCount == 0)
-                    {
-                        <form asp-action="Delete" asp-route-id="@role.Id" method="post" class="d-inline">
-                            <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-                        </form>
-                    }
+                <td class="text-muted">@role.Permissions.Count of @PermissionCatalog.All.Count</td>
+                <td class="text-muted">@role.UserCount</td>
+                <td class="text-end cell-actions">
+                    <div class="dropdown">
+                        <button class="icon-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Actions for @role.Name"><icon name="ellipsis" /></button>
+                        <div class="dropdown-menu dropdown-menu-end">
+                            <a class="dropdown-item" asp-action="Edit" asp-route-id="@role.Id"><icon name="pencil" class="icon-sm" /> Open</a>
+                            <a class="dropdown-item" asp-controller="AuditAdmin" asp-action="Index" asp-route-EntityId="@role.Id" asp-permission="@PermissionCodes.Audit.View"><icon name="history" class="icon-sm" /> History</a>
+                            @if (canManage && !role.IsSystem)
+                            {
+                                <div class="dropdown-divider"></div>
+                                @if (role.UserCount == 0)
+                                {
+                                    <form asp-action="Delete" asp-route-id="@role.Id" method="post" class="confirm-submit" data-confirm="Delete the @role.Name role?">
+                                        <button type="submit" class="dropdown-item text-danger"><icon name="trash-2" class="icon-sm" /> Delete</button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <span class="dropdown-item-text small text-muted">Take it off its @role.UserCount @(role.UserCount == 1 ? "person" : "people") to delete it</span>
+                                }
+                            }
+                        </div>
+                    </div>
                 </td>
             </tr>
         }

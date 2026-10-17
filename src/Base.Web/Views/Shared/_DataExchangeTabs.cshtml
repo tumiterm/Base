@@ -1,0 +1,5 @@
+@model string
+<nav class="tabs" aria-label="Import and export">
+    <a class="@(Model == "imports" ? "active" : "")" aria-current="@(Model == "imports" ? "page" : null)" asp-controller="Imports" asp-action="Index"><icon name="upload" class="icon-sm" /> Import</a>
+    <a class="@(Model == "exports" ? "active" : "")" aria-current="@(Model == "exports" ? "page" : null)" asp-controller="Exports" asp-action="Index"><icon name="download" class="icon-sm" /> My exports</a>
+</nav>

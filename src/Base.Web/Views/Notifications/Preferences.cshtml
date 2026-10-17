@@ -1,36 +1,60 @@
 @model IReadOnlyList<Base.Application.Notifications.NotificationPreferenceItem>
+@using Base.Domain.Notifications
 @{
     ViewData["Title"] = "Notification preferences";
+    var channels = Model.Select(p => p.Channel).Distinct().Order().ToList();
 }
+@functions {
+    private static string Describe(string category) => category switch
+    {
+        "Security" => "Sign-in links, password changes and key expiry. Always sent, so you notice anything unexpected.",
+        "Reminders" => "Reminders the organisation sends you.",
+        "Activity" => "When work you started finishes, such as a large export or an import.",
+        "Billing" => "The organisation's plan, trial and payments.",
+        _ => string.Empty,
+    };
+}
+<nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-action="Index">Notifications</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">Preferences</span></nav>
 <div class="page-header">
-    <h1 class="page-title">Notification preferences</h1>
+    <div>
+        <h1 class="page-title">Notification preferences</h1>
+        <p class="page-subtitle">Choose how you hear about each kind of message. Changes save as you switch them.</p>
+    </div>
 </div>
-<p class="text-muted">Choose how you hear from us. Security messages (sign-in links, password changes) are always sent.</p>
-<table class="table align-middle col-md-8">
-    <thead><tr><th>Category</th><th>Channel</th><th>Status</th><th></th></tr></thead>
-    <tbody>
-        @foreach (var pref in Model)
-        {
-            <tr>
-                <td>@pref.Category</td>
-                <td>@pref.Channel</td>
-                <td>@(pref.IsEnabled ? "On" : "Off")</td>
-                <td class="text-end">
-                    @if (pref.IsLocked)
-                    {
-                        <span class="text-muted small">Always on</span>
-                    }
-                    else
-                    {
-                        <form asp-action="Preferences" method="post" class="d-inline">
-                            <input type="hidden" name="category" value="@pref.Category" />
-                            <input type="hidden" name="channel" value="@pref.Channel" />
-                            <input type="hidden" name="isEnabled" value="@((!pref.IsEnabled).ToString())" />
-                            <button class="btn btn-sm btn-outline-secondary" type="submit">@(pref.IsEnabled ? "Turn off" : "Turn on")</button>
-                        </form>
-                    }
-                </td>
-            </tr>
-        }
-    </tbody>
-</table>
+<section class="panel">
+    <div class="panel-body">
+        <div class="setting-list">
+            @foreach (var category in Model.GroupBy(p => p.Category, StringComparer.Ordinal))
+            {
+                <div class="setting-row">
+                    <div class="setting-text">
+                        <div class="setting-head"><span class="setting-name">@category.Key</span></div>
+                        <p class="setting-desc">@Describe(category.Key)</p>
+                    </div>
+                    <div class="setting-control d-flex flex-wrap gap-3">
+                        @foreach (var channel in channels)
+                        {
+                            var pref = category.FirstOrDefault(p => p.Channel == channel);
+                            if (pref is null)
+                            {
+                                continue;
+                            }
+
+                            var id = $"pref-{category.Key}-{channel}".ToLowerInvariant();
+                            <form asp-action="Preferences" method="post" class="d-flex align-items-center gap-2">
+                                <input type="hidden" name="category" value="@pref.Category" />
+                                <input type="hidden" name="channel" value="@pref.Channel" />
+                                <span class="form-check form-switch m-0">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="@id" name="isEnabled" value="true" checked="@pref.IsEnabled" disabled="@pref.IsLocked" data-autosubmit />
+                                    <input type="hidden" name="isEnabled" value="false" />
+                                </span>
+                                <label class="small" for="@id"><icon name="@MessageDisplay.Icon(channel)" class="icon-sm text-muted" /> @MessageDisplay.Channel(channel)@(pref.IsLocked ? " (always)" : "")</label>
+                                <noscript><button class="btn btn-secondary btn-sm" type="submit">Save</button></noscript>
+                            </form>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</section>

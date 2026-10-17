@@ -1,6 +1,7 @@
 @model Base.Application.Common.Records.ResolvedRecord
 @{
     var href = RecordLinks.Url(Url, Model);
+    var tip = Model.Label is null ? null : $"{Model.TypeName}: {Model.Label.Title}" + (Model.Label.Subtitle is null ? "" : $" ({Model.Label.Subtitle})");
 }
 @if (Model.Label is null)
 {
@@ -8,9 +9,9 @@
 }
 else if (href is null)
 {
-    <span class="record-link" title="@Model.TypeName"><icon name="@RecordLinks.Icon(Model.Ref.EntityType)" class="icon-sm" /> <span class="record-link-text">@Model.Label.Title</span></span>
+    <span class="record-link" title="@tip"><icon name="@RecordLinks.Icon(Model.Ref.EntityType)" class="icon-sm" /> <span class="record-link-text">@Model.Label.Title</span></span>
 }
 else
 {
-    <a class="record-link" href="@href" title="@Model.TypeName: @Model.Label.Title"><icon name="@RecordLinks.Icon(Model.Ref.EntityType)" class="icon-sm" /> <span class="record-link-text">@Model.Label.Title</span></a>
+    <a class="record-link" href="@href" title="@tip"><icon name="@RecordLinks.Icon(Model.Ref.EntityType)" class="icon-sm" /> <span class="record-link-text">@Model.Label.Title</span></a>
 }

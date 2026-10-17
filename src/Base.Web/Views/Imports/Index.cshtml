@@ -1,59 +1,84 @@
 @model ImportsViewModel
 @{
-    ViewData["Title"] = "Imports";
+    ViewData["Title"] = "Import";
 }
 <div class="page-header">
     <div>
-        <h1 class="page-title">Imports</h1>
-        <p class="page-subtitle">Bring data in from a spreadsheet.</p>
+        <h1 class="page-title">Import and export</h1>
+        <p class="page-subtitle">Bring records in from a spreadsheet. Every row goes through the same checks as the form, and nothing is saved until you confirm.</p>
     </div>
-    <a class="btn btn-link" asp-controller="Exports" asp-action="Index">My exports</a>
 </div>
+<partial name="_DataExchangeTabs" model='"imports"' />
+
 @if (Model.Importers.Count == 0)
 {
-    <p class="text-muted">There is nothing you can import.</p>
-}
-<div class="row g-3 mb-4">
-    @foreach (var importer in Model.Importers)
-    {
-        <div class="col-lg-6">
-            <form asp-action="Upload" asp-route-code="@importer.Code" method="post" enctype="multipart/form-data" class="card card-body h-100">
-                <h2 class="h5">@importer.Name</h2>
-                <p class="text-muted small">@importer.Description</p>
-                <p class="small mb-2">
-                    Columns: @string.Join(", ", importer.Columns.Select(c => c.Required ? c.Name + " (required)" : c.Name)).
-                    @(importer.AllowPartial ? "Valid rows are applied even if others have errors." : "Nothing is applied unless every row is valid.")
-                </p>
-                <p class="small">Template: <a asp-action="Template" asp-route-code="@importer.Code" asp-route-format="xlsx">Excel</a> · <a asp-action="Template" asp-route-code="@importer.Code" asp-route-format="csv">CSV</a></p>
-                <div class="drop-zone mb-2">
-                    <input class="form-control" type="file" name="file" accept=".csv,.xlsx" required aria-label="File for @importer.Name" />
-                    <div class="drop-zone-hint small text-muted">or drop a .csv or .xlsx file here</div>
-                </div>
-                <div><button class="btn btn-primary" type="submit">Check file</button> <span class="small text-muted ms-2">Nothing is saved until you confirm.</span></div>
-            </form>
-        </div>
-    }
-</div>
-<h2 class="h5">My imports</h2>
-@if (Model.History.Total == 0)
-{
-    <p class="text-muted">No imports yet.</p>
+    <div class="empty-state mb-4">
+        <icon name="upload" />
+        <div class="empty-state-title">Nothing to import</div>
+        <p class="mb-0">You don't have permission to import any kind of record.</p>
+    </div>
 }
 else
 {
-    <table class="table align-middle">
-        <thead><tr><th>Uploaded</th><th>Import</th><th>File</th><th>Rows</th><th>Status</th></tr></thead>
-        <tbody>
+    <div class="import-grid mb-4">
+        @foreach (var importer in Model.Importers)
+        {
+            var id = "import-" + importer.Code;
+            <form asp-action="Upload" asp-route-code="@importer.Code" method="post" enctype="multipart/form-data" class="panel d-flex flex-column" aria-labelledby="@id-title">
+                <div class="panel-header">
+                    <div class="entity">
+                        <span class="file-tile is-sheet" aria-hidden="true"><icon name="file-spreadsheet" /></span>
+                        <div class="entity-text">
+                            <h2 class="panel-title entity-name" id="@id-title">@importer.Name</h2>
+                            <span class="entity-sub">@(importer.AllowPartial ? "Valid rows go in even if others have errors" : "All rows must be valid")</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="panel-body stack flex-grow-1">
+                    <p class="text-muted small mb-0">@importer.Description</p>
+                    <div>
+                        <div class="form-label">Columns</div>
+                        <div class="d-flex flex-wrap gap-1">
+                            @foreach (var column in importer.Columns) {<span class="chip @(column.Required ? "is-active" : "")" title="@(column.Required ? "Required" : "Optional")">@column.Name@(column.Required ? " *" : "")</span>}
+                        </div>
+                    </div>
+                    <label class="drop-zone">
+                        <icon name="file-up" class="icon-lg" />
+                        <span class="drop-zone-hint"><strong>Choose a .csv or .xlsx file</strong> or drop it here</span>
+                        <input class="form-control" type="file" name="file" accept=".csv,.xlsx" required aria-label="File for @importer.Name" />
+                    </label>
+                </div>
+                <div class="panel-footer d-flex flex-wrap align-items-center gap-2">
+                    <span class="small text-muted">Template:</span>
+                    <a class="small" asp-action="Template" asp-route-code="@importer.Code" asp-route-format="xlsx">Excel</a>
+                    <a class="small" asp-action="Template" asp-route-code="@importer.Code" asp-route-format="csv">CSV</a>
+                    <button class="btn btn-primary btn-sm ms-auto" type="submit"><icon name="list-checks" class="icon-sm" /> Check the file</button>
+                </div>
+            </form>
+        }
+    </div>
+}
+
+<section class="panel" aria-labelledby="history-title">
+    <div class="panel-header"><h2 class="panel-title" id="history-title">My imports</h2><span class="text-muted small">@Model.History.Total</span></div>
+    @if (Model.History.Total == 0)
+    {
+        <div class="panel-body text-muted small">No imports yet.</div>
+    }
+    else
+    {
+        <ul class="item-list">
             @foreach (var job in Model.History.Items)
             {
-                <tr>
-                    <td class="text-nowrap small"><local-time value="@job.UploadedAt" /></td>
-                    <td>@job.ImporterName</td>
-                    <td class="text-break"><a asp-action="Details" asp-route-id="@job.Id">@job.FileName</a></td>
-                    <td>@job.TotalRows.ToString("N0")</td>
-                    <td><partial name="_StatusBadge" model="job.Status" /></td>
-                </tr>
+                <li>
+                    <span class="file-tile is-sheet" aria-hidden="true"><icon name="file-spreadsheet" /></span>
+                    <div class="item-main">
+                        <a class="item-title d-block text-decoration-none" asp-action="Details" asp-route-id="@job.Id">@job.FileName</a>
+                        <div class="item-sub">@job.ImporterName · @job.TotalRows.ToString("N0") row@(job.TotalRows == 1 ? "" : "s") · <local-time value="job.UploadedAt" format="d MMM yyyy, HH:mm" /></div>
+                    </div>
+                    <partial name="_StatusBadge" model="job.Status" />
+                </li>
             }
-        </tbody>
-    </table>
-}
+        </ul>
+    }
+</section>

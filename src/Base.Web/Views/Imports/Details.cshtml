@@ -3,56 +3,68 @@
 @{
     ViewData["Title"] = "Import " + Model.FileName;
     var finished = Model.Status is ImportStatus.Completed or ImportStatus.CompletedWithErrors or ImportStatus.Failed;
+    var running = Model.Status is ImportStatus.Queued or ImportStatus.Running;
 }
-<nav class="mb-2"><a asp-action="Index">&larr; Imports</a></nav>
-<h1 class="page-title mb-1">@Model.ImporterName <partial name="_StatusBadge" model="Model.Status" /></h1>
-<p class="text-muted small">@Model.FileName · uploaded <local-time value="@Model.UploadedAt" /></p>
+<nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-action="Index">Import</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">@Model.FileName</span></nav>
+<div class="page-header">
+    <div class="entity">
+        <span class="file-tile file-tile-lg is-sheet" aria-hidden="true"><icon name="file-spreadsheet" /></span>
+        <div class="entity-text">
+            <h1 class="page-title">@Model.ImporterName</h1>
+            <p class="page-subtitle d-flex flex-wrap align-items-center gap-2"><partial name="_StatusBadge" model="Model.Status" /> <span>@Model.FileName · uploaded <local-time value="Model.UploadedAt" format="d MMM yyyy, HH:mm" /></span></p>
+        </div>
+    </div>
+    @if (Model.CanConfirm)
+    {
+        <form asp-action="Confirm" asp-route-id="@Model.Id" method="post" class="page-actions">
+            <button class="btn btn-primary" type="submit"><icon name="check" class="icon-sm" /> Apply @Model.ValidRows.ToString("N0") row@(Model.ValidRows == 1 ? "" : "s")</button>
+        </form>
+    }
+</div>
 
-<div class="row g-3 mb-3">
-    <div class="col-sm-3"><div class="card card-body"><div class="small text-muted">Rows</div><div class="h4 mb-0">@Model.TotalRows.ToString("N0")</div></div></div>
+<div class="stat-grid">
+    <div class="panel stat-tile"><div class="stat"><span class="stat-label">Rows in the file</span><span class="stat-value">@Model.TotalRows.ToString("N0")</span></div></div>
     @if (finished)
     {
-        <div class="col-sm-3"><div class="card card-body"><div class="small text-muted">Applied</div><div class="h4 mb-0 text-success">@Model.AppliedRows.ToString("N0")</div></div></div>
-        <div class="col-sm-3"><div class="card card-body"><div class="small text-muted">Not applied</div><div class="h4 mb-0 @(Model.FailedRows > 0 ? "text-danger" : "")">@Model.FailedRows.ToString("N0")</div></div></div>
+        <div class="panel stat-tile"><div class="stat"><span class="stat-label">Applied</span><span class="stat-value">@Model.AppliedRows.ToString("N0")</span></div></div>
+        <div class="panel stat-tile @(Model.FailedRows > 0 ? "is-alert" : "")"><div class="stat"><span class="stat-label">Not applied</span><span class="stat-value">@Model.FailedRows.ToString("N0")</span></div></div>
     }
     else
     {
-        <div class="col-sm-3"><div class="card card-body"><div class="small text-muted">Valid</div><div class="h4 mb-0 text-success">@Model.ValidRows.ToString("N0")</div></div></div>
-        <div class="col-sm-3"><div class="card card-body"><div class="small text-muted">With errors</div><div class="h4 mb-0 @(Model.InvalidRows > 0 ? "text-danger" : "")">@Model.InvalidRows.ToString("N0")</div></div></div>
+        <div class="panel stat-tile"><div class="stat"><span class="stat-label">Ready to apply</span><span class="stat-value">@Model.ValidRows.ToString("N0")</span></div></div>
+        <div class="panel stat-tile @(Model.InvalidRows > 0 ? "is-alert" : "")"><div class="stat"><span class="stat-label">With errors</span><span class="stat-value">@Model.InvalidRows.ToString("N0")</span></div></div>
     }
 </div>
 
 @if (Model.Error is not null)
 {
-    <div class="alert alert-danger">@Model.Error</div>
+    <div class="status-callout is-warning mb-4" role="alert"><icon name="triangle-alert" /><div><div class="status-callout-title">The import stopped</div><div class="small">@Model.Error</div></div></div>
 }
-@if (Model.CanConfirm)
+else if (running)
 {
-    <form asp-action="Confirm" asp-route-id="@Model.Id" method="post" class="mb-3">
-        <button class="btn btn-primary" type="submit">Apply @Model.ValidRows.ToString("N0") row(s)</button>
-        @if (Model.InvalidRows > 0) { <span class="small text-muted ms-2">Rows with errors will be skipped.</span> }
-    </form>
+    <div class="status-callout mb-4" role="status"><icon name="hourglass" /><div><div class="status-callout-title">Applying the rows</div><div class="small">You'll get a notification when it finishes. Refresh to see progress.</div></div></div>
 }
-else if (Model.Status is ImportStatus.Queued or ImportStatus.Running)
+else if (Model.CanConfirm)
 {
-    <p class="text-muted">The import is running. You'll get a notification when it finishes; refresh to see progress.</p>
+    <div class="status-callout is-ok mb-4" role="status"><icon name="list-checks" /><div><div class="status-callout-title">Checked: nothing has been saved yet</div><div class="small">@(Model.InvalidRows > 0 ? $"Applying adds the {Model.ValidRows:N0} valid rows; the {Model.InvalidRows:N0} with errors are skipped." : "Every row is valid. Apply to add them.")</div></div></div>
 }
 
 @if (Model.Errors.Count > 0)
 {
-    <div class="d-flex justify-content-between align-items-center">
-        <h2 class="h5 mb-0">Problems</h2>
-        <a class="btn btn-sm btn-outline-secondary" asp-action="Errors" asp-route-id="@Model.Id">Download the rows to fix</a>
-    </div>
-    <p class="small text-muted">Fix these in the downloaded file (it has an Errors column) and upload it again.</p>
-    <table class="table table-sm">
-        <thead><tr><th>Row</th><th>Column</th><th>Problem</th></tr></thead>
-        <tbody>
-            @foreach (var error in Model.Errors.Take(200))
-            {
-                <tr><td>@error.Row</td><td>@error.Column</td><td>@error.Message</td></tr>
-            }
-        </tbody>
-    </table>
-    @if (Model.Errors.Count > 200) { <p class="small text-muted">Showing the first 200; the downloaded file has them all.</p> }
+    <section class="panel" aria-labelledby="problems-title">
+        <div class="panel-header">
+            <h2 class="panel-title" id="problems-title">Problems <span class="text-muted fw-normal">@Model.Errors.Count.ToString("N0")</span></h2>
+            <a class="btn btn-secondary btn-sm" asp-action="Errors" asp-route-id="@Model.Id"><icon name="download" class="icon-sm" /> Download the rows to fix</a>
+        </div>
+        <table class="table table-flush table-entity align-middle mb-0">
+            <thead><tr><th>Row</th><th>Column</th><th>Problem</th></tr></thead>
+            <tbody>
+                @foreach (var error in Model.Errors.Take(200))
+                {
+                    <tr><td class="tabular">@error.Row</td><td>@error.Column</td><td>@error.Message</td></tr>
+                }
+            </tbody>
+        </table>
+        <div class="panel-footer small text-muted">Fix them in the downloaded file (it has an Errors column) and upload it again.@(Model.Errors.Count > 200 ? " Showing the first 200; the file has them all." : "")</div>
+    </section>
 }

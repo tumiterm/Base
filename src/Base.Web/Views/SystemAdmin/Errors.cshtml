@@ -3,24 +3,33 @@
     ViewData["Title"] = "Errors";
     var results = Model.Errors;
 }
-<nav class="mb-2"><a asp-action="Index">&larr; System</a></nav>
+<nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-action="Index">System</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">Errors</span></nav>
 <div class="page-header">
-    <h1 class="page-title">Errors</h1>
-</div>
-<form method="get" class="mb-3" role="search">
-    <div class="input-group">
-        <input name="search" value="@Model.Search" class="form-control" placeholder="Ticket (E-...), exception type or message" aria-label="Search errors" />
-        <button class="btn btn-outline-secondary" type="submit">Search</button>
+    <div>
+        <h1 class="page-title">Errors</h1>
+        <p class="page-subtitle">Every unhandled error, by the ticket number the user saw. Search by ticket, exception or message.</p>
     </div>
-</form>
-<partial name="_ErrorTable" model="results.Items" />
-@if (results.Total > 0)
+</div>
+<div class="toolbar">
+    <span class="text-muted small">@results.Total.ToString("N0") recorded</span>
+    <span class="toolbar-spacer"></span>
+    <form method="get" class="toolbar-search" role="search">
+        <label class="input-affix">
+            <icon name="search" class="icon-sm" />
+            <input class="form-control" type="search" name="search" value="@Model.Search" placeholder="E-…, exception type or message" aria-label="Search errors" />
+        </label>
+    </form>
+</div>
+<section class="panel">
+    <partial name="_ErrorTable" model="results.Items" />
+</section>
+@if (results.TotalPages > 1)
 {
-    <nav class="d-flex justify-content-between">
-        <span class="text-muted small">@results.Total error(s), page @results.Page of @results.TotalPages</span>
-        <div class="btn-group">
-            <a class="btn btn-outline-secondary btn-sm @(results.HasPrevious ? "" : "disabled")" asp-route-page="@(results.Page - 1)" asp-route-search="@Model.Search">Previous</a>
-            <a class="btn btn-outline-secondary btn-sm @(results.HasNext ? "" : "disabled")" asp-route-page="@(results.Page + 1)" asp-route-search="@Model.Search">Next</a>
-        </div>
-    </nav>
+    <div class="d-flex justify-content-between align-items-center mt-3">
+        <span class="text-muted small">Page @results.Page of @results.TotalPages</span>
+        <nav class="btn-group btn-group-sm" aria-label="Pages">
+            <a class="btn btn-outline-secondary @(results.HasPrevious ? "" : "disabled")" asp-route-page="@(results.Page - 1)" asp-route-search="@Model.Search">Previous</a>
+            <a class="btn btn-outline-secondary @(results.HasNext ? "" : "disabled")" asp-route-page="@(results.Page + 1)" asp-route-search="@Model.Search">Next</a>
+        </nav>
+    </div>
 }

@@ -1,4 +1,5 @@
 using Base.Application.Auditing;
+using Base.Application.Common.Records;
 using Base.Application.Security;
 using Base.Infrastructure.Auditing;
 using Base.Web.Security;
@@ -9,7 +10,7 @@ namespace Base.Web.Controllers;
 
 [Route("admin/audit")]
 [HasPermission(PermissionCodes.Audit.View)]
-public sealed class AuditAdminController(IAuditTrail audit, AuditedEntityTypes entityTypes) : Controller
+public sealed class AuditAdminController(IAuditTrail audit, AuditedEntityTypes entityTypes, IRecordLabels records) : Controller
 {
     [HttpGet("")]
     public async Task<IActionResult> Index([FromQuery] AuditFilterViewModel filter, CancellationToken cancellationToken)
@@ -26,6 +27,19 @@ public sealed class AuditAdminController(IAuditTrail audit, AuditedEntityTypes e
             filter.Page,
             50);
 
-        return View(new AuditListViewModel(await audit.SearchAsync(query, cancellationToken), filter, entityTypes.Names));
+        var entries = await audit.SearchAsync(query, cancellationToken);
+        var owners = entries.Items.Select(e => AuditRecordOwners.OwnerOf(e.EntityType, e.EntityId)).Select(o => new RecordRef(o.EntityType, o.EntityId)).ToList();
+        if (filter.EntityType is not null && filter.EntityId is not null)
+        {
+            owners.Add(new RecordRef(filter.EntityType, filter.EntityId));
+        }
+
+        if (filter.UserId is { } userId)
+        {
+            owners.Add(new RecordRef("User", userId.ToString()));
+        }
+
+        var labels = await records.ResolveAsync(owners, cancellationToken);
+        return View(new AuditListViewModel(entries, filter, entityTypes.Names, labels));
     }
 }

@@ -1,62 +1,101 @@
 @model EditRoleViewModel
+@inject ICurrentUser CurrentUser
 @{
     var isNew = Model.Id is null;
     ViewData["Title"] = isNew ? "New role" : Model.Name;
     var action = isNew ? "Create" : "Edit";
+    var canManage = CurrentUser.HasPermission(PermissionCodes.Roles.Manage);
+    var locked = Model.IsAdministrator || !canManage;
+    var granted = Model.IsAdministrator ? PermissionCatalog.All.Count : Model.Permissions.Count;
 }
+<nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-action="Index">Roles</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">@ViewData["Title"]</span></nav>
 <div class="page-header">
-    <h1 class="page-title">@ViewData["Title"]</h1>
-</div>
-@if (!isNew)
-{
-    <p asp-permission="@PermissionCodes.Audit.View"><a asp-controller="AuditAdmin" asp-action="Index" asp-route-EntityId="@Model.Id">History</a></p>
-}
-<form asp-action="@action" asp-route-id="@Model.Id" method="post">
-    <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
-    <div class="row g-3 mb-3">
-        <div class="col-md-4">
-            <label asp-for="Name" class="form-label"></label>
-            <input asp-for="Name" class="form-control" readonly="@Model.IsSystem" />
-            <span asp-validation-for="Name" class="text-danger"></span>
-        </div>
-        <div class="col-md-8">
-            <label asp-for="Description" class="form-label"></label>
-            <input asp-for="Description" class="form-control" />
-            <span asp-validation-for="Description" class="text-danger"></span>
+    <div class="entity">
+        <span class="file-tile file-tile-lg @(Model.IsSystem ? "is-code" : "")" aria-hidden="true"><icon name="shield-check" /></span>
+        <div class="entity-text">
+            <h1 class="page-title">@ViewData["Title"]</h1>
+            <p class="page-subtitle">@(isNew ? "Choose what people with this role can do." : $"{granted} of {PermissionCatalog.All.Count} permissions")@(Model.IsSystem ? " · built in" : "")</p>
         </div>
     </div>
-
-    @if (Model.IsAdministrator)
+    @if (!isNew)
     {
-        <div class="alert alert-info">Administrators always hold every permission.</div>
+        <div class="page-actions">
+            <a class="btn btn-secondary" asp-controller="AuditAdmin" asp-action="Index" asp-route-EntityId="@Model.Id" asp-permission="@PermissionCodes.Audit.View"><icon name="history" class="icon-sm" /> History</a>
+        </div>
     }
-    <span class="text-danger small">@Html.ValidationMessage("Permissions")</span>
-    <div class="row g-3">
-        @foreach (var module in EditRoleViewModel.Modules)
-        {
-            <fieldset class="col-md-6 col-lg-4">
-                <legend class="fs-6 fw-semibold">@module.Key</legend>
-                @foreach (var permission in module)
+</div>
+
+<form asp-action="@action" asp-route-id="@Model.Id" method="post" class="panel" novalidate>
+    <div class="panel-body">
+        <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+        <section class="form-section">
+            <div>
+                <h2 class="form-section-title">About</h2>
+                <p class="form-section-desc">@(Model.IsSystem ? "Built-in roles keep their name; the description is yours to change." : "A short name people recognise, and what it's for.")</p>
+            </div>
+            <div class="row g-3">
+                <div class="col-md-5">
+                    <label asp-for="Name" class="form-label">Name</label>
+                    <input asp-for="Name" class="form-control" readonly="@Model.IsSystem" disabled="@(!canManage)" placeholder="Payroll clerk" />
+                    <span asp-validation-for="Name" class="text-danger"></span>
+                </div>
+                <div class="col-md-7">
+                    <label asp-for="Description" class="form-label">Description</label>
+                    <input asp-for="Description" class="form-control" disabled="@(!canManage)" placeholder="Runs the monthly payroll; no administration" />
+                    <span asp-validation-for="Description" class="text-danger"></span>
+                </div>
+            </div>
+        </section>
+        <section class="form-section">
+            <div>
+                <h2 class="form-section-title">Permissions</h2>
+                <p class="form-section-desc">Some permissions include others (managing includes viewing). Platform permissions only ever reach the platform's own people.</p>
+            </div>
+            <div class="stack">
+                @if (Model.IsAdministrator)
                 {
-                    var id = "perm-" + permission.Key.Replace('.', '-');
-                    var isChecked = Model.IsAdministrator || Model.Permissions.Contains(permission.Key, StringComparer.Ordinal);
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="Permissions" value="@permission.Key" id="@id" checked="@isChecked" disabled="@Model.IsAdministrator" />
-                        <label class="form-check-label" for="@id">
-                            @permission.Label
-                            <span class="d-block small text-muted">@permission.Description</span>
-                        </label>
-                    </div>
-                    @if (Model.IsAdministrator)
-                    {
-                        <input type="hidden" name="Permissions" value="@permission.Key" />
-                    }
+                    <div class="status-callout is-ok"><icon name="shield-check" /><div><div class="status-callout-title">Administrators hold every permission</div><div class="small">Including ones added in later releases. To limit someone, give them another role.</div></div></div>
                 }
-            </fieldset>
-        }
+                <span class="field-validation-error small">@Html.ValidationMessage("Permissions")</span>
+                @foreach (var module in EditRoleViewModel.Modules)
+                {
+                    var groupId = "module-" + module.Key.Replace(' ', '-').ToLowerInvariant();
+                    var inGroup = module.Count(p => Model.IsAdministrator || Model.Permissions.Contains(p.Key, StringComparer.Ordinal));
+                    <fieldset class="perm-group" id="@groupId" disabled="@locked">
+                        <legend class="perm-group-head">
+                            <span class="perm-group-title">@module.Key</span>
+                            <span class="text-muted small" data-check-count>@inGroup of @module.Count()</span>
+                            @if (!locked)
+                            {
+                                <button class="btn-inline ms-auto" type="button" data-check-all="#@groupId">Select all</button>
+                            }
+                        </legend>
+                        @foreach (var permission in module)
+                        {
+                            var id = "perm-" + permission.Key.Replace('.', '-');
+                            var isChecked = Model.IsAdministrator || Model.Permissions.Contains(permission.Key, StringComparer.Ordinal);
+                            <label class="perm-row" for="@id">
+                                <span class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" role="switch" name="Permissions" value="@permission.Key" id="@id" checked="@isChecked" /></span>
+                                <span class="perm-text">
+                                    <span class="perm-name">@permission.Label @if (permission.IsPlatform) {<span class="chip ms-1" title="Only for the platform's own people"><icon name="globe" /> Platform</span>}</span>
+                                    <span class="perm-desc">@permission.Description</span>
+                                </span>
+                            </label>
+                            @if (Model.IsAdministrator)
+                            {
+                                <input type="hidden" name="Permissions" value="@permission.Key" />
+                            }
+                        }
+                    </fieldset>
+                }
+            </div>
+        </section>
     </div>
-    <div class="mt-3">
-        <button type="submit" class="btn btn-primary">Save</button>
-        <a asp-action="Index" class="btn btn-link">Cancel</a>
-    </div>
+    @if (canManage)
+    {
+        <div class="panel-footer d-flex justify-content-end gap-2">
+            <a asp-action="Index" class="btn btn-ghost">Cancel</a>
+            <button type="submit" class="btn btn-primary"><icon name="check" class="icon-sm" /> @(isNew ? "Create role" : "Save changes")</button>
+        </div>
+    }
 </form>

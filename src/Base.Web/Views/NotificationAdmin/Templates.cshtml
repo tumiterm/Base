@@ -1,22 +1,40 @@
 @model IReadOnlyList<Base.Application.Notifications.NotificationTemplateView>
 @{
-    ViewData["Title"] = "Notification templates";
+    ViewData["Title"] = "Message templates";
 }
 <div class="page-header">
-    <h1 class="page-title">Notification templates</h1>
+    <div>
+        <h1 class="page-title">Messages</h1>
+        <p class="page-subtitle">The wording of everything the application sends. Defaults ship with the application; changes here apply to this organisation only and can be reset.</p>
+    </div>
 </div>
-<p class="text-muted">Default wording ships with the application. Changes here apply to this tenant only and can be reset.</p>
-<table class="table align-middle">
-    <thead><tr><th>Template</th><th>Category</th><th>Channels</th><th>Customised parts</th></tr></thead>
-    <tbody>
-        @foreach (var t in Model)
-        {
-            <tr>
-                <td><a asp-action="Template" asp-route-code="@t.Definition.Code">@t.Definition.Name</a><div class="small text-muted">@t.Definition.Description</div></td>
-                <td>@t.Definition.Category @if (t.Definition.IsMandatory) { <span class="badge text-bg-secondary">always sent</span> }</td>
-                <td>@string.Join(", ", t.Definition.Channels)@if (t.Definition.Fallback is { Count: > 0 } fb) { <div class="small text-muted">fallback: @string.Join(" → ", fb)</div> }</td>
-                <td>@t.Parts.Count(p => p.OverrideContent is not null)</td>
-            </tr>
-        }
-    </tbody>
-</table>
+<partial name="_Tabs" model='"templates"' />
+<div class="stack">
+    @foreach (var group in Model.GroupBy(t => t.Definition.Category, StringComparer.Ordinal))
+    {
+        <section class="panel" aria-label="@group.Key">
+            <div class="panel-header"><h2 class="panel-title">@group.Key</h2><span class="text-muted small">@group.Count()</span></div>
+            <ul class="item-list">
+                @foreach (var t in group)
+                {
+                    var d = t.Definition;
+                    var custom = t.Parts.Count(p => p.OverrideContent is not null);
+                    <li>
+                        <span class="file-tile @(custom > 0 ? "is-code" : "")" aria-hidden="true"><icon name="@MessageDisplay.Icon(d.Channels[0])" /></span>
+                        <div class="item-main">
+                            <a class="item-title d-block text-decoration-none" asp-action="Template" asp-route-code="@d.Code">@d.Name</a>
+                            <div class="item-sub">@d.Description</div>
+                            <div class="d-flex flex-wrap gap-1 mt-1">
+                                @foreach (var c in d.Channels) {<span class="chip"><icon name="@MessageDisplay.Icon(c)" /> @MessageDisplay.Channel(c)</span>}
+                                @if (d.Fallback is { Count: > 0 } fallback) {<span class="chip" title="Tried when the main channel can't deliver">then @string.Join(", ", fallback.Select(MessageDisplay.Channel))</span>}
+                                @if (d.IsMandatory) {<span class="chip" title="People can't opt out">Always sent</span>}
+                                @if (custom > 0) {<span class="chip is-active">@custom part@(custom == 1 ? "" : "s") customised</span>}
+                            </div>
+                        </div>
+                        <icon name="chevron-right" class="icon-sm text-muted mt-1" />
+                    </li>
+                }
+            </ul>
+        </section>
+    }
+</div>

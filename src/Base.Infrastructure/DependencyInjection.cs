@@ -181,6 +181,8 @@ public static class DependencyInjection
 
         services.AddScoped<IdentityQueries>();
         services.AddScoped<IUserAdministration, UserAdministrationService>();
+        services.AddScoped<Application.Common.Records.IRecordLabelProvider, UserRecordLabels>();
+        services.AddScoped<Application.Common.Records.IRecordLabelProvider, RoleRecordLabels>();
         services.AddScoped<IRoleAdministration, RoleAdministrationService>();
         services.AddScoped<IAccountService, AccountService>();
         services.AddScoped<IdentityEmailHandlers>();

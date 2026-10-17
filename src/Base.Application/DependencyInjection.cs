@@ -78,6 +78,7 @@ public static class DependencyInjection
 
         services.AddScoped<DocumentService>();
         services.AddScoped<IDocumentService>(sp => sp.GetRequiredService<DocumentService>());
+        services.AddScoped<IRecordLabelProvider, DocumentRecordLabels>();
         services.AddScoped<IDocumentRetention, DocumentRetention>();
         services.AddScoped<IScheduledJob, DocumentRetentionJob>();
         services.AddScoped<IDocumentGenerator, DocumentGenerator>();

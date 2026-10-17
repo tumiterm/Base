@@ -3,17 +3,40 @@
     var error = Model.Error;
     ViewData["Title"] = error.Ticket;
 }
-<nav class="mb-2"><a asp-action="Errors">&larr; Errors</a></nav>
-<h1 class="page-title mb-1">@error.Ticket</h1>
-<p class="text-muted small"><local-time value="@error.OccurredAt" /> · @error.Method @error.Path · @(error.User ?? "anonymous")</p>
-<div class="d-flex gap-2 mb-3">
-    @if (Model.TraceUrl is { } trace) { <a class="btn btn-sm btn-outline-primary" href="@trace" target="_blank" rel="noopener">Open the trace</a> }
-    @if (Model.LogSearchUrl is { } logs) { <a class="btn btn-sm btn-outline-primary" href="@logs" target="_blank" rel="noopener">Search the logs</a> }
+<nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-action="Index">System</a><icon name="chevron-right" class="icon-sm" /><a asp-action="Errors">Errors</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">@error.Ticket</span></nav>
+<div class="page-header">
+    <div class="entity">
+        <span class="file-tile file-tile-lg is-pdf" aria-hidden="true"><icon name="circle-alert" /></span>
+        <div class="entity-text">
+            <h1 class="page-title mono">@error.Ticket</h1>
+            <p class="page-subtitle">@error.ExceptionType.Split('.')[^1] · <local-time value="error.OccurredAt" format="d MMM yyyy, HH:mm:ss" /></p>
+        </div>
+    </div>
+    <div class="page-actions">
+        @if (Model.TraceUrl is { } trace) {<a class="btn btn-secondary" href="@trace" target="_blank" rel="noopener"><icon name="activity" class="icon-sm" /> Open the trace</a>}
+        @if (Model.LogSearchUrl is { } logs) {<a class="btn btn-secondary" href="@logs" target="_blank" rel="noopener"><icon name="search" class="icon-sm" /> Search the logs</a>}
+        <button class="btn btn-ghost" type="button" data-copy="#error-details"><icon name="copy" class="icon-sm" /> <span data-copy-label>Copy details</span></button>
+    </div>
 </div>
-<dl class="row small">
-    <dt class="col-sm-2">Type</dt><dd class="col-sm-10">@error.ExceptionType</dd>
-    <dt class="col-sm-2">Message</dt><dd class="col-sm-10">@error.Message</dd>
-    <dt class="col-sm-2">Trace id</dt><dd class="col-sm-10"><code>@(error.TraceId ?? "-")</code></dd>
-    <dt class="col-sm-2">Fingerprint</dt><dd class="col-sm-10"><code>@error.Fingerprint</code> <span class="text-muted">(same type and place = same fingerprint)</span></dd>
-</dl>
-<pre class="small bg-body-tertiary p-3 border rounded text-wrap">@error.Details</pre>
+<div class="detail-grid">
+    <section class="panel" aria-labelledby="stack-title">
+        <div class="panel-header"><h2 class="panel-title" id="stack-title">What happened</h2></div>
+        <div class="panel-body"><p class="mb-0 fw-semibold">@error.Message</p></div>
+        <pre class="code-block" id="error-details">@error.Details</pre>
+    </section>
+    <aside class="stack">
+        <section class="panel" aria-labelledby="context-title">
+            <div class="panel-header"><h2 class="panel-title" id="context-title">Context</h2></div>
+            <div class="panel-body">
+                <dl class="kv">
+                    <dt>Request</dt><dd class="mono">@error.Method @error.Path</dd>
+                    <dt>User</dt><dd>@(error.User ?? "Anonymous")</dd>
+                    <dt>Exception</dt><dd class="mono">@error.ExceptionType</dd>
+                    <dt>Trace id</dt><dd class="mono">@(error.TraceId ?? "—")</dd>
+                    <dt>Fingerprint</dt><dd class="mono">@error.Fingerprint</dd>
+                </dl>
+            </div>
+            <div class="panel-footer small text-muted">The same exception thrown from the same place has the same fingerprint, so repeats are easy to group.</div>
+        </section>
+    </aside>
+</div>

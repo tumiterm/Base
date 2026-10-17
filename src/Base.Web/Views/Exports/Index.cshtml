@@ -5,49 +5,51 @@
 }
 <div class="page-header">
     <div>
-        <h1 class="page-title">My exports</h1>
-        <p class="page-subtitle">Files you exported; big exports are prepared in the background.</p>
+        <h1 class="page-title">Import and export</h1>
+        <p class="page-subtitle">Export any list with the Export buttons on it. Big exports are prepared in the background, and their files wait here for a few days.</p>
     </div>
-    <a class="btn btn-link" asp-controller="Imports" asp-action="Index">Imports</a>
 </div>
-<p class="text-muted">Export any list with the Export buttons on it. Big exports are prepared in the background; their files stay here for a few days.</p>
+<partial name="_DataExchangeTabs" model='"exports"' />
 @if (Model.Total == 0)
 {
-    <p class="text-muted">You haven't exported anything yet.</p>
+    <div class="empty-state">
+        <icon name="download" />
+        <div class="empty-state-title">No exports yet</div>
+        <p class="mb-0">Use Export Excel or CSV on People, Users, Documents or the audit trail.</p>
+    </div>
 }
 else
 {
-    <table class="table align-middle">
-        <thead><tr><th>Requested</th><th>List</th><th>Format</th><th>Rows</th><th>Status</th><th></th></tr></thead>
-        <tbody>
+    <section class="panel">
+        <ul class="item-list">
             @foreach (var job in Model.Items)
             {
-                var badge = job.Status switch { ExportStatus.Completed => "text-bg-success", ExportStatus.Failed => "text-bg-danger", _ => "text-bg-warning" };
-                <tr>
-                    <td class="text-nowrap small"><local-time value="@job.RequestedAt" /></td>
-                    <td>@job.ExporterName</td>
-                    <td>@job.Format.ToString().ToUpperInvariant()</td>
-                    <td>@job.RowCount.ToString("N0")</td>
-                    <td><span class="badge @badge">@job.Status</span>@if (job.Error is not null) { <div class="small text-danger">@job.Error</div> }</td>
-                    <td>
-                        @if (job.CanDownload)
-                        {
-                            <a class="btn btn-sm btn-outline-primary" asp-action="Download" asp-route-id="@job.Id">Download</a>
-                        }
-                        else if (job.Status == ExportStatus.Completed)
-                        {
-                            <span class="small text-muted">@(job.RowCount > 0 && job.CompletedAt is not null ? "Downloaded at the time" : "")</span>
-                        }
-                    </td>
-                </tr>
+                var (tone, label) = job.Status switch { ExportStatus.Completed => ("success", "Ready"), ExportStatus.Failed => ("danger", "Failed"), _ => ("info", "Preparing") };
+                var sheet = job.Format.ToString().ToUpperInvariant();
+                <li>
+                    <span class="file-tile is-sheet" aria-hidden="true"><icon name="file-spreadsheet" /></span>
+                    <div class="item-main">
+                        <div class="item-title">@job.ExporterName <span class="chip ms-1">@sheet</span></div>
+                        <div class="item-sub">@job.RowCount.ToString("N0") row@(job.RowCount == 1 ? "" : "s") · requested <local-time value="job.RequestedAt" format="d MMM yyyy, HH:mm" /></div>
+                        @if (job.Error is not null) {<div class="item-sub text-danger">@job.Error</div>}
+                    </div>
+                    <span class="badge text-bg-@tone">@label</span>
+                    @if (job.CanDownload)
+                    {
+                        <a class="btn btn-secondary btn-sm" asp-action="Download" asp-route-id="@job.Id"><icon name="download" class="icon-sm" /> Download</a>
+                    }
+                </li>
             }
-        </tbody>
-    </table>
-    <nav class="d-flex justify-content-between">
-        <span class="text-muted small">@Model.Total export(s), page @Model.Page of @Model.TotalPages</span>
-        <div class="btn-group">
-            <a class="btn btn-outline-secondary btn-sm @(Model.HasPrevious ? "" : "disabled")" asp-route-page="@(Model.Page - 1)">Previous</a>
-            <a class="btn btn-outline-secondary btn-sm @(Model.HasNext ? "" : "disabled")" asp-route-page="@(Model.Page + 1)">Next</a>
+        </ul>
+    </section>
+    @if (Model.TotalPages > 1)
+    {
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <span class="text-muted small">Page @Model.Page of @Model.TotalPages</span>
+            <nav class="btn-group btn-group-sm" aria-label="Pages">
+                <a class="btn btn-outline-secondary @(Model.HasPrevious ? "" : "disabled")" asp-route-page="@(Model.Page - 1)">Previous</a>
+                <a class="btn btn-outline-secondary @(Model.HasNext ? "" : "disabled")" asp-route-page="@(Model.Page + 1)">Next</a>
+            </nav>
         </div>
-    </nav>
+    }
 }

@@ -1,37 +1,81 @@
 @model Base.Application.Notifications.NotificationTemplateView
+@inject ICurrentUser CurrentUser
 @{
     var d = Model.Definition;
     ViewData["Title"] = d.Name;
-    var variables = d.Variables.Concat(Base.Application.Notifications.NotificationCatalog.BuiltInVariables).Order(StringComparer.Ordinal);
+    var variables = d.Variables.Concat(Base.Application.Notifications.NotificationCatalog.BuiltInVariables).Order(StringComparer.Ordinal).ToList();
+    var canManage = CurrentUser.HasPermission(PermissionCodes.Notifications.Manage);
 }
+<nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-action="Index">Messages</a><icon name="chevron-right" class="icon-sm" /><a asp-action="Templates">Templates</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">@d.Name</span></nav>
 <div class="page-header">
-    <h1 class="page-title">@d.Name</h1>
-</div>
-<p class="text-muted">@d.Description</p>
-<p class="small">Variables: @foreach (var v in variables) { <code class="me-2">{{@v}}</code> }</p>
-@if (d.WhatsApp is { } wa)
-{
-    <p class="small">WhatsApp sends the approved template <code>@wa.Name</code> (@wa.Language) with parameters: @string.Join(", ", wa.Parameters). Its wording is managed in Meta Business Manager, not here.</p>
-}
-<div asp-validation-summary="All" class="alert alert-danger" role="alert"></div>
-@foreach (var part in Model.Parts)
-{
-    <div class="card mb-3">
-        <div class="card-header d-flex justify-content-between">
-            <span><code>@part.Part</code> @if (part.OverrideContent is not null) { <span class="badge text-bg-info">customised</span> }</span>
-            @if (part.OverrideContent is not null)
-            {
-                <form asp-action="ResetPart" asp-route-code="@d.Code" asp-route-part="@part.Part" method="post" asp-permission="@PermissionCodes.Notifications.Manage">
-                    <button class="btn btn-sm btn-link" type="submit">Reset to default</button>
-                </form>
-            }
-        </div>
-        <div class="card-body">
-            <form asp-action="SavePart" asp-route-code="@d.Code" asp-route-part="@part.Part" method="post">
-                <textarea class="form-control font-monospace mb-2" name="content" rows="@(part.Part.EndsWith("html", StringComparison.Ordinal) ? 6 : 3)">@part.Effective</textarea>
-                <button class="btn btn-sm btn-primary" type="submit" asp-permission="@PermissionCodes.Notifications.Manage">Save</button>
-            </form>
+    <div class="entity">
+        <span class="file-tile file-tile-lg" aria-hidden="true"><icon name="@MessageDisplay.Icon(d.Channels[0])" /></span>
+        <div class="entity-text">
+            <h1 class="page-title">@d.Name</h1>
+            <p class="page-subtitle">@d.Description</p>
         </div>
     </div>
+</div>
+@if (!ViewData.ModelState.IsValid)
+{
+    <div asp-validation-summary="All" class="alert alert-danger" role="alert"></div>
 }
-<a asp-action="Templates">Back to templates</a>
+<div class="detail-grid">
+    <div class="stack">
+        @foreach (var part in Model.Parts)
+        {
+            var id = "part-" + part.Part.Replace('.', '-');
+            var html = part.Part.EndsWith("html", StringComparison.Ordinal);
+            <form class="panel" method="post" asp-action="SavePart" asp-route-code="@d.Code" asp-route-part="@part.Part" aria-labelledby="@id-title">
+                <div class="panel-header">
+                    <h2 class="panel-title" id="@id-title">@MessageDisplay.Part(part.Part)</h2>
+                    @if (part.OverrideContent is not null) {<span class="chip is-active">Customised</span>} else {<span class="text-muted small">Default wording</span>}
+                </div>
+                <div class="panel-body">
+                    <label class="visually-hidden" for="@id">@MessageDisplay.Part(part.Part)</label>
+                    <textarea class="form-control font-monospace" id="@id" name="content" rows="@(html ? 10 : part.Part.EndsWith("subject", StringComparison.Ordinal) || part.Part.EndsWith("title", StringComparison.Ordinal) ? 1 : 5)" spellcheck="@(html ? "false" : "true")" disabled="@(!canManage)">@part.Effective</textarea>
+                </div>
+                @if (canManage)
+                {
+                    <div class="panel-footer d-flex justify-content-end gap-2">
+                        @if (part.OverrideContent is not null)
+                        {
+                            <button class="btn btn-ghost" type="submit" formaction="@Url.Action("ResetPart", new { code = d.Code, part = part.Part })" formnovalidate>Reset to default</button>
+                        }
+                        <button class="btn btn-primary" type="submit"><icon name="check" class="icon-sm" /> Save</button>
+                    </div>
+                }
+            </form>
+        }
+    </div>
+    <aside class="stack">
+        <section class="panel" aria-labelledby="vars-title">
+            <div class="panel-header"><h2 class="panel-title" id="vars-title">Placeholders</h2></div>
+            <div class="panel-body stack">
+                <p class="small text-muted mb-0">Filled in when the message is sent. Only these can be used.</p>
+                <div class="d-flex flex-wrap gap-1">
+                    @foreach (var v in variables) {<code class="chip mono">{{@v}}</code>}
+                </div>
+            </div>
+        </section>
+        <section class="panel" aria-labelledby="about-title">
+            <div class="panel-header"><h2 class="panel-title" id="about-title">How it's sent</h2></div>
+            <div class="panel-body">
+                <dl class="kv">
+                    <dt>Category</dt><dd>@d.Category</dd>
+                    <dt>Channels</dt><dd>@string.Join(", ", d.Channels.Select(MessageDisplay.Channel))</dd>
+                    @if (d.Fallback is { Count: > 0 } fallback) {<dt>If that fails</dt><dd>@string.Join(", then ", fallback.Select(MessageDisplay.Channel))</dd>}
+                    <dt>Opt out</dt><dd>@(d.IsMandatory ? "Not possible: always sent" : "People can switch it off")</dd>
+                    @if (d.IsSensitive) {<dt>Kept</dt><dd>Not stored: it contains a sign-in link</dd>}
+                </dl>
+            </div>
+        </section>
+        @if (d.WhatsApp is { } wa)
+        {
+            <section class="panel" aria-labelledby="wa-title">
+                <div class="panel-header"><h2 class="panel-title" id="wa-title">WhatsApp</h2></div>
+                <div class="panel-body small">Sends the approved template <span class="mono">@wa.Name</span> (@wa.Language) with @string.Join(", ", wa.Parameters). Its wording is managed in Meta Business Manager, not here.</div>
+            </section>
+        }
+    </aside>
+</div>

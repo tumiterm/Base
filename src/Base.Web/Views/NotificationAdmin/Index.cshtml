@@ -1,80 +1,93 @@
 @model NotificationLogViewModel
+@inject ICurrentUser CurrentUser
 @using Base.Domain.Notifications
 @{
-    ViewData["Title"] = "Notification log";
+    ViewData["Title"] = "Messages";
     var results = Model.Messages;
     var f = Model.Filter;
+    var filtered = f.Search is not null || f.Channel is not null || f.Status is not null || f.Template is not null;
+    var canResend = CurrentUser.HasPermission(PermissionCodes.Notifications.Manage);
+    var statuses = new (NotificationStatus? Status, string Label)[] { (null, "All"), (NotificationStatus.Sent, "Sent"), (NotificationStatus.Failed, "Failed"), (NotificationStatus.Retrying, "Retrying"), (NotificationStatus.Queued, "Queued"), (NotificationStatus.Skipped, "Skipped") };
+}
+@functions {
+    private object Route(NotificationLogFilterViewModel f, NotificationStatus? status, bool keepStatus = true, int page = 1) =>
+        new { f.Search, f.Channel, Status = keepStatus ? f.Status : status, f.Template, Page = page };
 }
 <div class="page-header">
     <div>
-        <h1 class="page-title">Notification log</h1>
-        <p class="page-subtitle">Every message the application sent, and how it went.</p>
+        <h1 class="page-title">Messages</h1>
+        <p class="page-subtitle">Every email, SMS, WhatsApp and in-app message the application sent, and how it went.</p>
     </div>
     <div class="page-actions">
         <partial name="_ExportButtons" model='new ExportButtonsViewModel("notifications", PermissionCodes.Notifications.View)' />
-        <a class="btn btn-link" asp-action="Templates">Templates</a>
     </div>
 </div>
-<form method="get" class="row g-2 align-items-end mb-3">
-    <div class="col-md-3"><label class="form-label small" for="Search">Recipient</label><input class="form-control" id="Search" name="Search" value="@f.Search" /></div>
-    <div class="col-md-2">
-        <label class="form-label small" for="Channel">Channel</label>
-        <select class="form-select" id="Channel" name="Channel">
-            <option value="">All</option>
-            @foreach (var c in Enum.GetValues<NotificationChannel>()) { <option value="@c" selected="@(c == f.Channel)">@c</option> }
+<partial name="_Tabs" model='"log"' />
+
+<div class="toolbar">
+    <nav class="segmented scroll-x" aria-label="Filter by status">
+        @foreach (var s in statuses)
+        {
+            var active = s.Status == f.Status;
+            <a class="@(active ? "is-active" : "")" aria-current="@(active ? "page" : null)" href="@Url.Action("Index", Route(f, s.Status, keepStatus: false))">@s.Label</a>
+        }
+    </nav>
+    <span class="toolbar-spacer"></span>
+    <form method="get" class="d-flex flex-wrap gap-2 toolbar-search" role="search">
+        <input type="hidden" name="Status" value="@f.Status" />
+        <select class="form-select w-auto" name="Channel" aria-label="Channel" data-autosubmit>
+            <option value="">All channels</option>
+            @foreach (var c in Enum.GetValues<NotificationChannel>()) {<option value="@c" selected="@(c == f.Channel)">@MessageDisplay.Channel(c)</option>}
         </select>
-    </div>
-    <div class="col-md-2">
-        <label class="form-label small" for="Status">Status</label>
-        <select class="form-select" id="Status" name="Status">
-            <option value="">All</option>
-            @foreach (var s in Enum.GetValues<NotificationStatus>()) { <option value="@s" selected="@(s == f.Status)">@s</option> }
+        <select class="form-select w-auto" name="Template" aria-label="Template" data-autosubmit>
+            <option value="">All templates</option>
+            @foreach (var t in Base.Application.Notifications.NotificationCatalog.All) {<option value="@t.Code" selected="@(t.Code == f.Template)">@t.Name</option>}
         </select>
-    </div>
-    <div class="col-md-3">
-        <label class="form-label small" for="Template">Template</label>
-        <select class="form-select" id="Template" name="Template">
-            <option value="">All</option>
-            @foreach (var t in Base.Application.Notifications.NotificationCatalog.All) { <option value="@t.Code" selected="@(t.Code == f.Template)">@t.Name</option> }
-        </select>
-    </div>
-    <div class="col-md-2 d-flex gap-2"><button class="btn btn-primary" type="submit">Filter</button><a class="btn btn-link" asp-action="Index">Clear</a></div>
-</form>
+        <label class="input-affix flex-grow-1">
+            <icon name="search" class="icon-sm" />
+            <input class="form-control" type="search" name="Search" value="@f.Search" placeholder="Recipient" aria-label="Search by recipient" />
+        </label>
+    </form>
+</div>
+
 @if (results.Total == 0)
 {
-    <p class="text-muted">No messages match.</p>
+    <div class="empty-state">
+        <icon name="inbox" />
+        <div class="empty-state-title">@(filtered ? "No messages match" : "Nothing sent yet")</div>
+        <p class="mb-2">@(filtered ? "Try another status, channel or template." : "Invitations, password resets and notices appear here as they go out.")</p>
+        @if (filtered) {<a class="btn btn-secondary" asp-action="Index">Clear filters</a>}
+    </div>
 }
 else
 {
-    <table class="table table-sm align-top">
-        <thead><tr><th>When</th><th>Template</th><th>Channel</th><th>To</th><th>Status</th><th>Details</th><th></th></tr></thead>
+    <table class="table table-entity align-middle">
+        <thead><tr><th>Message</th><th>Channel</th><th>Status</th><th>When</th><th><span class="visually-hidden">Actions</span></th></tr></thead>
         <tbody>
             @foreach (var m in results.Items)
             {
-                var badge = m.Status switch
-                {
-                    NotificationStatus.Sent => "text-bg-success",
-                    NotificationStatus.Failed => "text-bg-danger",
-                    NotificationStatus.Skipped => "text-bg-secondary",
-                    _ => "text-bg-warning",
-                };
+                var status = MessageDisplay.Status(m.Status);
                 <tr>
-                    <td class="text-nowrap"><local-time value="@m.CreatedAt" /></td>
-                    <td>@m.TemplateCode @if (m.FallbackOf is not null) { <span class="badge text-bg-light">fallback</span> }</td>
-                    <td>@m.Channel</td>
-                    <td class="text-break">@m.RecipientAddress<div class="small text-muted">@m.RecipientName</div></td>
-                    <td><span class="badge @badge">@m.Status</span>@if (m.Attempts > 1) { <div class="small text-muted">@m.Attempts attempts</div> }</td>
-                    <td class="small text-break">
-                        @if (m.Provider is not null) { <div>via @m.Provider</div> }
-                        @if (m.LastError is not null) { <div class="text-danger">@m.LastError</div> }
-                        @if (m.IsSensitive) { <div class="text-muted fst-italic">Contained a sign-in link; content not stored.</div> }
-                        else if (m.Subject is not null) { <div class="text-muted">@m.Subject</div> }
-                    </td>
                     <td>
-                        @if (!m.IsSensitive && m.Status != NotificationStatus.Skipped)
+                        <div class="entity">
+                            <span class="file-tile" aria-hidden="true"><icon name="@MessageDisplay.Icon(m.Channel)" /></span>
+                            <span class="entity-text">
+                                <span class="entity-name">@MessageDisplay.Template(m.TemplateCode)@(m.FallbackOf is not null ? " (fallback)" : "")</span>
+                                <span class="entity-sub">@(m.RecipientName is null ? m.RecipientAddress : $"{m.RecipientName} · {m.RecipientAddress}")</span>
+                                @if (m.LastError is not null) {<span class="entity-sub text-danger">@m.LastError</span>}
+                                else if (m.IsSensitive) {<span class="entity-sub">Contained a sign-in link, so its content wasn't kept.</span>}
+                                else if (m.Subject is not null) {<span class="entity-sub">“@m.Subject”</span>}
+                            </span>
+                        </div>
+                    </td>
+                    <td><span class="text-muted">@MessageDisplay.Channel(m.Channel)@(m.Provider is null ? "" : " · " + m.Provider)</span></td>
+                    <td><span class="badge text-bg-@status.Tone">@status.Label</span>@if (m.Attempts > 1) {<div class="small text-muted">@m.Attempts attempts</div>}</td>
+                    <td class="text-muted text-nowrap"><local-time value="m.CreatedAt" format="d MMM, HH:mm" /></td>
+                    <td class="text-end cell-actions">
+                        @if (canResend && !m.IsSensitive && m.Status != NotificationStatus.Skipped)
                         {
-                            <form asp-action="Resend" asp-route-id="@m.Id" method="post" asp-permission="@PermissionCodes.Notifications.Manage">
-                                <button class="btn btn-sm btn-outline-secondary" type="submit">Resend</button>
+                            <form asp-action="Resend" asp-route-id="@m.Id" method="post">
+                                <button class="icon-btn" type="submit" title="Send again" aria-label="Send this message again"><icon name="rotate-cw" /></button>
                             </form>
                         }
                     </td>
@@ -82,11 +95,11 @@ else
             }
         </tbody>
     </table>
-    <nav class="d-flex justify-content-between">
-        <span class="text-muted small">@results.Total message(s), page @results.Page of @results.TotalPages</span>
-        <div class="btn-group">
-            <a class="btn btn-outline-secondary btn-sm @(results.HasPrevious ? "" : "disabled")" asp-route-Page="@(results.Page - 1)" asp-route-Search="@f.Search" asp-route-Channel="@f.Channel" asp-route-Status="@f.Status" asp-route-Template="@f.Template">Previous</a>
-            <a class="btn btn-outline-secondary btn-sm @(results.HasNext ? "" : "disabled")" asp-route-Page="@(results.Page + 1)" asp-route-Search="@f.Search" asp-route-Channel="@f.Channel" asp-route-Status="@f.Status" asp-route-Template="@f.Template">Next</a>
-        </div>
-    </nav>
+    <div class="d-flex justify-content-between align-items-center">
+        <span class="text-muted small">@results.Total.ToString("N0") message@(results.Total == 1 ? "" : "s") · page @results.Page of @results.TotalPages</span>
+        <nav class="btn-group btn-group-sm" aria-label="Pages">
+            <a class="btn btn-outline-secondary @(results.HasPrevious ? "" : "disabled")" href="@Url.Action("Index", Route(f, null, page: results.Page - 1))">Previous</a>
+            <a class="btn btn-outline-secondary @(results.HasNext ? "" : "disabled")" href="@Url.Action("Index", Route(f, null, page: results.Page + 1))">Next</a>
+        </nav>
+    </div>
 }

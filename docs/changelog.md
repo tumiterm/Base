@@ -14,7 +14,17 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+- The System, Errors, error details, Roles, role, Messages (log, templates, template), Notifications, notification
+  preferences, Audit trail, Import, import results, My exports, Generate a document and Change password screens are
+  rebuilt on the design system.
+- The audit trail names the records it lists (people, users, roles, documents) instead of showing their ids, and
+  role assignments and permission changes appear under the user or role they belong to.
+
+### Fixed
+
+- Forms that list every validation message no longer trip the content security policy with an inline style.
 
 ## [1.0.0] - 2026-10-17
 

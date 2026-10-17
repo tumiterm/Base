@@ -4,127 +4,159 @@
     ViewData["Title"] = "Audit trail";
     var results = Model.Entries;
     var f = Model.Filter;
+    var filtered = f.EntityType is not null || f.EntityId is not null || f.UserId is not null || f.From is not null || f.To is not null;
+}
+@functions {
+    private static (string Verb, string Dot) Describe(AuditAction action) => action switch
+    {
+        AuditAction.Created => ("added", "is-ok"),
+        AuditAction.Deleted => ("removed", "is-alert"),
+        AuditAction.Restored => ("restored", "is-warning"),
+        AuditAction.Updated => ("changed", "is-info"),
+        _ => (action.ToString().ToLowerInvariant(), "is-alert"),
+    };
+
+    private static string Humanize(string type)
+    {
+        var builder = new System.Text.StringBuilder();
+        foreach (var c in type)
+        {
+            if (char.IsUpper(c) && builder.Length > 0)
+            {
+                builder.Append(' ');
+            }
+
+            builder.Append(builder.Length == 0 ? c : char.ToLowerInvariant(c));
+        }
+
+        return builder.ToString();
+    }
+
+    private object Route(AuditFilterViewModel f, int page) => new
+    {
+        f.EntityType, f.EntityId, f.UserId, From = f.From?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+        To = f.To?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), Page = page,
+    };
 }
 <div class="page-header">
     <div>
         <h1 class="page-title">Audit trail</h1>
-        <p class="page-subtitle">Who changed what, and when.</p>
+        <p class="page-subtitle">Who changed what, and when. Personal and secret values are recorded as changed, never stored.</p>
     </div>
-    <partial name="_ExportButtons" model='new ExportButtonsViewModel("audit", PermissionCodes.Audit.View)' />
+    <div class="page-actions">
+        <partial name="_ExportButtons" model='new ExportButtonsViewModel("audit", PermissionCodes.Audit.View)' />
+    </div>
 </div>
-<form method="get" class="row g-2 align-items-end mb-3">
-    <div class="col-md-2">
-        <label class="form-label small" for="EntityType">Type</label>
-        <select class="form-select" id="EntityType" name="EntityType">
-            <option value="">All</option>
-            @foreach (var type in Model.EntityTypes)
-            {
-                <option value="@type" selected="@(type == f.EntityType)">@type</option>
-            }
-        </select>
-    </div>
-    <div class="col-md-3">
-        <label class="form-label small" for="EntityId">Record id</label>
-        <input class="form-control" id="EntityId" name="EntityId" value="@f.EntityId" />
-    </div>
-    <div class="col-md-2">
-        <label class="form-label small" for="From">From (UTC)</label>
-        <input class="form-control" type="date" id="From" name="From" value="@f.From?.ToString("yyyy-MM-dd")" />
-    </div>
-    <div class="col-md-2">
-        <label class="form-label small" for="To">To (UTC)</label>
-        <input class="form-control" type="date" id="To" name="To" value="@f.To?.ToString("yyyy-MM-dd")" />
-    </div>
-    @if (f.UserId is { } userId)
-    {
-        <input type="hidden" name="UserId" value="@userId" />
-    }
-    <div class="col-md-3 d-flex gap-2">
-        <button class="btn btn-primary" type="submit">Filter</button>
-        <a class="btn btn-link" asp-action="Index">Clear</a>
-    </div>
+
+<form method="get" class="toolbar" role="search">
+    @if (f.EntityId is not null) {<input type="hidden" name="EntityId" value="@f.EntityId" />}
+    @if (f.UserId is { } userId) {<input type="hidden" name="UserId" value="@userId" />}
+    <select class="form-select w-auto" name="EntityType" aria-label="Kind of record" data-autosubmit>
+        <option value="">Every kind of record</option>
+        @foreach (var type in Model.EntityTypes) {<option value="@type" selected="@(type == f.EntityType)">@Humanize(type)</option>}
+    </select>
+    <span class="toolbar-spacer"></span>
+    <label class="d-flex align-items-center gap-2 small text-muted">From <input class="form-control w-auto" type="date" name="From" value="@f.From?.ToString("yyyy-MM-dd")" data-autosubmit /></label>
+    <label class="d-flex align-items-center gap-2 small text-muted">to <input class="form-control w-auto" type="date" name="To" value="@f.To?.ToString("yyyy-MM-dd")" data-autosubmit /></label>
+    <noscript><button class="btn btn-secondary" type="submit">Filter</button></noscript>
 </form>
-@if (f.UserId is not null)
+
+@if (Model.Filtered is not null || f.UserId is not null || (f.EntityId is not null && Model.Filtered is null))
 {
-    <p class="small">Showing changes made by one user. <a asp-action="Index" asp-route-EntityType="@f.EntityType" asp-route-EntityId="@f.EntityId">Show everyone</a></p>
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        @if (f.UserId is not null)
+        {
+            <span class="text-muted small">Changes made by</span>
+            @if (Model.Actor is { } actor) {<partial name="_RecordLink" model="actor" />} else {<span class="chip">one person</span>}
+            <a class="chip is-active" href="@Url.Action("Index", new { f.EntityType, f.EntityId })" aria-label="Show everyone's changes">Everyone <icon name="x" /></a>
+        }
+        @if (f.EntityId is not null)
+        {
+            <span class="text-muted small">History of</span>
+            @if (Model.Filtered is { } record) {<partial name="_RecordLink" model="record" />} else {<span class="chip">one record</span>}
+            <a class="chip is-active" href="@Url.Action("Index", new { f.EntityType, f.UserId })" aria-label="Show every record">Every record <icon name="x" /></a>
+        }
+    </div>
 }
 
 @if (results.Total == 0)
 {
-    <p class="text-muted">No changes match.</p>
+    <div class="empty-state">
+        <icon name="history" />
+        <div class="empty-state-title">@(filtered ? "No changes match" : "No changes yet")</div>
+        <p class="mb-2">@(filtered ? "Try another kind of record or dates." : "Every change anyone makes is recorded here.")</p>
+        @if (filtered) {<a class="btn btn-secondary" asp-action="Index">Clear filters</a>}
+    </div>
 }
 else
 {
-    <table class="table table-sm align-top">
-        <thead>
-            <tr><th>When</th><th>Who</th><th>What</th><th>Changes</th></tr>
-        </thead>
-        <tbody>
+    <section class="panel">
+        <ul class="item-list">
             @foreach (var entry in results.Items)
             {
-                var badge = entry.Action switch
-                {
-                    AuditAction.Created => "text-bg-success",
-                    AuditAction.Deleted or AuditAction.Purged => "text-bg-danger",
-                    AuditAction.Restored => "text-bg-info",
-                    _ => "text-bg-secondary",
-                };
-                <tr>
-                    <td class="text-nowrap"><local-time value="@entry.OccurredAt" format="dd MMM yyyy HH:mm:ss" /></td>
-                    <td>
-                        @if (entry.UserId is { } who)
+                var (verb, dot) = Describe(entry.Action);
+                var record = Model.RecordOf(entry);
+                var detail = entry.EntityType is "UserClaim" or "RoleClaim" ? " a permission or claim of" : entry.EntityType == "UserRole" ? " a role of" : "";
+                <li>
+                    <span class="state-dot @dot" aria-hidden="true"></span>
+                    <div class="item-main">
+                        <div class="item-title d-flex flex-wrap align-items-center gap-1">
+                            @if (entry.UserId is { } who)
+                            {
+                                <a class="text-decoration-none" asp-action="Index" asp-route-UserId="@who" title="Everything this person changed">@entry.UserName</a>
+                            }
+                            else
+                            {
+                                <span>@entry.UserName</span>
+                            }
+                            <span class="fw-normal text-muted">@verb@detail</span>
+                            @if (record is not null && record.Label is not null)
+                            {
+                                <partial name="_RecordLink" model="record" />
+                            }
+                            else
+                            {
+                                <a class="chip" asp-action="Index" asp-route-EntityType="@entry.EntityType" asp-route-EntityId="@entry.EntityId" title="History of this record">@(record?.TypeName ?? Humanize(entry.EntityType))</a>
+                            }
+                        </div>
+                        @if (entry.Changes.Count > 0 && entry.Action != AuditAction.Created)
                         {
-                            <a asp-action="Index" asp-route-UserId="@who" title="Everything this user changed">@entry.UserName</a>
-                        }
-                        else
-                        {
-                            @entry.UserName
-                        }
-                    </td>
-                    <td>
-                        <span class="badge @badge">@entry.Action</span>
-                        <a asp-action="Index" asp-route-EntityType="@entry.EntityType" asp-route-EntityId="@entry.EntityId" title="History of this record">@entry.EntityType</a>
-                        <div class="small text-muted text-break">@entry.EntityId</div>
-                    </td>
-                    <td>
-                        @if (entry.Changes.Count == 0)
-                        {
-                            <span class="text-muted small">No field values</span>
-                        }
-                        else
-                        {
-                            <table class="table table-borderless table-sm small mb-0">
+                            <dl class="kv small mt-2">
                                 @foreach (var change in entry.Changes)
                                 {
-                                    <tr>
-                                        <th class="fw-semibold pe-2">@change.Property</th>
+                                    <dt>@Humanize(change.Property)</dt>
+                                    <dd>
                                         @if (change.Redacted)
                                         {
-                                            <td colspan="2" class="text-muted fst-italic">changed (value hidden)</td>
+                                            <span class="text-muted">Changed (value not recorded)</span>
                                         }
                                         else
                                         {
-                                            <td class="text-danger text-break">@(change.Old ?? "")</td>
-                                            <td class="text-success text-break">@(change.New ?? "")</td>
+                                            <span class="text-muted text-decoration-line-through">@(string.IsNullOrEmpty(change.Old) ? "empty" : change.Old)</span>
+                                            <icon name="chevron-right" class="icon-sm text-muted" />
+                                            <span>@(string.IsNullOrEmpty(change.New) ? "empty" : change.New)</span>
                                         }
-                                    </tr>
+                                    </dd>
                                 }
-                            </table>
+                            </dl>
                         }
-                    </td>
-                </tr>
+                    </div>
+                    <div class="item-aside">
+                        <local-time value="entry.OccurredAt" format="d MMM yyyy, HH:mm" />
+                        @if (record?.Label is not null)
+                        {
+                            <a class="d-block small mt-1" asp-action="Index" asp-route-EntityType="@entry.EntityType" asp-route-EntityId="@entry.EntityId">History</a>
+                        }
+                    </div>
+                </li>
             }
-        </tbody>
-    </table>
-    <nav aria-label="Pages" class="d-flex justify-content-between align-items-center">
-        <span class="text-muted small">@results.Total change(s), page @results.Page of @results.TotalPages</span>
-        <div class="btn-group">
-            <a class="btn btn-outline-secondary btn-sm @(results.HasPrevious ? "" : "disabled")"
-               asp-route-Page="@(results.Page - 1)" asp-route-EntityType="@f.EntityType" asp-route-EntityId="@f.EntityId"
-               asp-route-UserId="@f.UserId" asp-route-From="@f.From?.ToString("yyyy-MM-dd")" asp-route-To="@f.To?.ToString("yyyy-MM-dd")">Previous</a>
-            <a class="btn btn-outline-secondary btn-sm @(results.HasNext ? "" : "disabled")"
-               asp-route-Page="@(results.Page + 1)" asp-route-EntityType="@f.EntityType" asp-route-EntityId="@f.EntityId"
-               asp-route-UserId="@f.UserId" asp-route-From="@f.From?.ToString("yyyy-MM-dd")" asp-route-To="@f.To?.ToString("yyyy-MM-dd")">Next</a>
-        </div>
-    </nav>
+        </ul>
+    </section>
+    <div class="d-flex justify-content-between align-items-center mt-3">
+        <span class="text-muted small">@results.Total.ToString("N0") change@(results.Total == 1 ? "" : "s") · page @results.Page of @results.TotalPages</span>
+        <nav class="btn-group btn-group-sm" aria-label="Pages">
+            <a class="btn btn-outline-secondary @(results.HasPrevious ? "" : "disabled")" href="@Url.Action("Index", Route(f, results.Page - 1))">Previous</a>
+            <a class="btn btn-outline-secondary @(results.HasNext ? "" : "disabled")" href="@Url.Action("Index", Route(f, results.Page + 1))">Next</a>
+        </nav>
+    </div>
 }

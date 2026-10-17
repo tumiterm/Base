@@ -1,23 +1,26 @@
 @model IReadOnlyList<Base.Application.Operations.ErrorRecord>
 @if (Model.Count == 0)
 {
-    <p class="small text-muted mt-2">No errors recorded.</p>
+    <div class="empty-state border-0">
+        <icon name="circle-check" />
+        <div class="empty-state-title">No errors recorded</div>
+        <p class="mb-0">Unhandled errors show up here with the ticket number the user was given.</p>
+    </div>
 }
 else
 {
-    <table class="table table-sm align-top mt-2">
-        <thead><tr><th>Ticket</th><th>When</th><th>Error</th><th>Request</th><th>User</th></tr></thead>
-        <tbody>
-            @foreach (var error in Model)
-            {
-                <tr>
-                    <td class="text-nowrap"><a asp-action="Error" asp-route-ticket="@error.Ticket">@error.Ticket</a></td>
-                    <td class="small text-nowrap"><local-time value="@error.OccurredAt" /></td>
-                    <td class="small text-break">@error.ExceptionType.Split('.')[^1]<div class="text-muted">@error.Message</div></td>
-                    <td class="small text-break">@error.Method @error.Path</td>
-                    <td class="small">@error.User</td>
-                </tr>
-            }
-        </tbody>
-    </table>
+    <ul class="item-list">
+        @foreach (var error in Model)
+        {
+            <li>
+                <span class="state-dot is-alert" aria-hidden="true"></span>
+                <div class="item-main">
+                    <a class="item-title d-block text-decoration-none" asp-controller="SystemAdmin" asp-action="Error" asp-route-ticket="@error.Ticket"><span class="mono">@error.Ticket</span> · @error.ExceptionType.Split('.')[^1]</a>
+                    <div class="item-sub">@error.Message</div>
+                    <div class="item-sub"><span class="mono">@error.Method @error.Path</span> · @(error.User ?? "anonymous")</div>
+                </div>
+                <div class="item-aside"><local-time value="error.OccurredAt" format="d MMM, HH:mm" /></div>
+            </li>
+        }
+    </ul>
 }
