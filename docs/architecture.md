@@ -171,6 +171,29 @@ job applies each `DocumentTypeCatalog` type's `ArchiveAfterDays` and `DeleteAfte
 and checks apply, but not the upload allow-list) or returned for preview. `LinkedDocuments` is a view component that
 lists and uploads a record's documents on any page.
 
+## Exports and imports
+
+Each list that can be exported has an `IExporter`, usually an `Exporter<TRow>` that pages an existing query use case
+(`IUserAdministration.SearchAsync`, `IAuditTrail`...), so whatever that use case filters out stays out. The list's
+query string is the export filter. `IExportService` counts first:
+- up to `Exports.MaxImmediateRows` rows, it streams the file;
+- above that (and up to `Exports.MaxRows`), it queues an `ExportJob` whose outbox handler writes the file. The file is
+  a `StoredFile` owned by the requester that expires after `Exports.RetentionDays`, and the requester gets an in-app
+  notification.
+
+Each kind of import has an `IImporter`. Upload goes through `FileService` (signature, size and upload checks apply).
+The dry run maps headers (by name or alias, ignoring case and punctuation), parses typed cells, runs the importer's
+row checks and records an `ImportJob` with the counts and the first 1,000 errors. Confirm raises `ImportQueued`. The
+handler re-runs the checks, then applies row by row, stopping at the first failure unless the importer allows partial
+imports.
+
+Both handlers run inside `IRunAsUser`. Infrastructure wraps the host's `ICurrentUser` in an overridable one, and
+run-as installs a principal built by the sign-in claims factory, so `HasPermission`, `PermissionGuard` and the audit
+stamps all see the real person.
+
+Formats are `ITabularWriter`/`ITabularReader` in Infrastructure: CSV (formula-injection safe) and XLSX (OpenXML SDK,
+streaming).
+
 ## Background work
 
 - **Outbox** (`OutboxProcessor`): due messages are claimed with an atomic lease, so several instances are safe.

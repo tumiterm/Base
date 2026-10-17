@@ -118,6 +118,11 @@ scripts/new-project.cs  Creates a renamed copy for a new project.
   SHA-256, plus any extra checks you register (ClamAV virus scanning is built in). Object keys never contain user
   input, every download goes through an access check, downloads use pre-signed URLs, and deleted files are purged
   after a retention period.
+- **Exports and imports:** any list to Excel or CSV from an Export button that keeps the list's filters. Big exports
+  run in the background, and every export is recorded. Imports upload a file, check every row without saving, show
+  the errors by row (with a downloadable "rows to fix" file), then apply in the background as the person who
+  uploaded. By default nothing is applied unless every row is valid. Each importer has a template download. Built in:
+  exports of users, the audit trail, the notification log and documents, and a bulk user invite.
 - **Documents:** titled, typed, tagged documents with versions, Draft → Final → Archived, links to any record and
   retention rules per type. There are screens at `/documents`, an API at `/api/documents`, and a `LinkedDocuments`
   component you can drop onto any page. Documents can be generated from HTML templates: HTML is built in, PDF uses

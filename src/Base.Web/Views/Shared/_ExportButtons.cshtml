@@ -1,0 +1,12 @@
+@model ExportButtonsViewModel
+@{
+    // Carry the list's current filters into the export; paging doesn't apply to it.
+    var query = string.Join("&", Context.Request.Query
+        .Where(q => !string.Equals(q.Key, "page", StringComparison.OrdinalIgnoreCase))
+        .Select(q => $"{Uri.EscapeDataString(q.Key)}={Uri.EscapeDataString(q.Value.ToString())}"));
+    var suffix = query.Length == 0 ? "" : "&" + query;
+}
+<div class="btn-group btn-group-sm" role="group" aria-label="Export" asp-permission="@Model.Permission">
+    <a class="btn btn-outline-secondary" href="@Url.Content($"~/exports/{Model.Code}")?format=xlsx@(suffix)">Export Excel</a>
+    <a class="btn btn-outline-secondary" href="@Url.Content($"~/exports/{Model.Code}")?format=csv@(suffix)">CSV</a>
+</div>

@@ -33,6 +33,20 @@ public static class SettingCodes
         public const string DatabaseTenantQuotaMb = "Files.Database.TenantQuotaMb";
     }
 
+    public static class Exports
+    {
+        /// <summary>Exports up to this many rows download at once; bigger ones run in the background.</summary>
+        public const string MaxImmediateRows = "Exports.MaxImmediateRows";
+        public const string MaxRows = "Exports.MaxRows";
+        public const string RetentionDays = "Exports.RetentionDays";
+    }
+
+    public static class Imports
+    {
+        public const string MaxRows = "Imports.MaxRows";
+        public const string RetentionDays = "Imports.RetentionDays";
+    }
+
     public static class Audit
     {
         public const string RetentionDays = "Audit.RetentionDays";

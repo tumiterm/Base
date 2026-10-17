@@ -3,12 +3,14 @@ using Amazon.S3;
 using Azure.Storage.Blobs;
 using Base.Application.Common.Abstractions;
 using Base.Application.Common.Persistence;
+using Base.Application.DataExchange;
 using Base.Application.Documents.Generation;
 using Base.Application.Files;
 using Base.Application.Messaging;
 using Base.Application.Notifications;
 using Base.Application.Users;
 using Base.Infrastructure.Auditing;
+using Base.Infrastructure.DataExchange;
 using Base.Infrastructure.Documents;
 using Base.Infrastructure.Files;
 using Base.Infrastructure.Identity;
@@ -44,6 +46,7 @@ public static class DependencyInjection
 
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddScoped<ICurrentUser, SystemCurrentUser>();
+        AddRunAs(services);
         services.AddHybridCache();
 
         services.AddOptions<DatabaseOptions>().BindConfiguration(DatabaseOptions.SectionName);
@@ -57,6 +60,7 @@ public static class DependencyInjection
         AddFileStorage(services, configuration, environment);
         AddNotifications(services);
         AddDocuments(services, configuration);
+        AddDataExchange(services);
         AddHangfire(services, configuration, connectionString);
 
         services.AddScoped<ITenantContext, TenantContext>();
@@ -228,6 +232,32 @@ public static class DependencyInjection
         services.AddScoped<IEmailSender, NotificationEmailSender>();
         services.AddScoped<IStartupTask, NotificationConfigurationCheck>();
         services.AddHostedService<NotificationRetentionService>();
+    }
+
+    /// <summary>
+    /// Wraps the host's <see cref="ICurrentUser"/> (registered before this runs) so background work can act as a user
+    /// through <see cref="IRunAsUser"/>.
+    /// </summary>
+    private static void AddRunAs(IServiceCollection services)
+    {
+        var inner = services.Last(d => d.ServiceType == typeof(ICurrentUser));
+        services.Remove(inner);
+        services.AddScoped<CurrentUserOverride>();
+        services.AddScoped<ICurrentUser>(sp => new OverridableCurrentUser(sp.GetRequiredService<CurrentUserOverride>(), Resolve(sp, inner)));
+        services.AddScoped<IRunAsUser, RunAsUser>();
+
+        static ICurrentUser Resolve(IServiceProvider sp, ServiceDescriptor descriptor) =>
+            descriptor.ImplementationInstance as ICurrentUser
+            ?? descriptor.ImplementationFactory?.Invoke(sp) as ICurrentUser
+            ?? (ICurrentUser)ActivatorUtilities.CreateInstance(sp, descriptor.ImplementationType!);
+    }
+
+    private static void AddDataExchange(IServiceCollection services)
+    {
+        services.AddSingleton<ITabularWriter, CsvWriter>();
+        services.AddSingleton<ITabularWriter, XlsxWriter>();
+        services.AddSingleton<ITabularReader, CsvReader>();
+        services.AddSingleton<ITabularReader, XlsxReader>();
     }
 
     private static void AddDocuments(IServiceCollection services, IConfiguration configuration)

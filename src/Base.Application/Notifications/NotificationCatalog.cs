@@ -18,6 +18,12 @@ public static class NotificationTemplates
         /// <summary>A generic reminder; also the worked example of WhatsApp with SMS fallback.</summary>
         public const string Reminder = "General.Reminder";
     }
+
+    public static class DataExchange
+    {
+        public const string ExportReady = "DataExchange.ExportReady";
+        public const string ImportFinished = "DataExchange.ImportFinished";
+    }
 }
 
 /// <summary>What users opt in or out of. Categories whose templates are all mandatory can't be switched off.</summary>
@@ -25,6 +31,9 @@ public static class NotificationCategories
 {
     public const string Security = "Security";
     public const string Reminders = "Reminders";
+
+    /// <summary>Results of work the user started (exports, imports).</summary>
+    public const string Activity = "Activity";
 }
 
 /// <summary>A WhatsApp template approved by Meta: its name, language, and the variables that fill {{1}}, {{2}}, ...</summary>
@@ -73,6 +82,10 @@ public static class NotificationCatalog
             [NotificationChannel.WhatsApp, NotificationChannel.InApp], ["Title", "Message"],
             Fallback: [NotificationChannel.Sms, NotificationChannel.Email],
             WhatsApp: new WhatsAppTemplate("general_reminder", "en", ["RecipientName", "Title", "Message"])),
+        new(NotificationTemplates.DataExchange.ExportReady, "Export finished", NotificationCategories.Activity,
+            "A large export finished in the background (or failed).", [NotificationChannel.InApp], ["Export", "Outcome"]),
+        new(NotificationTemplates.DataExchange.ImportFinished, "Import finished", NotificationCategories.Activity,
+            "An import finished applying, with how many rows went in.", [NotificationChannel.InApp], ["Import", "Outcome"]),
     ];
 
     private static readonly FrozenDictionary<string, NotificationTemplateDefinition> ByCode =
