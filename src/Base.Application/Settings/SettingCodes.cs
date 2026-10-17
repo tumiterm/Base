@@ -29,6 +29,15 @@ public static class SettingCodes
 
     public static class Notifications
     {
+        /// <summary>Provider instance (from configuration) for each channel in this tenant; empty uses the channel's default.</summary>
+        public const string EmailProvider = "Notifications.EmailProvider";
+        public const string SmsProvider = "Notifications.SmsProvider";
+        public const string WhatsAppProvider = "Notifications.WhatsAppProvider";
+
+        /// <summary>Country calling code added to local phone numbers that start with 0.</summary>
+        public const string DefaultCountryCode = "Notifications.DefaultCountryCode";
+        public const string RetentionDays = "Notifications.RetentionDays";
+
         public const string ErrorAlertRecipients = "Notifications.ErrorAlertRecipients";
         public const string ErrorAlertThrottleMinutes = "Notifications.ErrorAlertThrottleMinutes";
     }

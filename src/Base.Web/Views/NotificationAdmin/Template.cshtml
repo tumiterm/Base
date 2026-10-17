@@ -1,0 +1,35 @@
+@model Base.Application.Notifications.NotificationTemplateView
+@{
+    var d = Model.Definition;
+    ViewData["Title"] = d.Name;
+    var variables = d.Variables.Concat(Base.Application.Notifications.NotificationCatalog.BuiltInVariables).Order(StringComparer.Ordinal);
+}
+<h1 class="h3">@d.Name</h1>
+<p class="text-muted">@d.Description</p>
+<p class="small">Variables: @foreach (var v in variables) { <code class="me-2">{{@v}}</code> }</p>
+@if (d.WhatsApp is { } wa)
+{
+    <p class="small">WhatsApp sends the approved template <code>@wa.Name</code> (@wa.Language) with parameters: @string.Join(", ", wa.Parameters). Its wording is managed in Meta Business Manager, not here.</p>
+}
+<div asp-validation-summary="All" class="alert alert-danger" role="alert"></div>
+@foreach (var part in Model.Parts)
+{
+    <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between">
+            <span><code>@part.Part</code> @if (part.OverrideContent is not null) { <span class="badge text-bg-info">customised</span> }</span>
+            @if (part.OverrideContent is not null)
+            {
+                <form asp-action="ResetPart" asp-route-code="@d.Code" asp-route-part="@part.Part" method="post" asp-permission="@PermissionCodes.Notifications.Manage">
+                    <button class="btn btn-sm btn-link" type="submit">Reset to default</button>
+                </form>
+            }
+        </div>
+        <div class="card-body">
+            <form asp-action="SavePart" asp-route-code="@d.Code" asp-route-part="@part.Part" method="post">
+                <textarea class="form-control font-monospace mb-2" name="content" rows="@(part.Part.EndsWith("html", StringComparison.Ordinal) ? 6 : 3)">@part.Effective</textarea>
+                <button class="btn btn-sm btn-primary" type="submit" asp-permission="@PermissionCodes.Notifications.Manage">Save</button>
+            </form>
+        </div>
+    </div>
+}
+<a asp-action="Templates">Back to templates</a>

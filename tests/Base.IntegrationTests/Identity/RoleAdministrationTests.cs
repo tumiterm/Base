@@ -16,7 +16,6 @@ public sealed class RoleAdministrationTests(SqlServerFixture sql) : IAsyncLifeti
         _app = await TestApp.CreateAsync(sql.NewDatabase(), services =>
         {
             services.AddSingleton<ICurrentUser>(_actor);
-            services.AddSingleton<IEmailSender>(new CapturingEmailSender());
         });
 
     public async ValueTask DisposeAsync() => await _app.DisposeAsync();

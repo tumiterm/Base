@@ -1,5 +1,7 @@
 using Base.Application;
 using Base.Application.Common.Abstractions;
+using Base.Application.Notifications;
+using Base.Domain.Notifications;
 using Base.Infrastructure;
 using Base.Infrastructure.Startup;
 using Microsoft.Extensions.Configuration;
@@ -13,8 +15,9 @@ namespace Base.IntegrationTests.Infrastructure;
 /// <summary>The Application + Infrastructure layers wired as in production, against a fresh database, with a fake clock.</summary>
 public sealed class TestApp : IAsyncDisposable
 {
-    private TestApp(ServiceProvider services, FakeTimeProvider time, Guid defaultTenantId)
+    private TestApp(ServiceProvider services, FakeTimeProvider time, Guid defaultTenantId, SentMessages sent)
     {
+        Sent = sent;
         Services = services;
         Time = time;
         DefaultTenantId = defaultTenantId;
@@ -26,7 +29,13 @@ public sealed class TestApp : IAsyncDisposable
 
     public Guid DefaultTenantId { get; }
 
-    public static async Task<TestApp> CreateAsync(string connectionString, Action<IServiceCollection>? configure = null)
+    /// <summary>Everything sent through the capturing notification providers (all channels are on and use them).</summary>
+    public SentMessages Sent { get; }
+
+    public static async Task<TestApp> CreateAsync(
+        string connectionString,
+        Action<IServiceCollection>? configure = null,
+        IReadOnlyDictionary<string, string?>? settings = null)
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>(StringComparer.Ordinal)
@@ -35,8 +44,18 @@ public sealed class TestApp : IAsyncDisposable
                 ["Database:MigrateOnStartup"] = "true",
                 ["Outbox:Enabled"] = "false",
                 ["FileStorage:LocalDisk:RootPath"] = Path.Combine(Path.GetTempPath(), "base-tests", Guid.NewGuid().ToString("N")),
+                ["Notifications:Channels:Email:Enabled"] = "true",
+                ["Notifications:Channels:Email:Provider"] = CapturingNotificationProvider.ProviderName,
+                ["Notifications:Channels:Sms:Enabled"] = "true",
+                ["Notifications:Channels:Sms:Provider"] = CapturingNotificationProvider.ProviderName,
+                ["Notifications:Channels:WhatsApp:Enabled"] = "true",
+                ["Notifications:Channels:WhatsApp:Provider"] = CapturingNotificationProvider.ProviderName,
+                ["Notifications:Channels:InApp:Enabled"] = "true",
             })
+            .AddInMemoryCollection(settings ?? new Dictionary<string, string?>(StringComparer.Ordinal))
             .Build();
+
+        var sent = new SentMessages();
 
         var time = new FakeTimeProvider(new DateTimeOffset(2026, 1, 15, 8, 0, 0, TimeSpan.Zero));
         var services = new ServiceCollection();
@@ -44,6 +63,11 @@ public sealed class TestApp : IAsyncDisposable
         services.AddSingleton<IConfiguration>(configuration);
         services.AddSingleton<TimeProvider>(time);
         services.AddApplication().AddInfrastructure(configuration, new TestEnvironment());
+        foreach (var channel in new[] { NotificationChannel.Email, NotificationChannel.Sms, NotificationChannel.WhatsApp })
+        {
+            services.AddSingleton<INotificationProvider>(new CapturingNotificationProvider(channel, sent.All, sent.Failures));
+        }
+
         configure?.Invoke(services);
 
         var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
@@ -59,7 +83,7 @@ public sealed class TestApp : IAsyncDisposable
             tenantId = scope.ServiceProvider.GetRequiredService<ITenantContext>().TenantId;
         }
 
-        return new TestApp(provider, time, tenantId);
+        return new TestApp(provider, time, tenantId, sent);
     }
 
     /// <summary>Runs <paramref name="work"/> in a fresh DI scope (a new DbContext) as the given tenant.</summary>

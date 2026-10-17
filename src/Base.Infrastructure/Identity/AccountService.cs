@@ -1,6 +1,7 @@
 using Base.Application.Common.Abstractions;
 using Base.Application.Common.Results;
 using Base.Application.Common.Validation;
+using Base.Application.Notifications;
 using Base.Application.Users;
 using FluentValidation;
 using Microsoft.AspNetCore.Identity;
@@ -9,6 +10,7 @@ namespace Base.Infrastructure.Identity;
 
 internal sealed class AccountService(
     UserManager<ApplicationUser> users,
+    INotificationService notifications,
     ICurrentUser currentUser,
     TimeProvider time,
     IValidator<SetPasswordRequest> setPasswordValidator,
@@ -77,6 +79,11 @@ internal sealed class AccountService(
         user.EmailConfirmed = true;
         await users.ResetAccessFailedCountAsync(user);
         await users.UpdateAsync(user);
+        if (request.Kind == PasswordTokenKind.Reset)
+        {
+            await NotifyPasswordChangedAsync(user, cancellationToken);
+        }
+
         return ValidationResponse.Success("Your password has been set. You can sign in now.");
     }
 
@@ -100,8 +107,16 @@ internal sealed class AccountService(
             return ValidationResponse.Failure(new ValidationError(nameof(ChangePasswordRequest.CurrentPassword), "The current password is incorrect."));
         }
 
-        return result.Succeeded
-            ? ValidationResponse.Success("Your password has been changed.")
-            : result.ToValidationResponse(nameof(ChangePasswordRequest.NewPassword));
+        if (!result.Succeeded)
+        {
+            return result.ToValidationResponse(nameof(ChangePasswordRequest.NewPassword));
+        }
+
+        await NotifyPasswordChangedAsync(user, cancellationToken);
+        return ValidationResponse.Success("Your password has been changed.");
     }
+
+    /// <summary>Tells the owner, so an unexpected change gets noticed. Queued: never fails the password change.</summary>
+    private async Task NotifyPasswordChangedAsync(ApplicationUser user, CancellationToken cancellationToken) =>
+        await notifications.SendAsync(new Notification(NotificationTemplates.Identity.PasswordChanged, NotificationRecipient.ToUser(user.Id)), cancellationToken);
 }

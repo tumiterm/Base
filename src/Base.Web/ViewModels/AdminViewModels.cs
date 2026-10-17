@@ -123,3 +123,18 @@ public sealed class AuditFilterViewModel
 }
 
 public sealed record AuditListViewModel(PagedResult<Application.Auditing.AuditRecord> Entries, AuditFilterViewModel Filter, IReadOnlyList<string> EntityTypes);
+
+public sealed class NotificationLogFilterViewModel
+{
+    public string? Search { get; set; }
+
+    public Domain.Notifications.NotificationChannel? Channel { get; set; }
+
+    public Domain.Notifications.NotificationStatus? Status { get; set; }
+
+    public string? Template { get; set; }
+
+    public int Page { get; set; } = 1;
+}
+
+public sealed record NotificationLogViewModel(PagedResult<Application.Notifications.NotificationLogItem> Messages, NotificationLogFilterViewModel Filter);

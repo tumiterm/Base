@@ -30,6 +30,12 @@ public static class PermissionCodes
         public const string DeleteAll = "Files.DeleteAll";
     }
 
+    public static class Notifications
+    {
+        public const string View = "Notifications.View";
+        public const string Manage = "Notifications.Manage";
+    }
+
     public static class Audit
     {
         public const string View = "Audit.View";

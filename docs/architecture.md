@@ -89,6 +89,29 @@ the API at `/api/users`, `/api/roles` and `/api/permissions`.
 - **Passwords** follow NIST SP 800-63B: at least 12 characters, at least 4 distinct, no forced digits or symbols, and
   lockout after 5 failures.
 
+## Notifications
+
+Business code calls `INotificationService.SendAsync(new Notification(template, recipient, data, channels?))`.
+
+- **Templates** are entries in `NotificationCatalog` (category, default channels, fallback, mandatory or sensitive,
+  WhatsApp template) plus a wording file `Application/Notifications/Templates/{Code}.txt`. A file has sections
+  (`email.subject`, `email.html`, `email.text`, `sms`, `inapp.title`, `inapp.body`) with `{{Variable}}` placeholders.
+  Unknown variables are an error; HTML parts are encoded. Tenants override individual sections in the database, and
+  overrides are validated against the template's variables.
+- **Queueing.** `SendAsync` resolves the recipient (from the user account or explicit addresses; phones are
+  normalised to E.164), then picks the first usable channel in each chain (primary, then fallback). Channels that are
+  off, have no address, or that the user opted out of are recorded as **Skipped**, with the reason. The rest are
+  queued as `NotificationMessage` rows, which raise `NotificationQueued`, and the unit of work is saved.
+- **Delivery** (`NotificationDispatcher`, an outbox handler) sends through the channel's provider. Retryable failures
+  (timeouts, 429, 5xx) are retried up to 3 times with the outbox's backoff. Permanent failures, or running out of
+  retries, queue the next fallback channel. In-app messages go straight to the user's inbox.
+- **Sensitive** templates (invite and reset links) are sent immediately, and their rows keep no content, data or
+  addresses. If no channel accepts them, `SendAsync` throws, so the outbox retries the caller with a fresh token.
+- **Providers** are named instances from `Notifications:Providers` (by `Type`), plus any `INotificationProvider` in DI.
+  Each channel has a default instance, and a tenant setting can pick another. `IEmailSender` (plain, untemplated email,
+  e.g. error alerts) uses the Email channel's provider too.
+- **Retention:** `NotificationRetentionService` purges messages older than `Notifications.RetentionDays` (default 365).
+
 ## Audit trail
 
 `AuditTrailInterceptor` (the last interceptor in the chain) turns each audited insert, update, soft delete, restore and
@@ -142,6 +165,6 @@ can't be saved, the object is deleted. Reads use the provider recorded on the fi
 | --- | --- | --- |
 | UnitTests | Domain rules, catalogues (codes ↔ catalogue), ValidationResponse, file validation | Milliseconds |
 | ArchitectureTests | Layer dependencies, single entity base, immutable events | Milliseconds |
-| IntegrationTests | Real SQL Server (Testcontainers): filters, tenancy, audit, concurrency, transactions, outbox, settings, migrations, user/role administration and the emailed invite and reset links; the full web pipeline via `WebApplicationFactory` | ~40 s |
+| IntegrationTests | Real SQL Server (Testcontainers): filters, tenancy, audit, concurrency, transactions, outbox, settings, migrations, user/role administration, notifications (delivery, retry, fallback, opt-outs, overrides), provider HTTP request shapes; the full web pipeline via `WebApplicationFactory` | ~50 s |
 
 EF InMemory is not used: it ignores the SQL translation of filters, row versions, transactions and unique indexes.

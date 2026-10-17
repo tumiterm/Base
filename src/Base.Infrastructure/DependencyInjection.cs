@@ -5,12 +5,14 @@ using Base.Application.Common.Abstractions;
 using Base.Application.Common.Persistence;
 using Base.Application.Files;
 using Base.Application.Messaging;
+using Base.Application.Notifications;
 using Base.Application.Users;
 using Base.Infrastructure.Auditing;
-using Base.Infrastructure.Email;
 using Base.Infrastructure.Files;
 using Base.Infrastructure.Identity;
 using Base.Infrastructure.Jobs;
+using Base.Infrastructure.Notifications;
+using Base.Infrastructure.Notifications.Providers;
 using Base.Infrastructure.Outbox;
 using Base.Infrastructure.Persistence;
 using Base.Infrastructure.Persistence.Interceptors;
@@ -51,7 +53,7 @@ public static class DependencyInjection
         AddPersistence(services, connectionString, environment);
         AddIdentityCore(services);
         AddFileStorage(services, configuration, environment);
-        AddEmail(services, configuration);
+        AddNotifications(services);
         AddHangfire(services, configuration, connectionString);
 
         services.AddScoped<ITenantContext, TenantContext>();
@@ -203,17 +205,16 @@ public static class DependencyInjection
         services.AddSingleton<IFileStorageProviderResolver, FileStorageProviderResolver>();
     }
 
-    private static void AddEmail(IServiceCollection services, IConfiguration configuration)
+    private static void AddNotifications(IServiceCollection services)
     {
-        services.AddOptions<SmtpOptions>().BindConfiguration(SmtpOptions.SectionName);
-        if (string.IsNullOrWhiteSpace(configuration[$"{SmtpOptions.SectionName}:{nameof(SmtpOptions.Host)}"]))
-        {
-            services.AddSingleton<IEmailSender, LoggingEmailSender>();
-        }
-        else
-        {
-            services.AddSingleton<IEmailSender, MailKitEmailSender>();
-        }
+        services.AddOptions<NotificationOptions>().BindConfiguration(NotificationOptions.SectionName);
+        services.AddHttpClient(HttpNotificationProvider.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(30));
+        services.AddSingleton<NotificationProviderRegistry>();
+        services.AddScoped<INotificationChannels, NotificationChannels>();
+        services.AddScoped<INotificationRecipientResolver, NotificationRecipientResolver>();
+        services.AddScoped<IEmailSender, NotificationEmailSender>();
+        services.AddScoped<IStartupTask, NotificationConfigurationCheck>();
+        services.AddHostedService<NotificationRetentionService>();
     }
 
     private static void AddHangfire(IServiceCollection services, IConfiguration configuration, string connectionString)

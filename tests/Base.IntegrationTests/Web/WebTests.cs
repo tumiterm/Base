@@ -165,6 +165,25 @@ public sealed partial class WebTests(SqlServerFixture sql) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Notification_screens_render_and_the_bell_shows_in_the_navbar()
+    {
+        var client = Client();
+        await SignInAsync(client);
+
+        foreach (var path in new[] { "/notifications", "/notifications/preferences", "/admin/notifications", "/admin/notifications/templates", "/admin/notifications/templates/General.Reminder" })
+        {
+            var response = await client.GetAsync(path, TestContext.Current.CancellationToken);
+            response.StatusCode.ShouldBe(HttpStatusCode.OK, path);
+        }
+
+        (await client.GetStringAsync("/", TestContext.Current.CancellationToken)).ShouldContain("aria-label=\"Notifications, ");
+        (await client.GetStringAsync("/admin/notifications/templates/General.Reminder", TestContext.Current.CancellationToken)).ShouldContain("general_reminder");
+        (await client.GetFromJsonAsync<int>("/api/me/notifications/unread-count", TestContext.Current.CancellationToken)).ShouldBeGreaterThanOrEqualTo(0);
+        var preferences = await client.GetStringAsync("/api/me/notifications/preferences", TestContext.Current.CancellationToken);
+        preferences.ShouldContain("\"channel\":\"WhatsApp\"");
+    }
+
+    [Fact]
     public async Task Administration_screens_require_sign_in()
     {
         var response = await Client().GetAsync("/admin/users", TestContext.Current.CancellationToken);

@@ -1,0 +1,34 @@
+@model IReadOnlyList<Base.Application.Notifications.NotificationPreferenceItem>
+@{
+    ViewData["Title"] = "Notification preferences";
+}
+<h1 class="h3 mb-3">Notification preferences</h1>
+<p class="text-muted">Choose how you hear from us. Security messages (sign-in links, password changes) are always sent.</p>
+<table class="table align-middle col-md-8">
+    <thead><tr><th>Category</th><th>Channel</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+        @foreach (var pref in Model)
+        {
+            <tr>
+                <td>@pref.Category</td>
+                <td>@pref.Channel</td>
+                <td>@(pref.IsEnabled ? "On" : "Off")</td>
+                <td class="text-end">
+                    @if (pref.IsLocked)
+                    {
+                        <span class="text-muted small">Always on</span>
+                    }
+                    else
+                    {
+                        <form asp-action="Preferences" method="post" class="d-inline">
+                            <input type="hidden" name="category" value="@pref.Category" />
+                            <input type="hidden" name="channel" value="@pref.Channel" />
+                            <input type="hidden" name="isEnabled" value="@((!pref.IsEnabled).ToString())" />
+                            <button class="btn btn-sm btn-outline-secondary" type="submit">@(pref.IsEnabled ? "Turn off" : "Turn on")</button>
+                        </form>
+                    }
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>

@@ -1,6 +1,7 @@
 using Base.Application.Common.Abstractions;
 using Base.Domain.Auditing;
 using Base.Domain.Files;
+using Base.Domain.Notifications;
 using Base.Domain.Settings;
 using Base.Domain.Tenancy;
 using Base.Infrastructure.Identity;
@@ -30,6 +31,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+
+    public DbSet<NotificationMessage> NotificationMessages => Set<NotificationMessage>();
+
+    public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
+
+    public DbSet<NotificationTemplateOverride> NotificationTemplateOverrides => Set<NotificationTemplateOverride>();
 
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
