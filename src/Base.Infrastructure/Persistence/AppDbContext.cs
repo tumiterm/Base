@@ -1,5 +1,6 @@
 using Base.Application.Common.Abstractions;
 using Base.Domain.Auditing;
+using Base.Domain.DataExchange;
 using Base.Domain.Documents;
 using Base.Domain.Files;
 using Base.Domain.Notifications;
@@ -33,6 +34,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
     public DbSet<FileContent> FileContents => Set<FileContent>();
 
     public DbSet<Document> Documents => Set<Document>();
+
+    public DbSet<ExportJob> ExportJobs => Set<ExportJob>();
+
+    public DbSet<ImportJob> ImportJobs => Set<ImportJob>();
 
     public DbSet<DocumentVersion> DocumentVersions => Set<DocumentVersion>();
 

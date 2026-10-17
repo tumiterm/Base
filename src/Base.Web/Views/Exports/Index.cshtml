@@ -1,0 +1,50 @@
+@model Base.Application.Common.Persistence.PagedResult<Base.Application.DataExchange.ExportJobView>
+@using Base.Domain.DataExchange
+@{
+    ViewData["Title"] = "My exports";
+}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">My exports</h1>
+    <a class="btn btn-link" asp-controller="Imports" asp-action="Index">Imports</a>
+</div>
+<p class="text-muted">Export any list with the Export buttons on it. Big exports are prepared in the background; their files stay here for a few days.</p>
+@if (Model.Total == 0)
+{
+    <p class="text-muted">You haven't exported anything yet.</p>
+}
+else
+{
+    <table class="table align-middle">
+        <thead><tr><th>Requested</th><th>List</th><th>Format</th><th>Rows</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+            @foreach (var job in Model.Items)
+            {
+                var badge = job.Status switch { ExportStatus.Completed => "text-bg-success", ExportStatus.Failed => "text-bg-danger", _ => "text-bg-warning" };
+                <tr>
+                    <td class="text-nowrap small"><local-time value="@job.RequestedAt" /></td>
+                    <td>@job.ExporterName</td>
+                    <td>@job.Format.ToString().ToUpperInvariant()</td>
+                    <td>@job.RowCount.ToString("N0")</td>
+                    <td><span class="badge @badge">@job.Status</span>@if (job.Error is not null) { <div class="small text-danger">@job.Error</div> }</td>
+                    <td>
+                        @if (job.CanDownload)
+                        {
+                            <a class="btn btn-sm btn-outline-primary" asp-action="Download" asp-route-id="@job.Id">Download</a>
+                        }
+                        else if (job.Status == ExportStatus.Completed)
+                        {
+                            <span class="small text-muted">@(job.RowCount > 0 && job.CompletedAt is not null ? "Downloaded at the time" : "")</span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <nav class="d-flex justify-content-between">
+        <span class="text-muted small">@Model.Total export(s), page @Model.Page of @Model.TotalPages</span>
+        <div class="btn-group">
+            <a class="btn btn-outline-secondary btn-sm @(Model.HasPrevious ? "" : "disabled")" asp-route-page="@(Model.Page - 1)">Previous</a>
+            <a class="btn btn-outline-secondary btn-sm @(Model.HasNext ? "" : "disabled")" asp-route-page="@(Model.Page + 1)">Next</a>
+        </div>
+    </nav>
+}

@@ -38,6 +38,9 @@ cross-cutting feature or adding a package:
 - Documents (titled, versioned, linked to any record) go through `IDocumentService`. New document type = constant in
   `DocumentTypes` + `DocumentTypeCatalog` entry; new generated document = constant in `DocumentTemplates` + catalogue
   entry + `Documents/Templates/{Code}.html`. Output formats are `IDocumentRenderer`s; no licensed engine in the base.
+- Lists are exported by an `IExporter` (`Exporter<TRow>`, paging an existing use case) and files are imported by an
+  `IImporter` (apply rows through existing use cases); register them in DI. Never hand-build CSV/Excel. Background work
+  that acts for a person uses `IRunAsUser`, so their permissions apply.
 - Notify people only through `INotificationService` (template code + recipient + data). New template = constant in
   `NotificationTemplates` + `NotificationCatalog` entry + `Notifications/Templates/{Code}.txt` (tests check they match).
   Templates containing secrets are `IsSensitive` (sent at once, stored without content). Providers are configured

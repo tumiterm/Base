@@ -24,7 +24,7 @@ internal sealed partial class FileService(
 
     public async Task<ValidationResponse<FileUploadResult>> UploadAsync(FileUploadRequest request, CancellationToken cancellationToken = default)
     {
-        var staged = await StageAsync(request, currentUser.UserId, null, serverGenerated: false, cancellationToken);
+        var staged = await StageAsync(request, currentUser.UserId, null, replaceAllowList: false, cancellationToken);
         if (!staged.IsSuccess)
         {
             return staged.As<FileUploadResult>();
@@ -40,11 +40,13 @@ internal sealed partial class FileService(
     /// </summary>
     /// <param name="ownerUserId">Who may read and delete it through <see cref="IFileService"/>; null when another feature owns it.</param>
     /// <param name="allowedExtensions">
-    /// A further restriction on top of the <c>Files.AllowedExtensions</c> setting; or, when <paramref name="serverGenerated"/>,
-    /// the only one (the setting governs what users may upload, not what the application renders itself).
+    /// A further restriction on top of the <c>Files.AllowedExtensions</c> setting; or, when <paramref name="replaceAllowList"/>,
+    /// the only one. The setting governs general uploads; features that take specific formats (generated documents,
+    /// exports, import files) pass their own list. Every other check still applies.
     /// </param>
+    /// <param name="maxBytes">Replaces the <c>Files.MaxUploadSizeMb</c> limit, for output the application produces itself.</param>
     internal async Task<ValidationResponse<StagedFile>> StageAsync(
-        FileUploadRequest request, Guid? ownerUserId, IReadOnlyCollection<string>? allowedExtensions, bool serverGenerated, CancellationToken cancellationToken)
+        FileUploadRequest request, Guid? ownerUserId, IReadOnlyCollection<string>? allowedExtensions, bool replaceAllowList, CancellationToken cancellationToken, long? maxBytes = null)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -60,10 +62,10 @@ internal sealed partial class FileService(
             return Fail("Invalid file category.", nameof(request.Category));
         }
 
-        IEnumerable<string> allowed = serverGenerated && allowedExtensions is not null
+        IEnumerable<string> allowed = replaceAllowList && allowedExtensions is not null
             ? allowedExtensions
             : await settings.GetListAsync(SettingCodes.Files.AllowedExtensions, cancellationToken);
-        if (allowedExtensions is not null && !serverGenerated)
+        if (allowedExtensions is not null && !replaceAllowList)
         {
             allowed = allowed.Intersect(allowedExtensions, StringComparer.OrdinalIgnoreCase).ToList();
         }
@@ -73,7 +75,7 @@ internal sealed partial class FileService(
             return Fail($"Files of type '{extension}' are not allowed. Allowed: {string.Join(", ", allowed)}.");
         }
 
-        var maxBytes = await settings.GetIntAsync(SettingCodes.Files.MaxUploadSizeMb, cancellationToken) * 1024L * 1024L;
+        maxBytes ??= await settings.GetIntAsync(SettingCodes.Files.MaxUploadSizeMb, cancellationToken) * 1024L * 1024L;
 
         // Spool to a temp file while hashing and measuring, so we never trust Content-Length and never hold the file in memory.
         await using var spool = new FileStream(
@@ -180,6 +182,13 @@ internal sealed partial class FileService(
         return url is not null
             ? new FileDownload(downloadFileName, file.ContentType, url, null)
             : new FileDownload(downloadFileName, file.ContentType, null, await provider.OpenReadAsync(file.ObjectKey, cancellationToken));
+    }
+
+    /// <summary>The file's bytes from its provider, never a redirect. For server-side reads of authorised files.</summary>
+    internal Task<Stream> OpenReadAsync(StoredFile file, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(file);
+        return providers.Get(file.ProviderName).OpenReadAsync(file.ObjectKey, cancellationToken);
     }
 
     public async Task<ValidationResponse> DeleteAsync(Guid fileId, CancellationToken cancellationToken = default)

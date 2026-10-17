@@ -1,0 +1,18 @@
+@model Base.Domain.DataExchange.ImportStatus
+@{
+    var css = Model switch
+    {
+        Base.Domain.DataExchange.ImportStatus.Completed or Base.Domain.DataExchange.ImportStatus.Validated => "text-bg-success",
+        Base.Domain.DataExchange.ImportStatus.Invalid or Base.Domain.DataExchange.ImportStatus.Failed => "text-bg-danger",
+        Base.Domain.DataExchange.ImportStatus.CompletedWithErrors => "text-bg-warning",
+        _ => "text-bg-secondary",
+    };
+    var label = Model switch
+    {
+        Base.Domain.DataExchange.ImportStatus.Validated => "Ready to apply",
+        Base.Domain.DataExchange.ImportStatus.Invalid => "Has errors",
+        Base.Domain.DataExchange.ImportStatus.CompletedWithErrors => "Completed with errors",
+        _ => Model.ToString(),
+    };
+}
+<span class="badge @css">@label</span>

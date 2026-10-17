@@ -266,8 +266,8 @@ internal sealed class DocumentService(
         // The document owns the file: no owner, so it's reachable only through this service (and Files.ReadAll).
         var request = new FileUploadRequest(upload.Content, upload.FileName, null, type.Code);
         return generatedExtensions is null
-            ? files.StageAsync(request, null, type.AllowedExtensions, serverGenerated: false, cancellationToken)
-            : files.StageAsync(request, null, generatedExtensions, serverGenerated: true, cancellationToken);
+            ? files.StageAsync(request, null, type.AllowedExtensions, replaceAllowList: false, cancellationToken)
+            : files.StageAsync(request, null, generatedExtensions, replaceAllowList: true, cancellationToken);
     }
 
     private DocumentDetails ToDetails(Document document) => new(

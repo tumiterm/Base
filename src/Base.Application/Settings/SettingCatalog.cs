@@ -40,6 +40,17 @@ public static class SettingCatalog
             "Total size of the files one tenant may keep in the database provider, including deleted files not yet purged. 0 = no limit.",
             SettingScope.Platform, Min: 0, Max: 102400),
 
+        new(SettingCodes.Exports.MaxImmediateRows, "Exports: download at once up to (rows)", SettingDataType.Integer, "5000", "Data exchange",
+            "Exports with more rows run in the background; the user is notified in-app when the file is ready.", Min: 1, Max: 100000),
+        new(SettingCodes.Exports.MaxRows, "Exports: most rows", SettingDataType.Integer, "100000", "Data exchange",
+            "Exports with more rows are refused; narrow the filter instead.", SettingScope.Platform, Min: 1, Max: 1000000),
+        new(SettingCodes.Exports.RetentionDays, "Exports: keep files (days)", SettingDataType.Integer, "7", "Data exchange",
+            "Background export files can be downloaded for this long, then they are deleted.", Min: 1, Max: 90),
+        new(SettingCodes.Imports.MaxRows, "Imports: most rows", SettingDataType.Integer, "10000", "Data exchange",
+            "Files with more data rows are refused; split them.", SettingScope.Platform, Min: 1, Max: 100000),
+        new(SettingCodes.Imports.RetentionDays, "Imports: keep uploaded files (days)", SettingDataType.Integer, "30", "Data exchange",
+            "Uploaded import files (and their error reports) are kept this long.", Min: 1, Max: 365),
+
         new(SettingCodes.Audit.RetentionDays, "Audit retention (days)", SettingDataType.Integer, "730", "Audit",
             "Audit entries older than this are deleted by a daily job. Check your legal retention obligations first.",
             SettingScope.Platform, Min: 30, Max: 3650),

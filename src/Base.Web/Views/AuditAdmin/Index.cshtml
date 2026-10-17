@@ -5,7 +5,10 @@
     var results = Model.Entries;
     var f = Model.Filter;
 }
-<h1 class="h3 mb-3">Audit trail</h1>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">Audit trail</h1>
+    <partial name="_ExportButtons" model='new ExportButtonsViewModel("audit", PermissionCodes.Audit.View)' />
+</div>
 <form method="get" class="row g-2 align-items-end mb-3">
     <div class="col-md-2">
         <label class="form-label small" for="EntityType">Type</label>

@@ -8,6 +8,7 @@
 }
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h1 class="h3 mb-0">Documents</h1>
+    <partial name="_ExportButtons" model='new ExportButtonsViewModel("documents", PermissionCodes.Documents.Create)' />
     @if (Model.CanCreate)
     {
         <a class="btn btn-outline-primary" asp-action="Generate">Generate from a template</a>

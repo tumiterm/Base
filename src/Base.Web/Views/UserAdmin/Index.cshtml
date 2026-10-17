@@ -5,7 +5,11 @@
 }
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h1 class="h3 mb-0">Users</h1>
-    <a class="btn btn-primary" asp-action="Invite" asp-permission="@PermissionCodes.Users.Manage">Invite user</a>
+    <div class="d-flex gap-2">
+        <partial name="_ExportButtons" model='new ExportButtonsViewModel("users", PermissionCodes.Users.View)' />
+        <a class="btn btn-outline-primary" asp-controller="Imports" asp-action="Index" asp-permission="@PermissionCodes.Users.Manage">Import</a>
+        <a class="btn btn-primary" asp-action="Invite" asp-permission="@PermissionCodes.Users.Manage">Invite user</a>
+    </div>
 </div>
 <form method="get" class="mb-3" role="search">
     <div class="input-group">

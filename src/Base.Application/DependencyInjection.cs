@@ -1,10 +1,13 @@
 using Base.Application.Auditing;
+using Base.Application.DataExchange;
 using Base.Application.Documents;
 using Base.Application.Documents.Generation;
 using Base.Application.Files;
 using Base.Application.Messaging;
 using Base.Application.Notifications;
 using Base.Application.Settings;
+using Base.Application.Users;
+using Base.Domain.DataExchange;
 using Base.Domain.Notifications;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,6 +26,18 @@ public static class DependencyInjection
         services.AddScoped<FileService>();
         services.AddScoped<IFileService>(sp => sp.GetRequiredService<FileService>());
         services.AddScoped<IAuditTrail, AuditTrailService>();
+
+        services.AddScoped<ExportService>();
+        services.AddScoped<IExportService>(sp => sp.GetRequiredService<ExportService>());
+        services.AddScoped<ImportService>();
+        services.AddScoped<IImportService>(sp => sp.GetRequiredService<ImportService>());
+        services.AddScoped<IDomainEventHandler<ExportQueued>, ExportQueuedHandler>();
+        services.AddScoped<IDomainEventHandler<ImportQueued>, ImportQueuedHandler>();
+        services.AddScoped<IExporter, UsersExporter>();
+        services.AddScoped<IExporter, AuditExporter>();
+        services.AddScoped<IExporter, NotificationLogExporter>();
+        services.AddScoped<IExporter, DocumentsExporter>();
+        services.AddScoped<IImporter, UserInviteImporter>();
 
         services.AddScoped<DocumentService>();
         services.AddScoped<IDocumentService>(sp => sp.GetRequiredService<DocumentService>());

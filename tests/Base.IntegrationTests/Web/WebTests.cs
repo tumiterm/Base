@@ -268,6 +268,46 @@ public sealed partial class WebTests(SqlServerFixture sql) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Lists_export_and_files_import_through_the_pages_and_the_api()
+    {
+        var client = Client();
+        await SignInAsync(client);
+        var token = await GetMetaTokenAsync(client);
+
+        var page = await client.GetStringAsync("/admin/users?search=admin", TestContext.Current.CancellationToken);
+        page.ShouldContain("href=\"/exports/users?format=csv&amp;search=admin\"", customMessage: "the export keeps the list's filter");
+
+        var csv = await client.GetAsync("/exports/users?format=csv&search=admin", TestContext.Current.CancellationToken);
+        csv.StatusCode.ShouldBe(HttpStatusCode.OK);
+        csv.Content.Headers.ContentType!.MediaType.ShouldBe("text/csv");
+        (await csv.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).ShouldContain(WebAppFactory.AdminEmail);
+
+        var api = await client.GetAsync("/api/exports/audit?format=xlsx", TestContext.Current.CancellationToken);
+        api.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await api.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken)).Take(2).ShouldBe("PK"u8.ToArray(), "an xlsx is a zip");
+
+        var template = await client.GetAsync("/imports/users/template?format=csv", TestContext.Current.CancellationToken);
+        (await template.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).ShouldContain("Email,Name,Roles");
+
+        using var form = new MultipartFormDataContent { { new ByteArrayContent("Email,Name\r\nbad,Someone\r\n"u8.ToArray()), "file", "people.csv" } };
+        using var upload = new HttpRequestMessage(HttpMethod.Post, "/api/imports/users") { Content = form };
+        upload.Headers.Add("X-CSRF-TOKEN", token);
+        var preview = await client.SendAsync(upload, TestContext.Current.CancellationToken);
+        preview.StatusCode.ShouldBe(HttpStatusCode.Created, await preview.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        var job = await preview.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
+        job.GetProperty("status").GetString().ShouldBe("Invalid");
+        var id = job.GetProperty("id").GetString();
+
+        foreach (var path in new[] { "/imports", "/exports", $"/imports/{id}" })
+        {
+            (await client.GetAsync(path, TestContext.Current.CancellationToken)).StatusCode.ShouldBe(HttpStatusCode.OK, path);
+        }
+
+        (await client.GetStringAsync($"/imports/{id}", TestContext.Current.CancellationToken)).ShouldContain("is not an email address");
+        (await client.GetStringAsync($"/api/imports/{id}/errors", TestContext.Current.CancellationToken)).ShouldContain("Errors");
+    }
+
+    [Fact]
     public async Task Password_pages_are_anonymous_and_set_password_is_never_cached()
     {
         var client = Client();

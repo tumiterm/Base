@@ -1,0 +1,56 @@
+@model ImportsViewModel
+@{
+    ViewData["Title"] = "Imports";
+}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">Imports</h1>
+    <a class="btn btn-link" asp-controller="Exports" asp-action="Index">My exports</a>
+</div>
+@if (Model.Importers.Count == 0)
+{
+    <p class="text-muted">There is nothing you can import.</p>
+}
+<div class="row g-3 mb-4">
+    @foreach (var importer in Model.Importers)
+    {
+        <div class="col-lg-6">
+            <form asp-action="Upload" asp-route-code="@importer.Code" method="post" enctype="multipart/form-data" class="card card-body h-100">
+                <h2 class="h5">@importer.Name</h2>
+                <p class="text-muted small">@importer.Description</p>
+                <p class="small mb-2">
+                    Columns: @string.Join(", ", importer.Columns.Select(c => c.Required ? c.Name + " (required)" : c.Name)).
+                    @(importer.AllowPartial ? "Valid rows are applied even if others have errors." : "Nothing is applied unless every row is valid.")
+                </p>
+                <p class="small">Template: <a asp-action="Template" asp-route-code="@importer.Code" asp-route-format="xlsx">Excel</a> · <a asp-action="Template" asp-route-code="@importer.Code" asp-route-format="csv">CSV</a></p>
+                <div class="drop-zone mb-2">
+                    <input class="form-control" type="file" name="file" accept=".csv,.xlsx" required aria-label="File for @importer.Name" />
+                    <div class="drop-zone-hint small text-muted">or drop a .csv or .xlsx file here</div>
+                </div>
+                <div><button class="btn btn-primary" type="submit">Check file</button> <span class="small text-muted ms-2">Nothing is saved until you confirm.</span></div>
+            </form>
+        </div>
+    }
+</div>
+<h2 class="h5">My imports</h2>
+@if (Model.History.Total == 0)
+{
+    <p class="text-muted">No imports yet.</p>
+}
+else
+{
+    <table class="table align-middle">
+        <thead><tr><th>Uploaded</th><th>Import</th><th>File</th><th>Rows</th><th>Status</th></tr></thead>
+        <tbody>
+            @foreach (var job in Model.History.Items)
+            {
+                <tr>
+                    <td class="text-nowrap small"><local-time value="@job.UploadedAt" /></td>
+                    <td>@job.ImporterName</td>
+                    <td class="text-break"><a asp-action="Details" asp-route-id="@job.Id">@job.FileName</a></td>
+                    <td>@job.TotalRows.ToString("N0")</td>
+                    <td><partial name="_StatusBadge" model="job.Status" /></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

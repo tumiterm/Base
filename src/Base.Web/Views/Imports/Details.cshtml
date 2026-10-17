@@ -1,0 +1,58 @@
+@model Base.Application.DataExchange.ImportJobView
+@using Base.Domain.DataExchange
+@{
+    ViewData["Title"] = "Import " + Model.FileName;
+    var finished = Model.Status is ImportStatus.Completed or ImportStatus.CompletedWithErrors or ImportStatus.Failed;
+}
+<nav class="mb-2"><a asp-action="Index">&larr; Imports</a></nav>
+<h1 class="h3 mb-1">@Model.ImporterName <partial name="_StatusBadge" model="Model.Status" /></h1>
+<p class="text-muted small">@Model.FileName · uploaded <local-time value="@Model.UploadedAt" /></p>
+
+<div class="row g-3 mb-3">
+    <div class="col-sm-3"><div class="card card-body"><div class="small text-muted">Rows</div><div class="h4 mb-0">@Model.TotalRows.ToString("N0")</div></div></div>
+    @if (finished)
+    {
+        <div class="col-sm-3"><div class="card card-body"><div class="small text-muted">Applied</div><div class="h4 mb-0 text-success">@Model.AppliedRows.ToString("N0")</div></div></div>
+        <div class="col-sm-3"><div class="card card-body"><div class="small text-muted">Not applied</div><div class="h4 mb-0 @(Model.FailedRows > 0 ? "text-danger" : "")">@Model.FailedRows.ToString("N0")</div></div></div>
+    }
+    else
+    {
+        <div class="col-sm-3"><div class="card card-body"><div class="small text-muted">Valid</div><div class="h4 mb-0 text-success">@Model.ValidRows.ToString("N0")</div></div></div>
+        <div class="col-sm-3"><div class="card card-body"><div class="small text-muted">With errors</div><div class="h4 mb-0 @(Model.InvalidRows > 0 ? "text-danger" : "")">@Model.InvalidRows.ToString("N0")</div></div></div>
+    }
+</div>
+
+@if (Model.Error is not null)
+{
+    <div class="alert alert-danger">@Model.Error</div>
+}
+@if (Model.CanConfirm)
+{
+    <form asp-action="Confirm" asp-route-id="@Model.Id" method="post" class="mb-3">
+        <button class="btn btn-primary" type="submit">Apply @Model.ValidRows.ToString("N0") row(s)</button>
+        @if (Model.InvalidRows > 0) { <span class="small text-muted ms-2">Rows with errors will be skipped.</span> }
+    </form>
+}
+else if (Model.Status is ImportStatus.Queued or ImportStatus.Running)
+{
+    <p class="text-muted">The import is running. You'll get a notification when it finishes; refresh to see progress.</p>
+}
+
+@if (Model.Errors.Count > 0)
+{
+    <div class="d-flex justify-content-between align-items-center">
+        <h2 class="h5 mb-0">Problems</h2>
+        <a class="btn btn-sm btn-outline-secondary" asp-action="Errors" asp-route-id="@Model.Id">Download the rows to fix</a>
+    </div>
+    <p class="small text-muted">Fix these in the downloaded file (it has an Errors column) and upload it again.</p>
+    <table class="table table-sm">
+        <thead><tr><th>Row</th><th>Column</th><th>Problem</th></tr></thead>
+        <tbody>
+            @foreach (var error in Model.Errors.Take(200))
+            {
+                <tr><td>@error.Row</td><td>@error.Column</td><td>@error.Message</td></tr>
+            }
+        </tbody>
+    </table>
+    @if (Model.Errors.Count > 200) { <p class="small text-muted">Showing the first 200; the downloaded file has them all.</p> }
+}

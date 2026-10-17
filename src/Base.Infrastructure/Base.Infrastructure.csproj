@@ -15,6 +15,7 @@
     <PackageReference Include="AWSSDK.S3" />
     <PackageReference Include="Azure.Storage.Blobs" />
     <PackageReference Include="MailKit" />
+    <PackageReference Include="DocumentFormat.OpenXml" />
     <PackageReference Include="Hangfire.Core" />
     <PackageReference Include="Hangfire.SqlServer" />
     <PackageReference Include="Hangfire.AspNetCore" />

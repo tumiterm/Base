@@ -321,3 +321,7 @@ and fallback, preferences, file templates with tenant overrides, delivery log, i
 **Round 6 (Oct 2026): documents.** Versioned documents with types, tags, links to any record, Draft → Final → Archived
 and per-type retention; generation from HTML templates (HTML built in, PDF via Gotenberg); a capped database storage
 provider per category; upload-check hook with ClamAV; purge of deleted files (ADR 0012).
+
+**Round 7 (Oct 2026): exports and imports.** Any list to CSV/Excel (immediate or background, recorded and audited);
+imports with a dry run, all-or-nothing by default, per-row error reports and templates; background work runs as the
+requester (`IRunAsUser`) so permissions still apply (ADR 0013).
