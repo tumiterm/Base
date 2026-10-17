@@ -14,8 +14,9 @@ application didn't say which build it was, so support couldn't tell either.
 - **`docs/changelog.md`** (Keep a Changelog): every change adds a line under Unreleased in the same commit. New
   projects get an empty changelog of their own and the Base's history as `docs/base-changelog.md`.
 - **Releases are tags.** A release moves Unreleased under the new version, bumps `BaseVersion`, and is tagged
-  `vX.Y.Z` on main. The release workflow refuses a tag that doesn't match the version or has no changelog section,
-  and publishes the section as the GitHub release notes.
+  `vX.Y.Z` on main: push the tag, or run the Release workflow by hand on main and it tags the commit itself. The
+  workflow refuses a tag that doesn't match the version, a version that is already released, or one with no
+  changelog section, and publishes the section as the GitHub release notes.
 - **The running build says what it is.** `AppVersion` reads the informational version (with the commit when built
   from git) and `BaseVersion` from assembly metadata. It is shown on the System page and in the account menu, and
   returned by `GET api/system/version`.

@@ -1,10 +1,13 @@
 name: Release
 
-# Pushing a tag vX.Y.Z publishes a GitHub release with that version's changelog section.
-# The tag must match the version in Directory.Build.props and docs/changelog.md must have a section for it.
+# Publishes a GitHub release with the version's changelog section, either:
+# - when a tag vX.Y.Z is pushed (it must match the version in Directory.Build.props), or
+# - when run by hand on main: it tags the current commit with the version in Directory.Build.props.
+# Either way docs/changelog.md must have a section for the version.
 on:
   push:
     tags: ['v*.*.*']
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -28,12 +31,25 @@ jobs:
       - name: Check the tag, the version and the changelog agree
         id: notes
         env:
-          TAG: ${{ github.ref_name }}
+          EVENT: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           version=$(dotnet msbuild src/Base.Domain/Base.Domain.csproj -getProperty:Version)
-          if [ "v$version" != "$TAG" ]; then
-            echo "::error::Tag $TAG doesn't match the version in Directory.Build.props ($version)."
+          tag="v$version"
+          if [ "$EVENT" = "push" ] && [ "$tag" != "$REF_NAME" ]; then
+            echo "::error::Tag $REF_NAME doesn't match the version in Directory.Build.props ($version)."
             exit 1
+          fi
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            if [ "$REF_NAME" != "main" ]; then
+              echo "::error::Releases are made from main, not $REF_NAME."
+              exit 1
+            fi
+            if gh release view "$tag" > /dev/null 2>&1 || git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
+              echo "::error::$tag already exists. Bump BaseVersion in Directory.Build.props first."
+              exit 1
+            fi
           fi
           awk -v v="$version" '
             $0 ~ "^## \\[" v "\\]" { found = 1; next }
@@ -44,9 +60,17 @@ jobs:
             echo "::error::docs/changelog.md has no section for $version."
             exit 1
           fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
-        run: gh release create "$TAG" --title "$TAG" --notes-file release-notes.md --verify-tag
+          TAG: ${{ steps.notes.outputs.tag }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT" = "push" ]; then
+            gh release create "$TAG" --title "$TAG" --notes-file release-notes.md --verify-tag
+          else
+            # Creates the tag on this commit.
+            gh release create "$TAG" --title "$TAG" --notes-file release-notes.md --target "$GITHUB_SHA"
+          fi
