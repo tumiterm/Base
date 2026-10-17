@@ -39,6 +39,8 @@ public static class PermissionCatalog
         new(PermissionCodes.Files.Upload, "Upload files", "Files", "Upload files; users can always read their own uploads.", Everyone, []),
         new(PermissionCodes.Files.ReadAll, "Read all files", "Files", "Download any file in the tenant, not just your own.", AdminOnly, []),
         new(PermissionCodes.Files.DeleteAll, "Delete any file", "Files", "Delete any file in the tenant.", AdminOnly, [PermissionCodes.Files.ReadAll]),
+        new(PermissionCodes.Notifications.View, "View notification log", "Notifications", "See every email, SMS, WhatsApp and in-app message sent, skipped or failed.", AdminOnly, []),
+        new(PermissionCodes.Notifications.Manage, "Manage notifications", "Notifications", "Resend messages and edit this tenant's notification wording.", AdminOnly, [PermissionCodes.Notifications.View]),
         new(PermissionCodes.Audit.View, "View audit trail", "System", "See who changed what, when, with before and after values.", AdminOnly, []),
         new(PermissionCodes.System.HealthView, "View system health", "System", "See health checks, errors and storage usage.", AdminOnly, []),
         new(PermissionCodes.System.JobsManage, "Manage background jobs", "System", "Open the job dashboard and retry or delete jobs.", AdminOnly, [PermissionCodes.System.HealthView]),

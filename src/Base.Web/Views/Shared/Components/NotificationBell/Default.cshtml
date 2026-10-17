@@ -1,0 +1,8 @@
+@model int
+<a class="btn btn-outline-light btn-sm position-relative" asp-controller="Notifications" asp-action="Index" title="Notifications" aria-label="Notifications, @Model unread">
+    <span aria-hidden="true">&#128276;</span>
+    @if (Model > 0)
+    {
+        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">@(Model > 99 ? "99+" : Model.ToString(System.Globalization.CultureInfo.InvariantCulture))</span>
+    }
+</a>

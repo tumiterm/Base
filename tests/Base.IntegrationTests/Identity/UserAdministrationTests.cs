@@ -4,6 +4,7 @@ using Base.Application.Common.Abstractions;
 using Base.Application.Common.Results;
 using Base.Application.Security;
 using Base.Application.Users;
+using Base.Domain.Notifications;
 using Base.Domain.Tenancy;
 using Base.Infrastructure.Outbox;
 using Base.Infrastructure.Persistence;
@@ -17,14 +18,12 @@ namespace Base.IntegrationTests.Identity;
 public sealed partial class UserAdministrationTests(SqlServerFixture sql) : IAsyncLifetime
 {
     private readonly TestCurrentUser _actor = new TestCurrentUser().WithAllPermissions();
-    private readonly CapturingEmailSender _email = new();
     private TestApp _app = null!;
 
     public async ValueTask InitializeAsync() =>
         _app = await TestApp.CreateAsync(sql.NewDatabase(), services =>
         {
             services.AddSingleton<ICurrentUser>(_actor);
-            services.AddSingleton<IEmailSender>(_email);
         });
 
     public async ValueTask DisposeAsync() => await _app.DisposeAsync();
@@ -58,7 +57,7 @@ public sealed partial class UserAdministrationTests(SqlServerFixture sql) : IAsy
 
         unknown.IsSuccess.ShouldBeTrue();
         await ProcessOutboxAsync();
-        _email.Sent.ShouldBeEmpty();
+        _app.Sent.All.ShouldBeEmpty();
     }
 
     [Fact]
@@ -176,11 +175,11 @@ public sealed partial class UserAdministrationTests(SqlServerFixture sql) : IAsy
 
     private async Task<string> DeliverSingleEmailLinkAsync(string to)
     {
-        _email.Sent.Clear();
+        _app.Sent.Clear();
         await ProcessOutboxAsync();
-        var message = _email.Sent.ShouldHaveSingleItem();
-        message.To.ShouldBe([to]);
-        return WebUtility.HtmlDecode(Href().Match(message.HtmlBody).Groups["href"].Value);
+        var message = _app.Sent.On(NotificationChannel.Email).ShouldHaveSingleItem();
+        message.To.ShouldBe(to);
+        return WebUtility.HtmlDecode(Href().Match(message.HtmlBody!).Groups["href"].Value);
     }
 
     private static SetPasswordRequest SetPasswordFrom(string link, string password)

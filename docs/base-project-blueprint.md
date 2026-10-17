@@ -311,3 +311,9 @@ forgot, reset and change password; escalation guard; last-administrator protecti
 
 **Round 3 (Oct 2026): audit trail.** Interceptor-written, same-transaction change history with before/after values,
 redaction, append-only entries, tenant isolation, retention, the `/admin/audit` screen and API (ADR 0010).
+
+**Round 4 (Oct 2026): development without Docker.** LocalDB fallback on Windows, dev admin seed, LocalDB fallback for tests.
+
+**Round 5 (Oct 2026): notifications.** Email, SMS, WhatsApp and in-app behind one service. Pluggable providers
+(SMTP, SendGrid, Twilio, Clickatell, BulkSMS, Meta). Channels switched on individually. Outbox delivery with retry
+and fallback, preferences, file templates with tenant overrides, delivery log, inbox (ADR 0011).

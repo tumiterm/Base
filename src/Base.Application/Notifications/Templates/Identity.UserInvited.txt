@@ -1,0 +1,13 @@
+--- email.subject
+You've been invited to {{AppName}}
+--- email.html
+<p>Hello {{RecipientName}},</p>
+<p>You've been invited to {{AppName}}. Choose a password to activate your account. The link expires in 3 days and works once.</p>
+<p><a href="{{Link}}">Set my password</a></p>
+<p style="color:#666;font-size:12px">If the button doesn't work, copy this address into your browser:<br>{{Link}}</p>
+--- email.text
+Hello {{RecipientName}},
+
+You've been invited to {{AppName}}. Choose a password to activate your account (the link expires in 3 days and works once):
+
+{{Link}}

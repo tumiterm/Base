@@ -1,0 +1,86 @@
+@model NotificationLogViewModel
+@using Base.Domain.Notifications
+@{
+    ViewData["Title"] = "Notification log";
+    var results = Model.Messages;
+    var f = Model.Filter;
+}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">Notification log</h1>
+    <a class="btn btn-link" asp-action="Templates">Templates</a>
+</div>
+<form method="get" class="row g-2 align-items-end mb-3">
+    <div class="col-md-3"><label class="form-label small" for="Search">Recipient</label><input class="form-control" id="Search" name="Search" value="@f.Search" /></div>
+    <div class="col-md-2">
+        <label class="form-label small" for="Channel">Channel</label>
+        <select class="form-select" id="Channel" name="Channel">
+            <option value="">All</option>
+            @foreach (var c in Enum.GetValues<NotificationChannel>()) { <option value="@c" selected="@(c == f.Channel)">@c</option> }
+        </select>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label small" for="Status">Status</label>
+        <select class="form-select" id="Status" name="Status">
+            <option value="">All</option>
+            @foreach (var s in Enum.GetValues<NotificationStatus>()) { <option value="@s" selected="@(s == f.Status)">@s</option> }
+        </select>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label small" for="Template">Template</label>
+        <select class="form-select" id="Template" name="Template">
+            <option value="">All</option>
+            @foreach (var t in Base.Application.Notifications.NotificationCatalog.All) { <option value="@t.Code" selected="@(t.Code == f.Template)">@t.Name</option> }
+        </select>
+    </div>
+    <div class="col-md-2 d-flex gap-2"><button class="btn btn-primary" type="submit">Filter</button><a class="btn btn-link" asp-action="Index">Clear</a></div>
+</form>
+@if (results.Total == 0)
+{
+    <p class="text-muted">No messages match.</p>
+}
+else
+{
+    <table class="table table-sm align-top">
+        <thead><tr><th>When</th><th>Template</th><th>Channel</th><th>To</th><th>Status</th><th>Details</th><th></th></tr></thead>
+        <tbody>
+            @foreach (var m in results.Items)
+            {
+                var badge = m.Status switch
+                {
+                    NotificationStatus.Sent => "text-bg-success",
+                    NotificationStatus.Failed => "text-bg-danger",
+                    NotificationStatus.Skipped => "text-bg-secondary",
+                    _ => "text-bg-warning",
+                };
+                <tr>
+                    <td class="text-nowrap"><local-time value="@m.CreatedAt" /></td>
+                    <td>@m.TemplateCode @if (m.FallbackOf is not null) { <span class="badge text-bg-light">fallback</span> }</td>
+                    <td>@m.Channel</td>
+                    <td class="text-break">@m.RecipientAddress<div class="small text-muted">@m.RecipientName</div></td>
+                    <td><span class="badge @badge">@m.Status</span>@if (m.Attempts > 1) { <div class="small text-muted">@m.Attempts attempts</div> }</td>
+                    <td class="small text-break">
+                        @if (m.Provider is not null) { <div>via @m.Provider</div> }
+                        @if (m.LastError is not null) { <div class="text-danger">@m.LastError</div> }
+                        @if (m.IsSensitive) { <div class="text-muted fst-italic">Contained a sign-in link; content not stored.</div> }
+                        else if (m.Subject is not null) { <div class="text-muted">@m.Subject</div> }
+                    </td>
+                    <td>
+                        @if (!m.IsSensitive && m.Status != NotificationStatus.Skipped)
+                        {
+                            <form asp-action="Resend" asp-route-id="@m.Id" method="post" asp-permission="@PermissionCodes.Notifications.Manage">
+                                <button class="btn btn-sm btn-outline-secondary" type="submit">Resend</button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <nav class="d-flex justify-content-between">
+        <span class="text-muted small">@results.Total message(s), page @results.Page of @results.TotalPages</span>
+        <div class="btn-group">
+            <a class="btn btn-outline-secondary btn-sm @(results.HasPrevious ? "" : "disabled")" asp-route-Page="@(results.Page - 1)" asp-route-Search="@f.Search" asp-route-Channel="@f.Channel" asp-route-Status="@f.Status" asp-route-Template="@f.Template">Previous</a>
+            <a class="btn btn-outline-secondary btn-sm @(results.HasNext ? "" : "disabled")" asp-route-Page="@(results.Page + 1)" asp-route-Search="@f.Search" asp-route-Channel="@f.Channel" asp-route-Status="@f.Status" asp-route-Template="@f.Template">Next</a>
+        </div>
+    </nav>
+}

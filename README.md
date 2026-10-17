@@ -97,6 +97,12 @@ scripts/new-project.cs  Creates a renamed copy for a new project.
   there are forgot, reset and change password flows. Nobody can grant or manage access they don't hold, the last
   active administrator is protected, and system roles are locked down. Passwords follow NIST SP 800-63B
   (length over composition rules).
+- **Notifications:** one `INotificationService` for **email, SMS, WhatsApp and in-app**. Built-in providers:
+  SMTP, SendGrid, Twilio (SMS and WhatsApp), Clickatell, BulkSMS and the Meta WhatsApp Cloud API. Each channel is
+  switched on separately; out of the box only email (to the log) and in-app are on. Wording comes from template files,
+  and each tenant can override it. Delivery goes through the outbox, with retries and fallback (e.g. WhatsApp, then SMS,
+  then email). Users can opt out per category; security messages can't be switched off. There's a delivery log with
+  resend, and an in-app inbox with a navbar bell. WhatsApp uses Meta-approved templates only.
 - **Audit trail:** every change to an audited record (every `EntityBase` entity, users, roles, role assignments and
   permission grants) is stored with who, when, the trace id and before/after values, in the same transaction as
   the change. Secrets are recorded as "changed" without values. Entries are append-only, tenant-isolated and
@@ -125,11 +131,36 @@ scripts/new-project.cs  Creates a renamed copy for a new project.
 | `Database` | `MigrateOnStartup`, `CommandTimeoutSeconds`, `MaxRetryCount`. |
 | `Tenancy` | `MultiTenant`, `DefaultTenantCode`, `FallbackToDefaultTenant`. |
 | `FileStorage` | `LocalDisk`, `S3` (Bucket, ServiceUrl, Region, AccessKey, SecretKey, ForcePathStyle), `AzureBlob`. |
-| `Smtp` | Mail server. Empty `Host` logs emails instead of sending them. |
+| `Notifications` | Channels on/off and provider instances (see below). Default: email to the log, in-app on, SMS/WhatsApp off. |
 | `Outbox` | Poll interval, batch size, max attempts, retention. |
 | `Hangfire` | Optional job server and dashboard (`Enabled: false` by default). |
 | `Seed` | First administrator (`AdminEmail`; `AdminPassword` from user-secrets only). |
 | `Serilog`, `OTEL_EXPORTER_OTLP_ENDPOINT` | Logging and telemetry export. |
+
+### Switching on a notification channel
+
+Each channel names a provider instance; instances are defined once and can be reused by any tenant
+(a tenant picks a different instance with the `Notifications.SmsProvider` / `EmailProvider` / `WhatsAppProvider` settings).
+Keep the secrets in user-secrets or environment variables:
+
+```json
+"Notifications": {
+  "Channels": {
+    "Email":    { "Enabled": true, "Provider": "smtp" },
+    "Sms":      { "Enabled": true, "Provider": "clickatell" },
+    "WhatsApp": { "Enabled": true, "Provider": "meta" }
+  },
+  "Providers": {
+    "smtp":       { "Type": "Smtp", "Host": "smtp.example.com", "FromAddress": "no-reply@example.com", "UserName": "...", "Password": "(secret)" },
+    "clickatell": { "Type": "Clickatell", "ApiKey": "(secret)" },
+    "meta":       { "Type": "MetaWhatsApp", "PhoneNumberId": "...", "AccessToken": "(secret)" }
+  }
+}
+```
+
+Types: `Log`, `Smtp`, `SendGrid`, `TwilioSms`, `TwilioWhatsApp`, `Clickatell`, `BulkSms`, `MetaWhatsApp`. A switched-on
+channel that points at a missing provider stops startup with a message naming it. To add your own provider, implement
+`INotificationProvider` and register it in DI; its `Name` becomes a valid `Provider` value.
 
 Set the `General.PublicBaseUrl` setting to the address users reach the app at: invite and reset emails link to it.
 It is a setting, not the request's `Host` header, so a forged header can't redirect those links.

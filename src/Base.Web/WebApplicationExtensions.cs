@@ -32,11 +32,13 @@ internal static class WebApplicationExtensions
         services.AddScoped<ICurrentUser, HttpCurrentUser>();
 
         services.AddControllersWithViews(options =>
-        {
-            // Every unsafe request (POST/PUT/PATCH/DELETE) needs an antiforgery token, API calls included,
-            // because the API is authenticated by the same cookie. site.js sends it as a header.
-            options.Filters.Add(new AutoValidateAntiforgeryTokenAttribute());
-        });
+            {
+                // Every unsafe request (POST/PUT/PATCH/DELETE) needs an antiforgery token, API calls included,
+                // because the API is authenticated by the same cookie. site.js sends it as a header.
+                options.Filters.Add(new AutoValidateAntiforgeryTokenAttribute());
+            })
+            // Enums travel as names ("Sms", "Sent"), not numbers, so API consumers read and send them as words.
+            .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
         services.AddAntiforgery(options =>
         {
             options.HeaderName = "X-CSRF-TOKEN";

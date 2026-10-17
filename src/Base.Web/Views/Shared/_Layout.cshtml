@@ -27,6 +27,9 @@
                     <li class="nav-item" asp-permission="@PermissionCodes.Roles.Manage">
                         <a class="nav-link" asp-controller="RoleAdmin" asp-action="Index">Roles</a>
                     </li>
+                    <li class="nav-item" asp-permission="@PermissionCodes.Notifications.View">
+                        <a class="nav-link" asp-controller="NotificationAdmin" asp-action="Index">Messages</a>
+                    </li>
                     <li class="nav-item" asp-permission="@PermissionCodes.Audit.View">
                         <a class="nav-link" asp-controller="AuditAdmin" asp-action="Index">Audit</a>
                     </li>
@@ -40,6 +43,7 @@
                 <div class="d-flex align-items-center gap-2">
                     @if (CurrentUser.IsAuthenticated)
                     {
+                        @await Component.InvokeAsync("NotificationBell")
                         <a class="navbar-text text-decoration-none" asp-controller="Account" asp-action="ChangePassword" title="Change password">@CurrentUser.AuditName</a>
                         <form asp-controller="Account" asp-action="Logout" method="post">
                             <button type="submit" class="btn btn-outline-light btn-sm">Sign out</button>

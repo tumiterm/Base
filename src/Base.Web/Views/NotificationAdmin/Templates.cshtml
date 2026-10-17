@@ -1,0 +1,20 @@
+@model IReadOnlyList<Base.Application.Notifications.NotificationTemplateView>
+@{
+    ViewData["Title"] = "Notification templates";
+}
+<h1 class="h3 mb-3">Notification templates</h1>
+<p class="text-muted">Default wording ships with the application. Changes here apply to this tenant only and can be reset.</p>
+<table class="table align-middle">
+    <thead><tr><th>Template</th><th>Category</th><th>Channels</th><th>Customised parts</th></tr></thead>
+    <tbody>
+        @foreach (var t in Model)
+        {
+            <tr>
+                <td><a asp-action="Template" asp-route-code="@t.Definition.Code">@t.Definition.Name</a><div class="small text-muted">@t.Definition.Description</div></td>
+                <td>@t.Definition.Category @if (t.Definition.IsMandatory) { <span class="badge text-bg-secondary">always sent</span> }</td>
+                <td>@string.Join(", ", t.Definition.Channels)@if (t.Definition.Fallback is { Count: > 0 } fb) { <div class="small text-muted">fallback: @string.Join(" → ", fb)</div> }</td>
+                <td>@t.Parts.Count(p => p.OverrideContent is not null)</td>
+            </tr>
+        }
+    </tbody>
+</table>

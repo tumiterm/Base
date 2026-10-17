@@ -33,9 +33,14 @@ cross-cutting feature or adding a package:
 - New permission = constant in `PermissionCodes` + `PermissionCatalog` entry; gate with `[HasPermission]`.
   New setting = constant in `SettingCodes` + `SettingCatalog` entry (no migration). Secrets are never settings.
 - Files only through `IFileService`: bytes go to object storage, never SQL.
+- Notify people only through `INotificationService` (template code + recipient + data). New template = constant in
+  `NotificationTemplates` + `NotificationCatalog` entry + `Notifications/Templates/{Code}.txt` (tests check they match).
+  Templates containing secrets are `IsSensitive` (sent at once, stored without content). Providers are configured
+  under `Notifications:Providers`; nothing is sent on a channel until it is switched on. `IEmailSender` is only for
+  untemplated operator email.
 - User and role changes go through `IUserAdministration`/`IRoleAdministration` (never `UserManager` from Web), which
   enforce `PermissionGuard`: nobody grants or manages access they don't hold. Emails with links are sent from outbox
-  handlers and build links from the `General.PublicBaseUrl` setting, never the request host.
+  handlers (via the sensitive notification templates) and build links from the `General.PublicBaseUrl` setting, never the request host.
 - Changes are audited automatically (`AuditTrailInterceptor`). Mark personal or secret fields `[AuditRedacted]` and
   noise `[NotAudited]`. `ExecuteUpdate`/`ExecuteDelete` bypass auditing: don't use them on business data.
 - Side effects after a commit go through domain events + `IDomainEventHandler<T>` (outbox; handlers idempotent).

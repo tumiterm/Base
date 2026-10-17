@@ -10,6 +10,11 @@
     <PackageReference Include="Microsoft.Extensions.Options" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Logical names without the assembly prefix, so a renamed project (scripts/new-project.cs) still finds them. -->
+    <EmbeddedResource Include="Notifications\Templates\*.txt" LogicalName="Notifications.%(Filename).txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Base.IntegrationTests" />
     <InternalsVisibleTo Include="Base.UnitTests" />
   </ItemGroup>
 </Project>
