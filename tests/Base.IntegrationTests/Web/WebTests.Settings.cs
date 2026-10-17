@@ -97,6 +97,16 @@ public sealed partial class WebTests
     }
 
     [Fact]
+    public async Task Release_pages_render_for_the_people_who_take_and_watch_releases()
+    {
+        var client = Client();
+        await SignInAsync(client);
+        (await client.GetStringAsync("/admin/releases", TestContext.Current.CancellationToken)).ShouldContain("You're up to date");
+        (await client.GetStringAsync("/platform/releases", TestContext.Current.CancellationToken)).ShouldContain("Organisations by release");
+        (await client.GetStringAsync("/platform/tenants", TestContext.Current.CancellationToken)).ShouldContain("Release");
+    }
+
+    [Fact]
     public async Task The_running_version_is_reported()
     {
         var client = Client();

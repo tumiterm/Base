@@ -1,0 +1,6 @@
+@model Base.Application.Releases.TenantReleaseState
+<div class="app-banner app-banner-info" role="status">
+    <icon name="rocket" class="icon-sm" />
+    <span>Release @Model.CurrentVersion is ready for your organisation, with @Model.Pending.Sum(p => p.Features.Count) new feature@(Model.Pending.Sum(p => p.Features.Count) == 1 ? "" : "s").</span>
+    <a class="app-banner-link" asp-controller="Releases" asp-action="Index">See what's new <icon name="chevron-right" class="icon-sm" /></a>
+</div>

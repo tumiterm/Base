@@ -871,3 +871,16 @@ a.stat-tile:hover { border-color: var(--border-strong); color: var(--text); }
 .item-list > li.is-unread .item-title { color: var(--text); }
 .item-list > li:not(.is-unread) .item-title { font-weight: 500; color: var(--text-2); }
 .import-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr)); gap: var(--s-4); }
+
+/* ---------- Releases ---------- */
+.release-hero { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-4) var(--s-6); padding: var(--s-5); }
+.release-hero.is-current { border-color: color-mix(in srgb, var(--success) 30%, var(--border)); }
+.release-hero.is-behind { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); background: color-mix(in srgb, var(--accent-subtle) 35%, var(--surface-1)); }
+.release-hero-version { display: flex; flex-direction: column; min-width: 7rem; }
+.release-hero-label { color: var(--text-3); font-size: var(--text-sm); font-weight: 500; }
+.release-hero-number { font-size: 2.25rem; font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.release-hero-text { flex: 1 1 18rem; min-width: 0; }
+.release-hero-action { flex: none; }
+.version-bar { display: grid; grid-template-columns: 4rem minmax(0, 1fr) 3rem; align-items: center; gap: var(--s-3); padding: var(--s-2) 0; }
+.version-bar-label { font-weight: 600; font-variant-numeric: tabular-nums; }
+.version-bar-count { text-align: right; color: var(--text-3); font-variant-numeric: tabular-nums; }

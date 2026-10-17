@@ -1,0 +1,39 @@
+@model Base.Application.Releases.FeatureState
+@using Base.Application.Releases
+@{
+    var f = Model.Feature;
+    var id = "feature-" + f.Code.Replace('.', '-');
+    var (chip, tone) = Model.Source switch
+    {
+        FeatureStateSource.Choice => (Model.IsOn ? "Switched on early" : "Kept the old way", "is-active"),
+        FeatureStateSource.Default => (Model.IsOn ? "On by default" : "Waiting for you", ""),
+        FeatureStateSource.Retired => ("Part of everyone's release", ""),
+        FeatureStateSource.NotInPlan => ("Not in your plan", ""),
+        _ => ("Yours", ""),
+    };
+}
+<div class="setting-row is-switch" id="@id">
+    <div class="setting-text">
+        <div class="setting-head">
+            <label class="setting-name" for="@id-switch">@f.Name</label>
+            <span class="chip @tone">@chip</span>
+        </div>
+        <p class="setting-desc">@f.Description</p>
+        <div class="setting-meta">
+            <span>Arrived in @ReleaseVersions.Display(f.Introduced)@(f.Rollout == ReleaseRollout.OnByDefault ? " · on by default" : " · opt-in")</span>
+            @if (Model.Source == FeatureStateSource.Choice)
+            {
+                <form asp-action="Follow" asp-route-code="@f.Code" method="post" class="d-inline"><button class="btn-inline" type="submit">Follow the release instead</button></form>
+            }
+        </div>
+    </div>
+    <div class="setting-control">
+        <form asp-action="Choose" asp-route-code="@f.Code" method="post">
+            <span class="form-check form-switch m-0">
+                <input class="form-check-input" type="checkbox" role="switch" id="@id-switch" name="isOn" value="true" checked="@Model.IsOn" disabled="@(!Model.CanChoose)" data-autosubmit />
+                <input type="hidden" name="isOn" value="false" />
+            </span>
+            <noscript><button class="btn btn-secondary btn-sm" type="submit">Save</button></noscript>
+        </form>
+    </div>
+</div>

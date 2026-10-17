@@ -1,6 +1,7 @@
 @model TenantDetailsViewModel
 @inject ICurrentUser CurrentUser
 @inject TimeProvider Time
+@inject Base.Application.Releases.ITenantReleases Releases
 @{
     var t = Model.Details.Tenant;
     var s = Model.Details.Subscription;
@@ -231,6 +232,27 @@
                 }
             </div>
         </section>
+
+        @{
+            var release = await Releases.GetForAsync(t.Id);
+        }
+        @if (release is not null)
+        {
+            <section class="panel" aria-labelledby="release-panel-title">
+                <div class="panel-header">
+                    <h2 class="panel-title" id="release-panel-title">Release</h2>
+                    @if (release.IsUpToDate) {<span class="badge text-bg-success">Up to date</span>} else {<span class="badge text-bg-warning">@release.Behind behind</span>}
+                </div>
+                <div class="panel-body">
+                    <dl class="kv">
+                        <dt>On</dt><dd class="tabular">@Base.Application.Releases.ReleaseVersions.Label(release.EffectiveVersion)@(release.IsUpToDate ? "" : $" (running {release.CurrentVersion})")</dd>
+                        @if (release.AdoptedAt is { } adoptedAt) {<dt>Last taken</dt><dd><local-time value="adoptedAt" format="d MMM yyyy" /></dd>}
+                        @if (!release.IsUpToDate) {<dt>Waiting</dt><dd>@release.Pending.Sum(p => p.Features.Count) feature(s) in @string.Join(", ", release.Pending.Select(p => p.Version))@(release.OnEarly > 0 ? $"; {release.OnEarly} switched on early" : "")</dd>}
+                    </dl>
+                </div>
+                <div class="panel-footer small text-muted">They take releases from What's new; you see the spread under <a asp-controller="PlatformReleases" asp-action="Index">Releases</a>.</div>
+            </section>
+        }
 
         <section class="panel" aria-labelledby="people-title">
             <div class="panel-header">

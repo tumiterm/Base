@@ -2,6 +2,7 @@ using Base.Application.Common.Abstractions;
 using Base.Application.Common.Persistence;
 using Base.Application.Common.Results;
 using Base.Application.Common.Validation;
+using Base.Application.Releases;
 using Base.Application.Security;
 using Base.Application.Settings;
 using Base.Application.Subscriptions;
@@ -28,6 +29,7 @@ internal sealed partial class TenantAdministrationService(
     ISubscriptionService subscriptions,
     ITenantEntitlements entitlements,
     IServiceScopeFactory scopes,
+    IReleaseCatalog releases,
     TimeProvider time,
     IValidator<CreateTenantRequest> createValidator,
     IValidator<UpdateTenantRequest> updateValidator,
@@ -129,6 +131,7 @@ internal sealed partial class TenantAdministrationService(
 
         var created = new Tenant(code, request.Name);
         created.ChangeContact(request.AdminEmail);
+        created.AdoptRelease(ReleaseVersions.Display(releases.CurrentVersion), time.GetUtcNow()); // starts with everything released so far
         if (host is not null)
         {
             created.AddDomain(host).MarkVerified(); // the operator is adding it, so it is trusted
@@ -315,7 +318,8 @@ internal sealed partial class TenantAdministrationService(
             x.Subscription != null ? x.Subscription.Status : null,
             x.Subscription != null ? x.Subscription.CurrentPeriodEnd : null,
             db.Users.Count(u => u.TenantId == x.Tenant.Id),
-            x.Tenant.DateCreated));
+            x.Tenant.DateCreated,
+            x.Tenant.ReleaseVersion));
 
     /// <summary>Runs as the new tenant: its public address, then its first administrator's invitation.</summary>
     private async Task<ValidationResponse> ProvisionAsync(Tenant created, string? host, CreateTenantRequest request, CancellationToken cancellationToken)

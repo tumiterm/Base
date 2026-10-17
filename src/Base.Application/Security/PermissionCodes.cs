@@ -12,6 +12,11 @@ public static class PermissionCodes
         public const string Edit = "Settings.Edit";
     }
 
+    public static class Releases
+    {
+        public const string Manage = "Releases.Manage";
+    }
+
     public static class Users
     {
         public const string View = "Users.View";

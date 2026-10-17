@@ -34,6 +34,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
 
     public DbSet<TenantDomain> TenantDomains => Set<TenantDomain>();
 
+    public DbSet<TenantFeatureChoice> TenantFeatureChoices => Set<TenantFeatureChoice>();
+
     public DbSet<ApiClient> ApiClients => Set<ApiClient>();
 
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();

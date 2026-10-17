@@ -38,6 +38,7 @@ public static class PermissionCatalog
     [
         new(PermissionCodes.Settings.View, "View settings", "Settings", "See application settings and their values.", AdminOnly, []),
         new(PermissionCodes.Settings.Edit, "Edit settings", "Settings", "Change application settings.", AdminOnly, [PermissionCodes.Settings.View]),
+        new(PermissionCodes.Releases.Manage, "Manage releases", "Settings", "Take new releases for the organisation, and switch their features on early or keep the old way.", AdminOnly, []),
         new(PermissionCodes.Users.View, "View users", "Users", "See user accounts.", AdminOnly, []),
         new(PermissionCodes.Users.Manage, "Manage users", "Users", "Create, lock and edit user accounts.", AdminOnly, [PermissionCodes.Users.View]),
         new(PermissionCodes.Roles.Manage, "Manage roles", "Users", "Create roles and grant permissions. Roles are shared by every tenant.", AdminOnly,

@@ -275,6 +275,16 @@ chosen provider, else the SMTP server from `Email.*` settings when switched on, 
 themselves with `VersionPrefix`. `AppVersion` exposes both at run time (System page, account menu,
 `api/system/version`). `docs/changelog.md` records every change; tags `vX.Y.Z` publish releases (ADR 0019).
 
+## Release adoption
+
+Every tenant runs the same build but adopts releases at its own pace (ADR 0022). `ReleaseCatalog` lists gated
+features with the version that introduced them and a rollout (`OptIn` or `OnByDefault`); `Tenant.ReleaseVersion` is
+the release a tenant last took and `TenantFeatureChoice` holds features turned on early or off. `ReleaseRules` decides
+each feature's state (plan → retired → newer than the build → choice → adopted → default) and which releases are
+pending; `ITenantReleases` caches the result per tenant and is what `[RequiresRelease]`, `asp-release` and services
+call. Administration → What's new takes releases and features; Platform → Releases shows the fleet. The
+`release-window` job enforces `Releases.MaxReleasesBehind`.
+
 ## UI and branding
 
 - `wwwroot/css/design-system.css` holds the tokens (light and dark) and the components. Bootstrap 5.3 is only the

@@ -14,6 +14,15 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ## [Unreleased]
 
+### Added
+
+- Tenants adopt releases at their own pace. Changes listed in `ReleaseCatalog` can be held back until an organisation
+  takes their release, tried early or turned off; Administration → What's new shows what is waiting, and a banner
+  tells administrators when they are behind. Platform → Releases shows how many organisations are on each release
+  and who is behind, and the tenants list shows each one's release. The `Releases.MaxReleasesBehind` setting and the
+  daily `release-window` job keep everyone within a support window. Gate features with `ITenantReleases.IsOnAsync`,
+  `[RequiresRelease]` or `asp-release` (ADR 0022). The Base's catalogue is empty.
+
 ### Changed
 
 - The System, Errors, error details, Roles, role, Messages (log, templates, template), Notifications, notification
@@ -24,6 +33,7 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ### Fixed
 
+- Source folders named `Releases` are no longer ignored by git.
 - Forms that list every validation message no longer trip the content security policy with an inline style.
 
 ## [1.0.0] - 2026-10-17

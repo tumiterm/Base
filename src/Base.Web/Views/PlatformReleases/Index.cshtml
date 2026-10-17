@@ -1,0 +1,76 @@
+@model PlatformReleasesViewModel
+@using Base.Application.Releases
+@{
+    ViewData["Title"] = "Releases";
+    var f = Model.Fleet;
+    var behind = f.TenantCount - f.UpToDate;
+    int Percent(int part) => f.TenantCount == 0 ? 0 : (int)Math.Round(100.0 * part / f.TenantCount);
+}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Releases</h1>
+        <p class="page-subtitle">Which release each organisation is on, and how far each new feature has spread. Organisations take releases at their own pace from What's new.</p>
+    </div>
+    <div class="page-actions">
+        <a class="btn btn-secondary" asp-controller="SettingsAdmin" asp-action="Index" asp-route-category="Releases" asp-permission="@PermissionCodes.Settings.View"><icon name="settings" class="icon-sm" /> Support window</a>
+    </div>
+</div>
+
+<div class="stat-grid">
+    <div class="panel stat-tile"><span class="file-tile is-code" aria-hidden="true"><icon name="git-branch" /></span><div class="stat"><span class="stat-label">Running</span><span class="stat-value">@f.CurrentVersion</span><span class="stat-sub">The version deployed now</span></div></div>
+    <div class="panel stat-tile"><span class="file-tile" aria-hidden="true"><icon name="circle-check" /></span><div class="stat"><span class="stat-label">Up to date</span><span class="stat-value">@f.UpToDate of @f.TenantCount</span><span class="stat-sub">Active organisations</span></div></div>
+    <div class="panel stat-tile @(behind > 0 ? "is-warning" : "")"><span class="file-tile" aria-hidden="true"><icon name="hourglass" /></span><div class="stat"><span class="stat-label">Behind</span><span class="stat-value">@behind</span><span class="stat-sub">Still to take a release</span></div></div>
+    <div class="panel stat-tile"><span class="file-tile" aria-hidden="true"><icon name="flag" /></span><div class="stat"><span class="stat-label">Gated features</span><span class="stat-value">@f.Features.Count</span><span class="stat-sub">In the release catalogue</span></div></div>
+</div>
+
+<div class="detail-grid">
+    <section class="panel" aria-labelledby="features-title">
+        <div class="panel-header"><h2 class="panel-title" id="features-title">Features</h2><span class="text-muted small">On for how many organisations</span></div>
+        @if (f.Features.Count == 0)
+        {
+            <div class="empty-state border-0">
+                <icon name="flag" />
+                <div class="empty-state-title">No gated features</div>
+                <p class="mb-0">Every change reaches every organisation on deployment. Add an entry to <span class="mono">ReleaseCatalog</span> when a change should be taken at each organisation's own pace.</p>
+            </div>
+        }
+        else
+        {
+            <div class="panel-body stack">
+                @foreach (var feature in f.Features.OrderByDescending(x => ReleaseVersions.Parse(x.Feature.Introduced)))
+                {
+                    var retired = feature.Feature.Retired is not null;
+                    <div class="meter @(Percent(feature.OnCount) >= 100 ? "is-full" : "")" data-meter="@Percent(feature.OnCount)">
+                        <div class="meter-head">
+                            <span class="meter-label">@feature.Feature.Name <span class="text-muted fw-normal">· @ReleaseVersions.Display(feature.Feature.Introduced)@(retired ? " · retired" : feature.Feature.Rollout == ReleaseRollout.OnByDefault ? " · on by default" : " · opt-in")</span></span>
+                            <span class="meter-value"><strong>@feature.OnCount</strong> of @f.TenantCount</span>
+                        </div>
+                        <div class="meter-track" role="progressbar" aria-label="@feature.Feature.Name adoption" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@Percent(feature.OnCount)"><div class="meter-fill"></div></div>
+                    </div>
+                }
+            </div>
+            <div class="panel-footer small text-muted">When a feature is on everywhere, set its <span class="mono">Retired</span> version and remove the old code path.</div>
+        }
+    </section>
+    <aside class="stack">
+        <section class="panel" aria-labelledby="versions-title">
+            <div class="panel-header"><h2 class="panel-title" id="versions-title">Organisations by release</h2></div>
+            <div class="panel-body">
+                @if (f.Versions.Count == 0)
+                {
+                    <p class="text-muted small mb-0">No active organisations.</p>
+                }
+                @foreach (var v in f.Versions)
+                {
+                    <div class="meter" data-meter="@Percent(v.Tenants)">
+                        <div class="meter-head">
+                            <span class="meter-label">@ReleaseVersions.Label(v.Version) @if (v.Version == f.CurrentVersion) {<span class="chip ms-1">current</span>}</span>
+                            <span class="meter-value"><strong>@v.Tenants</strong> organisation@(v.Tenants == 1 ? "" : "s")</span>
+                        </div>
+                        <div class="meter-track" role="progressbar" aria-label="Organisations on @v.Version" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@Percent(v.Tenants)"><div class="meter-fill"></div></div>
+                    </div>
+                }
+            </div>
+        </section>
+    </aside>
+</div>

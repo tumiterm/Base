@@ -55,7 +55,8 @@ public sealed record TenantSummary(
     SubscriptionStatus? Status,
     DateTimeOffset? PeriodEnd,
     int UserCount,
-    DateTimeOffset DateCreated);
+    DateTimeOffset DateCreated,
+    string ReleaseVersion = Base.Domain.Tenancy.Tenant.NoRelease);
 
 public sealed record TenantDomainView(Guid Id, string Host, bool IsVerified);
 

@@ -1,0 +1,10 @@
+@model Base.Application.Releases.ReleaseFeature
+@{
+    ViewData["Title"] = Model.Name;
+}
+<div class="empty-state">
+    <icon name="rocket" />
+    <div class="empty-state-title">@Model.Name isn't switched on yet</div>
+    <p class="mb-2">@Model.Description It arrived in release @Base.Application.Releases.ReleaseVersions.Display(Model.Introduced); your organisation takes new releases when it's ready.</p>
+    <a class="btn btn-primary" asp-controller="Releases" asp-action="Index" asp-permission="@PermissionCodes.Releases.Manage"><icon name="sparkles" class="icon-sm" /> See what's new</a>
+</div>

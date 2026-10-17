@@ -23,6 +23,12 @@ public static class SettingCodes
         public const string PasswordResetEnabled = "Security.PasswordResetEnabled";
     }
 
+    public static class Releases
+    {
+        /// <summary>The support window: how many releases an organisation may stay behind (0: no limit).</summary>
+        public const string MaxReleasesBehind = "Releases.MaxReleasesBehind";
+    }
+
     public static class Documents
     {
         /// <summary>Switch: whether documents open in the browser (PDF, images, text) or only download.</summary>

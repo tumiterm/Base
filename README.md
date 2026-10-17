@@ -26,6 +26,9 @@ in [`docs/changelog.md`](docs/changelog.md); releases are tags `vX.Y.Z`. How a p
 in [ADR 0019](docs/adr/0019-versioning-the-base.md). The running build shows its version on the System page, in the
 account menu and at `GET api/system/version`.
 
+Tenants adopt releases at their own pace: changes listed in `ReleaseCatalog` stay off, or can be turned off, until an
+organisation takes their release, and the platform sees who is behind ([ADR 0022](docs/adr/0022-tenant-release-adoption.md)).
+
 ## Run it locally
 
 In Development the app needs no configuration. With no connection string set it uses:

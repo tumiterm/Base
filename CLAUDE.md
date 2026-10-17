@@ -84,6 +84,10 @@ cross-cutting feature or adding a package:
 - Package versions live only in `Directory.Packages.props`. No pre-release packages.
 - Versions: `BaseVersion` in `Directory.Build.props` (SemVer, ADR 0019). Every change people would notice adds a line
   under Unreleased in `docs/changelog.md` in the same commit; a release bumps the version and tags `vX.Y.Z`.
+- A change that alters what people see or do can be release-gated: constant in `ReleaseFeatureCodes` + `ReleaseCatalog`
+  entry (introduced version, `OptIn`/`OnByDefault`) + a gate (`ITenantReleases.IsOnAsync`, `[RequiresRelease]`,
+  `asp-release`), tested in both states. Never gate fixes. Once on everywhere, set `Retired`, then delete the old path
+  (ADR 0022).
 - UI is built from the design system (`design-system.css` tokens, `<icon>`, the shell in `_Layout`) and must meet
   `docs/ui-design-direction.md`: no stock Bootstrap look, no inline scripts or styles (strict CSP), light and dark,
   phone layouts. Brand colours come from `var(--accent*)` (per-tenant `Branding.*` settings), never hard-coded.

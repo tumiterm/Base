@@ -47,7 +47,7 @@ internal sealed partial class MigrateDatabaseTask(AppDbContext db, IOptions<Data
 }
 
 /// <summary>Ensures the default tenant exists and makes it the tenant for the remaining startup tasks.</summary>
-internal sealed class DefaultTenantSeedTask(AppDbContext db, ITenantContext tenant, IOptions<TenancyOptions> options) : IStartupTask
+internal sealed class DefaultTenantSeedTask(AppDbContext db, ITenantContext tenant, IOptions<TenancyOptions> options, Application.Releases.IReleaseCatalog releases, TimeProvider time) : IStartupTask
 {
     public int Order => 10;
 
@@ -59,6 +59,7 @@ internal sealed class DefaultTenantSeedTask(AppDbContext db, ITenantContext tena
         if (existing is null)
         {
             existing = new Tenant(code, settings.DefaultTenantName);
+            existing.AdoptRelease(Application.Releases.ReleaseVersions.Display(releases.CurrentVersion), time.GetUtcNow());
             db.Tenants.Add(existing);
             await db.SaveChangesAsync(cancellationToken);
         }

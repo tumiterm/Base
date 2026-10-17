@@ -1,0 +1,74 @@
+@model ReleasesPageViewModel
+@using Base.Application.Releases
+@{
+    ViewData["Title"] = "What's new";
+    var s = Model.State;
+}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">What's new</h1>
+        <p class="page-subtitle">New features reach your organisation when you're ready. Try them one at a time, or take a whole release.</p>
+    </div>
+</div>
+
+<section class="panel release-hero @(s.IsUpToDate ? "is-current" : "is-behind")" aria-labelledby="release-title">
+    <div class="release-hero-version">
+        <span class="release-hero-label">Your release</span>
+        <span class="release-hero-number" id="release-title">@ReleaseVersions.Label(s.EffectiveVersion)</span>
+    </div>
+    <div class="release-hero-text">
+        @if (s.IsUpToDate)
+        {
+            <div class="status-callout-title">You're up to date</div>
+            <p class="mb-0 text-muted">Everything released so far is yours.</p>
+        }
+        else
+        {
+            <div class="status-callout-title">@s.Behind release@(s.Behind == 1 ? "" : "s") waiting: @string.Join(", ", s.Pending.Select(p => p.Version))</div>
+            <p class="mb-0 text-muted">
+                The application runs @s.CurrentVersion. Take it to switch on what's new for everyone in your organisation.
+                @if (s.MaxBehind is { } max) {<text>Organisations more than @max release@(max == 1 ? "" : "s") behind are moved forward automatically.</text>}
+            </p>
+        }
+    </div>
+    @if (!s.IsUpToDate)
+    {
+        <form asp-action="Adopt" method="post" class="release-hero-action">
+            <button class="btn btn-primary" type="submit"><icon name="rocket" class="icon-sm" /> Take @s.CurrentVersion</button>
+        </form>
+    }
+</section>
+
+@if (Model.CatalogueSize == 0)
+{
+    <div class="empty-state mt-4">
+        <icon name="sparkles" />
+        <div class="empty-state-title">Nothing is held back</div>
+        <p class="mb-0">Every change so far reaches everyone straight away. When a release changes how people work, its features appear here first, so you can try them before your whole organisation gets them.</p>
+    </div>
+}
+
+@foreach (var release in s.Pending.OrderByDescending(r => ReleaseVersions.Parse(r.Version)))
+{
+    <section class="panel mt-4" aria-labelledby="release-@release.Version.Replace('.', '-')">
+        <div class="panel-header">
+            <div>
+                <h2 class="panel-title" id="release-@release.Version.Replace('.', '-')">Release @release.Version</h2>
+                <div class="text-muted small">@release.Features.Count new feature@(release.Features.Count == 1 ? "" : "s") · @release.Features.Count(f => f.IsOn) on for you already</div>
+            </div>
+            <form asp-action="Adopt" method="post"><input type="hidden" name="version" value="@release.Version" /><button class="btn btn-secondary btn-sm" type="submit">Take @release.Version</button></form>
+        </div>
+        <div class="panel-body"><div class="setting-list">@foreach (var f in release.Features) {<partial name="_FeatureRow" model="f" />}</div></div>
+    </section>
+}
+
+@if (s.Taken.Count > 0)
+{
+    <section class="panel mt-4" aria-labelledby="taken-title">
+        <div class="panel-header">
+            <h2 class="panel-title" id="taken-title">Already yours</h2>
+            <span class="text-muted small">Switch one off to keep the old way for now</span>
+        </div>
+        <div class="panel-body"><div class="setting-list">@foreach (var f in s.Taken) {<partial name="_FeatureRow" model="f" />}</div></div>
+    </section>
+}

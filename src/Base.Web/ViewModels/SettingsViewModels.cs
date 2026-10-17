@@ -26,3 +26,8 @@ public sealed record SettingsPageViewModel(
 /// <summary>One setting's editor row.</summary>
 /// <param name="ShowScope">Mark platform-wide settings: only when the category mixes them with tenant ones.</param>
 public sealed record SettingFieldViewModel(SettingValue Setting, string? Value, bool CanEdit, bool IsPlatform, IReadOnlyList<string>? Choices, bool ShowScope);
+
+/// <param name="CatalogueSize">How many gated features the application has at all (0: nothing is ever held back).</param>
+public sealed record ReleasesPageViewModel(Base.Application.Releases.TenantReleaseState State, int CatalogueSize);
+
+public sealed record PlatformReleasesViewModel(Base.Application.Releases.ReleaseFleet Fleet);

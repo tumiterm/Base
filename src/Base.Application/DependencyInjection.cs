@@ -11,6 +11,7 @@ using Base.Application.Messaging;
 using Base.Application.Notifications;
 using Base.Application.Operations;
 using Base.Application.People;
+using Base.Application.Releases;
 using Base.Application.Settings;
 using Base.Application.Subscriptions;
 using Base.Application.Users;
@@ -58,6 +59,9 @@ public static class DependencyInjection
         services.AddScoped<IImporter, PeopleImporter>();
 
         services.AddScoped<ITenantEntitlements, TenantEntitlements>();
+        services.TryAddSingleton<IReleaseCatalog, DefaultReleaseCatalog>();
+        services.AddScoped<ITenantReleases, TenantReleases>();
+        services.AddScoped<IScheduledJob, ReleaseWindowJob>();
         services.AddScoped<IPlanAdministration, PlanAdministration>();
         services.AddScoped<ISubscriptionService, SubscriptionService>();
         services.AddScoped<IScheduledJob, SubscriptionLifecycleJob>();

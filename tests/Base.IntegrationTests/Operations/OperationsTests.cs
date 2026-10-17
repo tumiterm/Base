@@ -37,7 +37,7 @@ public sealed class OperationsTests(SqlServerFixture sql) : IAsyncLifetime
     {
         var scheduler = Scheduler();
 
-        (await scheduler.RunDueAsync(CancellationToken.None)).ShouldBe(10, "every job is due on first start");
+        (await scheduler.RunDueAsync(CancellationToken.None)).ShouldBe(11, "every job is due on first start");
         (await scheduler.RunDueAsync(CancellationToken.None)).ShouldBe(0, "nothing is due again until its interval passes");
 
         var status = await Jobs(j => j.StatusAsync());

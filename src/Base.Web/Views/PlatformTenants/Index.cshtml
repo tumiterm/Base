@@ -1,5 +1,6 @@
 @model TenantListViewModel
 @inject TimeProvider Time
+@inject Base.Application.Releases.IReleaseCatalog Releases
 @{
     ViewData["Title"] = "Tenants";
     var results = Model.Tenants;
@@ -52,7 +53,7 @@ else
 {
     <table class="table table-entity align-middle">
         <thead>
-            <tr><th>Tenant</th><th>Plan</th><th>Status</th><th>Renews or ends</th><th class="text-end">Users</th><th>Created</th></tr>
+            <tr><th>Tenant</th><th>Plan</th><th>Status</th><th>Renews or ends</th><th>Release</th><th class="text-end">Users</th><th>Created</th></tr>
         </thead>
         <tbody>
             @foreach (var t in results.Items)
@@ -79,6 +80,13 @@ else
                         {
                             <span class="text-muted">—</span>
                         }
+                    </td>
+                    <td>
+                        @{
+                            var behind = Base.Application.Releases.ReleaseRules.PendingVersions(Releases.Features, t.ReleaseVersion, Releases.CurrentVersion).Count;
+                        }
+                        <span class="tabular">@Base.Application.Releases.ReleaseVersions.Label(Base.Application.Releases.ReleaseRules.EffectiveVersion(Releases.Features, t.ReleaseVersion, Releases.CurrentVersion))</span>
+                        @if (behind > 0) {<span class="chip ms-1" title="Releases with features it hasn't taken">@behind behind</span>}
                     </td>
                     <td class="text-end tabular">@t.UserCount</td>
                     <td class="text-muted"><local-time value="t.DateCreated" format="d MMM yyyy" /></td>

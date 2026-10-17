@@ -10,6 +10,10 @@ public sealed class Tenant : EntityBase, INamedEntity
 {
     public const string DefaultCode = "default";
     public const int ContactEmailMaxLength = 256;
+    public const int ReleaseVersionMaxLength = 32;
+
+    /// <summary>What a tenant that never adopted a release is on: every gated feature is still ahead of it.</summary>
+    public const string NoRelease = "0.0.0";
 
     private readonly List<TenantDomain> _domains = [];
 
@@ -38,6 +42,21 @@ public sealed class Tenant : EntityBase, INamedEntity
     public string? ContactEmail { get; private set; }
 
     public IReadOnlyCollection<TenantDomain> Domains => _domains.AsReadOnly();
+
+    /// <summary>
+    /// The release (SemVer) whose features this tenant has taken: everything introduced up to it is on. New tenants
+    /// start on the running version; later releases wait until the tenant adopts them (or the support window does).
+    /// </summary>
+    public string ReleaseVersion { get; private set; } = NoRelease;
+
+    public DateTimeOffset? ReleaseAdoptedAt { get; private set; }
+
+    public void AdoptRelease(string version, DateTimeOffset adoptedAt)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(version);
+        ReleaseVersion = version.Trim();
+        ReleaseAdoptedAt = adoptedAt;
+    }
 
     public void Rename(string name)
     {

@@ -218,3 +218,13 @@ public sealed class SubscriptionController(ISubscriptionService subscriptions, I
     public async Task<IActionResult> Index(CancellationToken cancellationToken) =>
         View(new SubscriptionPageViewModel(await subscriptions.GetMineAsync(cancellationToken), await entitlements.GetAsync(cancellationToken)));
 }
+
+/// <summary>Where every tenant stands on releases: versions in use and how far each gated feature has spread.</summary>
+[Route("platform/releases")]
+[HasPermission(PermissionCodes.Platform.TenantsView)]
+public sealed class PlatformReleasesController(Application.Releases.ITenantReleases releases) : Controller
+{
+    [HttpGet("")]
+    public async Task<IActionResult> Index(CancellationToken cancellationToken) =>
+        View(new PlatformReleasesViewModel(await releases.FleetAsync(cancellationToken)));
+}

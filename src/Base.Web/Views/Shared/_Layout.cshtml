@@ -103,6 +103,7 @@
                 <div class="app-banner app-banner-info" role="status"><icon name="info" class="icon-sm" /> <span>@announcement</span></div>
             }
             @await Component.InvokeAsync("SubscriptionNotice")
+            @await Component.InvokeAsync("ReleaseNotice")
             <main class="app-content" id="content" role="main" tabindex="-1">
                 @RenderBody()
             </main>

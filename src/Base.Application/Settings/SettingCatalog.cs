@@ -23,6 +23,10 @@ public static class SettingCatalog
         new(SettingCodes.Security.PasswordResetEnabled, "Password reset by email", SettingDataType.Boolean, "true", "Security",
             "Offer \"Forgot your password?\" on the sign-in page. Turn off where accounts are managed centrally."),
 
+        new(SettingCodes.Releases.MaxReleasesBehind, "Support window (releases)", SettingDataType.Integer, "0", "Releases",
+            "Organisations more than this many releases behind are moved forward automatically each day, so old behaviour can be retired. 0 lets them stay as far behind as they like.",
+            SettingScope.Platform, Min: 0, Max: 50),
+
         new(SettingCodes.Documents.PreviewEnabled, "Preview documents in the browser", SettingDataType.Boolean, "true", "Documents",
             "PDFs, images and text open on the page. Turn off to make every document a download."),
 
