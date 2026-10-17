@@ -1,5 +1,5 @@
-# Extends the default rules. Only the throwaway local-container password used by docker-compose,
-# appsettings.Development.json and the design-time factory is allow-listed.
+# Extends the default rules. Only throwaway local-development credentials are allow-listed: the docker-compose
+# SQL Server password (DevelopmentDatabase, docker-compose.yml), MinIO's, and the Development-only admin seed password.
 [extend]
 useDefault = true
 
@@ -8,5 +8,6 @@ description = "Local development container credentials (not secrets)"
 regexes = [
   '''Base_Dev_Password1!''',
   '''base-dev-password''',
+  '''Admin-Dev-Password-1''',
   '''Base_Dev_Password1!''',
 ]

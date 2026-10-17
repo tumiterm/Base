@@ -12,8 +12,9 @@ internal sealed class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<A
 {
     public AppDbContext CreateDbContext(string[] args)
     {
-        var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__Default")
-            ?? "Server=localhost,1433;Database=Base;User Id=sa;Password=Base_Dev_Password1!;TrustServerCertificate=True";
+        var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__Default") is { Length: > 0 } configured
+            ? configured
+            : DevelopmentDatabase.Default;
 
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseSqlServer(connectionString, sql => sql.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName))
