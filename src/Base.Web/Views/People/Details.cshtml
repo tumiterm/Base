@@ -1,0 +1,202 @@
+@model PersonPageViewModel
+@inject ICurrentUser CurrentUser
+@using Base.Application.Auditing
+@using Base.Domain.People
+@{
+    var p = Model.Person;
+    ViewData["Title"] = p.DisplayName;
+    var canManage = CurrentUser.HasPermission(PermissionCodes.People.Manage);
+    var department = Model.Labels.Name(LookupLists.People.Department, p.DepartmentCode);
+    var title = Model.Labels.Name(LookupLists.People.Title, p.TitleCode);
+    var tabs = new (PersonTab Tab, string Label, string Icon)[] { (PersonTab.Profile, "Profile", "user"), (PersonTab.Documents, "Documents", "file-text"), (PersonTab.History, "History", "history") };
+}
+@functions {
+    private string? Show(PersonPageViewModel m, AuditChange change, string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return null;
+        }
+
+        if (change.Property == nameof(Person.Status) && Enum.TryParse<PersonStatus>(value, out var status))
+        {
+            return PersonDisplay.Status(status);
+        }
+
+        if (DateOnly.TryParseExact(value, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var date))
+        {
+            return date.ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        var list = PersonDisplay.ListOf(change.Property);
+        return list is null ? value : string.Join(", ", value.Split(", ").Select(code => m.Labels.Name(list, code)));
+    }
+}
+<nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-action="Index">People</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">@p.DisplayName</span></nav>
+<div class="page-header">
+    <div class="entity">
+        <partial name="_PersonAvatar" model='(p.Id, p.DisplayName, p.HasAvatar, "avatar-xl")' />
+        <div class="entity-text">
+            <h1 class="page-title">@(title is null ? "" : title + " ")@p.DisplayName</h1>
+            <p class="page-subtitle">@string.Join(" · ", new[] { p.JobTitle, department }.Where(s => !string.IsNullOrEmpty(s)).DefaultIfEmpty("No role yet"))</p>
+        </div>
+    </div>
+    <div class="page-actions">
+        @if (canManage)
+        {
+            <form method="post" asp-action="Status" asp-route-id="@p.Id" class="segmented" role="radiogroup" aria-label="Status">
+                @foreach (var status in Enum.GetValues<PersonStatus>())
+                {
+                    var disabled = p.Status == PersonStatus.Left && status == PersonStatus.OnLeave;
+                    <input type="radio" name="status" id="st-@status" value="@status" checked="@(p.Status == status)" disabled="@disabled" data-autosubmit />
+                    <label for="st-@status" title="@(disabled ? "Mark them active first" : null)">@PersonDisplay.Status(status)</label>
+                }
+                <noscript><button class="btn btn-sm btn-secondary" type="submit">Save</button></noscript>
+            </form>
+            <div class="dropdown">
+                <button class="btn btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false"><icon name="ellipsis" class="icon-sm" /> More</button>
+                <div class="dropdown-menu dropdown-menu-end">
+                    <button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#photo-dialog"><icon name="image" class="icon-sm" /> @(p.HasAvatar ? "Change photo" : "Add photo")</button>
+                    @if (p.HasAvatar)
+                    {
+                        <form method="post" asp-action="RemovePhoto" asp-route-id="@p.Id"><button class="dropdown-item" type="submit"><icon name="x" class="icon-sm" /> Remove photo</button></form>
+                    }
+                    <div class="dropdown-divider"></div>
+                    <button class="dropdown-item text-danger" type="button" data-bs-toggle="modal" data-bs-target="#delete-dialog"><icon name="trash-2" class="icon-sm" /> Remove person…</button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <span class="badge text-bg-@PersonDisplay.Tone(p.Status)">@PersonDisplay.Status(p.Status)</span>
+        }
+    </div>
+</div>
+
+<nav class="tabs" aria-label="Sections">
+    @foreach (var t in tabs)
+    {
+        <a class="@(Model.Tab == t.Tab ? "active" : "")" aria-current="@(Model.Tab == t.Tab ? "page" : null)" asp-action="Details" asp-route-id="@p.Id" asp-route-tab="@(t.Tab == PersonTab.Profile ? null : t.Tab)"><icon name="@t.Icon" class="icon-sm" /> @t.Label</a>
+    }
+</nav>
+
+@switch (Model.Tab)
+{
+    case PersonTab.Documents:
+        @await Component.InvokeAsync("LinkedDocuments", new { entityType = nameof(Person), entityId = p.Id.ToString() })
+        break;
+
+    case PersonTab.History:
+        <section class="panel">
+            <div class="panel-header"><h2 class="panel-title">History</h2><span class="text-muted small">Every change, who made it and when</span></div>
+            <div class="panel-body">
+                @if (Model.History is null || Model.History.Total == 0)
+                {
+                    <p class="text-muted mb-0">No changes recorded yet.</p>
+                }
+                else
+                {
+                    <ol class="timeline">
+                        @foreach (var entry in Model.History.Items)
+                        {
+                            <li class="@(entry.Action == Base.Domain.Auditing.AuditAction.Created ? "is-done" : entry.Action == Base.Domain.Auditing.AuditAction.Deleted ? "is-alert" : "")">
+                                <div class="timeline-title">@entry.UserName @(entry.Action switch { Base.Domain.Auditing.AuditAction.Created => "added them", Base.Domain.Auditing.AuditAction.Deleted => "removed them", _ => "changed " + string.Join(", ", entry.Changes.Select(c => PersonDisplay.Field(c.Property).ToLowerInvariant())) })</div>
+                                <div class="timeline-time"><local-time value="entry.OccurredAt" /></div>
+                                @if (entry.Action != Base.Domain.Auditing.AuditAction.Created && entry.Changes.Count > 0)
+                                {
+                                    <dl class="kv mt-2 small">
+                                        @foreach (var change in entry.Changes)
+                                        {
+                                            <dt>@PersonDisplay.Field(change.Property)</dt>
+                                            <dd>
+                                                @if (change.Redacted)
+                                                {
+                                                    <span class="text-muted">Changed (personal, not recorded)</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted text-decoration-line-through">@(Show(Model, change, change.Old) ?? "empty")</span>
+                                                    <icon name="chevron-right" class="icon-sm text-muted" />
+                                                    <span>@(Show(Model, change, change.New) ?? "empty")</span>
+                                                }
+                                            </dd>
+                                        }
+                                    </dl>
+                                }
+                            </li>
+                        }
+                    </ol>
+                }
+            </div>
+        </section>
+        break;
+
+    default:
+        <div class="detail-grid">
+            <form method="post" asp-action="Details" asp-route-id="@p.Id" class="panel" data-edit-form="@(Model.Editing ? "editing" : "reading")">
+                <div class="panel-header">
+                    <h2 class="panel-title">Profile</h2>
+                    @if (canManage)
+                    {
+                        <button class="btn btn-secondary btn-sm read-only" type="button" data-edit-start><icon name="pencil" class="icon-sm" /> Edit</button>
+                    }
+                </div>
+                <fieldset class="panel-body" disabled="@(!Model.Editing)">
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+                    <partial name="_PersonFields" model="(Model.Form, false)" />
+                </fieldset>
+                @if (canManage)
+                {
+                    <div class="panel-footer d-flex justify-content-end gap-2 edit-only">
+                        <button class="btn btn-ghost" type="button" data-edit-cancel>Cancel</button>
+                        <button class="btn btn-primary" type="submit"><icon name="check" class="icon-sm" /> Save</button>
+                    </div>
+                }
+            </form>
+            <aside class="stack">
+                <section class="panel">
+                    <div class="panel-header"><h2 class="panel-title">At a glance</h2></div>
+                    <div class="panel-body">
+                        <dl class="kv">
+                            <dt>Status</dt><dd><span class="badge text-bg-@PersonDisplay.Tone(p.Status)">@PersonDisplay.Status(p.Status)</span></dd>
+                            <dt>Started</dt><dd>@(p.StartDate?.ToString("d MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture) ?? "—")</dd>
+                            <dt>Email</dt><dd>@if (p.Email is not null) {<a href="mailto:@p.Email">@p.Email</a>} else {<text>—</text>}</dd>
+                            <dt>Skills</dt><dd>@(p.Skills.Count == 0 ? "—" : string.Join(", ", p.Skills.Select(s => Model.Labels.Name(LookupLists.People.Skill, s))))</dd>
+                        </dl>
+                    </div>
+                    <div class="panel-footer small text-muted">
+                        Added <local-time value="p.DateCreated" format="d MMM yyyy" /> by @(p.UserCreated ?? "System") · updated <local-time value="p.DateModified" format="d MMM yyyy" /> by @(p.UserModified ?? "System")
+                    </div>
+                </section>
+            </aside>
+        </div>
+        break;
+}
+
+@if (canManage)
+{
+    <div class="modal fade" id="photo-dialog" tabindex="-1" aria-labelledby="photo-title" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <form class="modal-content" method="post" asp-action="Photo" asp-route-id="@p.Id" enctype="multipart/form-data">
+                <div class="modal-header"><h2 class="modal-title" id="photo-title">Photo</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body stack">
+                    <p class="text-muted mb-0">A PNG, JPEG or WebP of up to 1 MB. Square photos look best.</p>
+                    <input class="form-control" type="file" name="photo" accept=".png,.jpg,.jpeg,.webp" required aria-label="Photo" />
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" type="submit"><icon name="upload" class="icon-sm" /> Upload</button></div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal fade" id="delete-dialog" tabindex="-1" aria-labelledby="delete-title" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <form class="modal-content" method="post" asp-action="Delete" asp-route-id="@p.Id">
+                <div class="modal-header"><h2 class="modal-title" id="delete-title">Remove @p.DisplayName?</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body">
+                    <p class="mb-0 text-muted">They disappear from the directory. Their history stays in the audit trail. If they've only left, mark them as left instead.</p>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button><button class="btn btn-danger" type="submit">Remove</button></div>
+            </form>
+        </div>
+    </div>
+}

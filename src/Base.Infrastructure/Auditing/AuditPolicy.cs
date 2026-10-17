@@ -96,7 +96,10 @@ internal static class AuditPolicy
             null => null,
             DateTimeOffset dto => dto.ToString("O", System.Globalization.CultureInfo.InvariantCulture),
             DateTime dt => dt.ToString("O", System.Globalization.CultureInfo.InvariantCulture),
+            DateOnly date => date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
             byte[] bytes => $"({bytes.Length} bytes)",
+            string s => s,
+            IEnumerable<string> list => string.Join(", ", list),
             IFormattable formattable => formattable.ToString(null, System.Globalization.CultureInfo.InvariantCulture),
             _ => value.ToString(),
         };

@@ -1,0 +1,21 @@
+@model PersonForm
+@{
+    ViewData["Title"] = "Add a person";
+}
+<nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-action="Index">People</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">Add a person</span></nav>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Add a person</h1>
+        <p class="page-subtitle">Only the name is required; everything else can be filled in later.</p>
+    </div>
+</div>
+<form method="post" asp-action="New" class="panel">
+    <div class="panel-body">
+        <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+        <partial name="_PersonFields" model="(Model, false)" />
+    </div>
+    <div class="panel-footer d-flex justify-content-end gap-2">
+        <a class="btn btn-ghost" asp-action="Index">Cancel</a>
+        <button class="btn btn-primary" type="submit"><icon name="user-plus" class="icon-sm" /> Add person</button>
+    </div>
+</form>

@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Base.Application.Common.Abstractions;
+using Base.Application.MasterData;
 using Base.Application.Security;
 using Base.Application.Settings;
 using Base.Application.Subscriptions;
@@ -220,5 +221,19 @@ internal sealed class SamplePlansSeedTask(AppDbContext db, IOptions<SeedOptions>
         plan.SetEntitlement(LimitCodes.Users, users);
         plan.SetEntitlement(LimitCodes.StorageMb, storageMb);
         return plan;
+    }
+}
+
+/// <summary>Gives every tenant the lookup catalogue's starting values it doesn't have yet (new lists, new defaults).</summary>
+internal sealed class LookupDefaultsSeedTask(AppDbContext db, ILookupDefaults defaults) : IStartupTask
+{
+    public int Order => 45;
+
+    public async Task ExecuteAsync(CancellationToken cancellationToken)
+    {
+        foreach (var tenantId in await db.Tenants.Select(t => t.Id).ToListAsync(cancellationToken))
+        {
+            await defaults.EnsureAsync(tenantId, cancellationToken);
+        }
     }
 }

@@ -1,0 +1,95 @@
+@model MasterDataViewModel
+@{
+    ViewData["Title"] = "Lookup lists";
+    var list = Model.Selected.Definition;
+    var values = Model.Values;
+}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Lookup lists</h1>
+        <p class="page-subtitle">The choices people pick from in forms. Records keep the entry they chose, so renaming relabels them everywhere.</p>
+    </div>
+</div>
+
+<div class="master-detail">
+    <nav class="panel list-nav" aria-label="Lists">
+        @foreach (var group in Model.Lists.GroupBy(l => l.Definition.Module))
+        {
+            <div class="list-nav-group">@group.Key</div>
+            @foreach (var l in group)
+            {
+                var active = l.Definition.Code == list.Code;
+                <a class="@(active ? "is-active" : "")" aria-current="@(active ? "page" : null)" asp-action="Index" asp-route-list="@l.Definition.Code">
+                    <span>@l.Definition.Name</span>
+                    <span class="count">@l.ActiveCount</span>
+                </a>
+            }
+        }
+    </nav>
+
+    <section class="panel" aria-labelledby="list-title">
+        <div class="panel-header">
+            <div>
+                <h2 class="panel-title" id="list-title">@list.Name</h2>
+                <div class="text-muted small">@list.Description</div>
+            </div>
+            <span class="text-muted small text-nowrap">@Model.Selected.ActiveCount of @Model.Selected.Count shown</span>
+        </div>
+        @if (values.Count == 0)
+        {
+            <div class="panel-body text-muted">No entries yet. Add the first below.</div>
+        }
+        else
+        {
+            <table class="table table-sm table-flush table-entity align-middle">
+                <thead>
+                    <tr><th class="w-50">Name</th><th>Code</th><th>Status</th><th class="text-end">Order</th></tr>
+                </thead>
+                <tbody>
+                    @for (var i = 0; i < values.Count; i++)
+                    {
+                        var v = values[i];
+                        <tr class="@(v.IsActive ? "" : "text-muted")">
+                            <td>
+                                <form method="post" asp-action="Rename" asp-route-id="@v.Id" class="d-flex align-items-center gap-2">
+                                    <input type="hidden" name="list" value="@list.Code" />
+                                    <input class="inline-input" name="name" value="@v.Name" maxlength="100" required aria-label="Name of @v.Name" />
+                                    <button class="btn btn-primary btn-sm inline-save" type="submit">Save</button>
+                                </form>
+                            </td>
+                            <td><span class="d-inline-flex align-items-center gap-2 text-nowrap"><span class="font-monospace small text-muted">@v.Code</span>@if (v.IsSeeded) {<span class="badge text-bg-light" title="Comes with the application">Default</span>}</span></td>
+                            <td>
+                                <form method="post" asp-action="SetActive" asp-route-id="@v.Id" class="d-flex align-items-center gap-2">
+                                    <input type="hidden" name="list" value="@list.Code" />
+                                    <input type="hidden" name="active" value="@(v.IsActive ? "false" : "true")" />
+                                    @if (v.IsActive) {<span class="badge text-bg-success">Shown</span>} else {<span class="badge text-bg-secondary">Hidden</span>}
+                                    <button class="btn btn-ghost btn-sm" type="submit"><icon name="@(v.IsActive ? "eye-off" : "eye")" class="icon-sm" /> @(v.IsActive ? "Hide" : "Show")</button>
+                                </form>
+                            </td>
+                            <td class="text-end text-nowrap cell-actions">
+                                <form method="post" asp-action="Move" asp-route-id="@v.Id" class="d-inline-flex gap-1">
+                                    <input type="hidden" name="list" value="@list.Code" />
+                                    <button class="icon-btn" type="submit" name="direction" value="-1" aria-label="Move @v.Name up" disabled="@(i == 0)"><icon name="chevron-up" /></button>
+                                    <button class="icon-btn" type="submit" name="direction" value="1" aria-label="Move @v.Name down" disabled="@(i == values.Count - 1)"><icon name="chevron-down" /></button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        @if (list.AllowTenantValues)
+        {
+            <form method="post" asp-action="Add" class="panel-footer d-flex gap-2">
+                <input type="hidden" name="list" value="@list.Code" />
+                <input class="form-control form-control-sm" name="name" maxlength="100" required placeholder="New entry, e.g. Legal" aria-label="New entry" />
+                <button class="btn btn-secondary btn-sm text-nowrap" type="submit"><icon name="plus" class="icon-sm" /> Add</button>
+            </form>
+        }
+        else
+        {
+            <div class="panel-footer small text-muted">This list is fixed; rename or hide its entries.</div>
+        }
+    </section>
+</div>
+<p class="text-muted small mt-3">Hidden entries aren't offered in forms but stay on the records that already use them. Entries can't be deleted, so history always reads correctly.</p>

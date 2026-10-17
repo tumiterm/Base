@@ -48,6 +48,17 @@ public static class PermissionCodes
         public const string View = "Audit.View";
     }
 
+    public static class MasterData
+    {
+        public const string Manage = "MasterData.Manage";
+    }
+
+    public static class People
+    {
+        public const string View = "People.View";
+        public const string Manage = "People.Manage";
+    }
+
     public static class Subscription
     {
         public const string View = "Subscription.View";

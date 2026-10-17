@@ -1,0 +1,110 @@
+@model (PersonForm Form, bool Compact)
+@{
+    var f = Model.Form;
+}
+<section class="form-section">
+    <div>
+        <h2 class="form-section-title">Name</h2>
+        <p class="form-section-desc edit-only">How they appear across the application.</p>
+    </div>
+    <div class="row g-3">
+        @if (!Model.Compact)
+        {
+            <div class="col-sm-3">
+                <label class="form-label" for="TitleCode">Title</label>
+                <select class="form-select" id="TitleCode" name="TitleCode" asp-lookup="@LookupLists.People.Title" asp-lookup-value="@f.TitleCode" asp-lookup-empty="—"></select>
+            @Html.ValidationMessage("TitleCode", null, new { @class = "text-danger" })
+            </div>
+        }
+        <div class="@(Model.Compact ? "col-sm-6" : "col-sm-4")">
+            <label class="form-label" for="FirstName">First name</label>
+            <input class="form-control" id="FirstName" name="FirstName" value="@f.FirstName" maxlength="100" autocomplete="off" required />
+            @Html.ValidationMessage("FirstName", null, new { @class = "text-danger" })
+        </div>
+        <div class="@(Model.Compact ? "col-sm-6" : "col-sm-5")">
+            <label class="form-label" for="LastName">Last name</label>
+            <input class="form-control" id="LastName" name="LastName" value="@f.LastName" maxlength="100" autocomplete="off" required />
+            @Html.ValidationMessage("LastName", null, new { @class = "text-danger" })
+        </div>
+        @if (!Model.Compact)
+        {
+            <div class="col-sm-6">
+                <label class="form-label" for="PreferredName">Preferred name <span class="text-muted fw-normal edit-only">(optional)</span></label>
+                <input class="form-control" id="PreferredName" name="PreferredName" value="@f.PreferredName" maxlength="100" placeholder="If not their first name" />
+            @Html.ValidationMessage("PreferredName", null, new { @class = "text-danger" })
+            </div>
+        }
+    </div>
+</section>
+
+<section class="form-section">
+    <div>
+        <h2 class="form-section-title">Contact</h2>
+        <p class="form-section-desc edit-only">The phone number and date of birth are hidden in the audit trail.</p>
+    </div>
+    <div class="row g-3">
+        <div class="col-sm-6">
+            <label class="form-label" for="Email">Email</label>
+            <input class="form-control" id="Email" name="Email" type="email" value="@f.Email" maxlength="256" autocomplete="off" />
+            @Html.ValidationMessage("Email", null, new { @class = "text-danger" })
+        </div>
+        <div class="col-sm-6">
+            <label class="form-label" for="Phone">Phone</label>
+            <input class="form-control" id="Phone" name="Phone" type="tel" value="@f.Phone" maxlength="30" inputmode="tel" placeholder="+27 82 555 0100" />
+            @Html.ValidationMessage("Phone", null, new { @class = "text-danger" })
+        </div>
+        @if (!Model.Compact)
+        {
+            <div class="col-sm-6">
+                <label class="form-label" for="DateOfBirth">Date of birth</label>
+                <input class="form-control" id="DateOfBirth" name="DateOfBirth" type="date" value="@f.DateOfBirth?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)" />
+            @Html.ValidationMessage("DateOfBirth", null, new { @class = "text-danger" })
+            </div>
+        }
+    </div>
+</section>
+
+<section class="form-section">
+    <div>
+        <h2 class="form-section-title">Role</h2>
+        <p class="form-section-desc edit-only">Departments and skills come from <a asp-controller="MasterData" asp-action="Index" asp-permission="@PermissionCodes.MasterData.Manage">the lookup lists</a>.</p>
+    </div>
+    <div class="row g-3">
+        <div class="col-sm-6">
+            <label class="form-label" for="DepartmentCode">Department</label>
+            <select class="form-select" id="DepartmentCode" name="DepartmentCode" data-combobox data-placeholder="Search departments" asp-lookup="@LookupLists.People.Department" asp-lookup-value="@f.DepartmentCode" asp-lookup-empty="No department"></select>
+            @Html.ValidationMessage("DepartmentCode", null, new { @class = "text-danger" })
+        </div>
+        <div class="col-sm-6">
+            <label class="form-label" for="JobTitle">Job title</label>
+            <input class="form-control" id="JobTitle" name="JobTitle" value="@f.JobTitle" maxlength="100" />
+            @Html.ValidationMessage("JobTitle", null, new { @class = "text-danger" })
+        </div>
+        <div class="col-sm-6">
+            <label class="form-label" for="StartDate">Start date</label>
+            <input class="form-control" id="StartDate" name="StartDate" type="date" value="@f.StartDate?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)" />
+            @Html.ValidationMessage("StartDate", null, new { @class = "text-danger" })
+        </div>
+        @if (!Model.Compact)
+        {
+            <div class="col-12">
+                <div class="form-label">Skills</div>
+                <partial name="_LookupChips" model="(LookupLists.People.Skill, nameof(PersonForm.Skills), (IEnumerable<string>)f.Skills)" />
+                @Html.ValidationMessage("Skills", null, new { @class = "text-danger" })
+            </div>
+        }
+    </div>
+</section>
+
+@if (!Model.Compact)
+{
+    <section class="form-section">
+        <div>
+            <h2 class="form-section-title">Notes</h2>
+        </div>
+        <div>
+            <textarea class="form-control" id="Notes" name="Notes" rows="3" maxlength="2000" aria-label="Notes" placeholder="Anything colleagues should know">@f.Notes</textarea>
+            @Html.ValidationMessage("Notes", null, new { @class = "text-danger" })
+        </div>
+    </section>
+}

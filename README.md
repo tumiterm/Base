@@ -89,6 +89,13 @@ scripts/new-project.cs  Creates a renamed copy for a new project.
   toasts, and tables that become cards on phones. Each tenant sets its accent colour, logo and default theme at
   Administration → Appearance, and readable text colours are derived automatically. The bar for every screen is in
   [docs/ui-design-direction.md](docs/ui-design-direction.md).
+- **Sample module: People.** A complete, documented vertical slice to copy ([docs/vertical-slice.md](docs/vertical-slice.md)):
+  - a directory with filters, sorting, a drawer to add people, and a profile that is edited in place
+  - photos, linked documents, and history from the audit trail
+  - export and import, an API, and tests
+- **Lookup lists (master data):** titles, departments, skills and any list a module declares. Each tenant gets the
+  starting values, then renames, reorders, hides or adds its own (Administration → Lookup lists). Records keep codes,
+  so history stays readable.
 - **Persistence:** a single `EntityBase` (audit, soft delete, row version, domain events); SQL Server-sequential
   GUID keys; UTC timestamps from `TimeProvider`; named query filters for soft delete and tenant isolation
   (fail closed); a repository that never commits; a small unit of work with retry-safe transactions; paging and

@@ -242,3 +242,153 @@ document.querySelectorAll('.drop-zone').forEach((zone) => {
         sync();
     });
 })();
+
+// Searchable combobox built from a <select data-combobox>. The select stays in the form (hidden) and holds the value,
+// so the page works without script; this adds typing to filter, arrow keys, Enter to pick and Escape to close.
+(() => {
+    let counter = 0;
+    document.querySelectorAll('select[data-combobox]').forEach((select) => {
+        const id = `cb-${++counter}`;
+        const wrap = document.createElement('div');
+        wrap.className = 'combobox';
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'form-control combobox-input';
+        input.id = select.id ? `${select.id}-search` : `${id}-input`;
+        input.setAttribute('role', 'combobox');
+        input.setAttribute('aria-autocomplete', 'list');
+        input.setAttribute('aria-expanded', 'false');
+        input.setAttribute('aria-controls', `${id}-list`);
+        input.autocomplete = 'off';
+        input.placeholder = select.dataset.placeholder || 'Search…';
+        if (select.disabled) input.disabled = true;
+        const list = document.createElement('ul');
+        list.className = 'combobox-list';
+        list.id = `${id}-list`;
+        list.setAttribute('role', 'listbox');
+        list.hidden = true;
+        const chevron = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        chevron.setAttribute('class', 'icon combobox-chevron');
+        chevron.setAttribute('aria-hidden', 'true');
+        const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+        use.setAttribute('href', '/img/icons.svg#chevron-down');
+        chevron.appendChild(use);
+
+        select.hidden = true;
+        select.tabIndex = -1;
+        select.parentNode.insertBefore(wrap, select);
+        wrap.append(input, chevron, list, select);
+        const label = select.id ? document.querySelector(`label[for="${select.id}"]`) : null;
+        if (label) label.htmlFor = input.id;
+
+        const options = () => [...select.options];
+        const textOf = (o) => (o && o.value !== '' ? o.text : '');
+        let active = -1;
+        let shown = [];
+        const sync = () => { input.value = textOf(select.selectedOptions[0]); };
+        const render = (filter) => {
+            const term = (filter || '').trim().toLowerCase();
+            shown = options().filter((o) => !term || o.text.toLowerCase().includes(term));
+            list.replaceChildren(...shown.map((o, i) => {
+                const li = document.createElement('li');
+                li.className = `combobox-option${o.value === '' ? ' is-empty' : ''}`;
+                li.id = `${id}-o${i}`;
+                li.setAttribute('role', 'option');
+                li.setAttribute('aria-selected', String(o.selected && o.value !== ''));
+                li.textContent = o.text;
+                li.addEventListener('mousedown', (e) => { e.preventDefault(); choose(o); });
+                return li;
+            }));
+            if (shown.length === 0) {
+                const none = document.createElement('li');
+                none.className = 'combobox-none';
+                none.textContent = 'No matches';
+                list.appendChild(none);
+            }
+            highlight(shown.findIndex((o) => o.selected));
+        };
+        const highlight = (index) => {
+            active = index;
+            [...list.children].forEach((li, i) => li.classList.toggle('is-active', i === index));
+            const current = list.children[index];
+            if (current && current.id) { input.setAttribute('aria-activedescendant', current.id); current.scrollIntoView({ block: 'nearest' }); } else input.removeAttribute('aria-activedescendant');
+        };
+        const open = () => { if (input.disabled || input.readOnly) return; render(''); list.hidden = false; input.setAttribute('aria-expanded', 'true'); };
+        const close = () => { list.hidden = true; input.setAttribute('aria-expanded', 'false'); input.removeAttribute('aria-activedescendant'); };
+        const choose = (option) => {
+            select.value = option.value;
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+            sync();
+            close();
+        };
+
+        input.addEventListener('focus', () => { open(); input.select(); });
+        input.addEventListener('input', () => { if (list.hidden) open(); render(input.value); highlight(shown.length ? 0 : -1); });
+        input.addEventListener('blur', () => { close(); sync(); });
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (list.hidden) { open(); return; }
+                const step = e.key === 'ArrowDown' ? 1 : -1;
+                highlight(Math.max(0, Math.min(shown.length - 1, active + step)));
+            } else if (e.key === 'Enter' && !list.hidden) {
+                e.preventDefault();
+                if (shown[active]) choose(shown[active]);
+            } else if (e.key === 'Escape' && !list.hidden) {
+                e.preventDefault();
+                e.stopPropagation();
+                close();
+                sync();
+            }
+        });
+        select.addEventListener('change', sync);
+        new MutationObserver(() => { input.disabled = select.disabled; }).observe(select, { attributes: true, attributeFilter: ['disabled'] });
+        sync();
+    });
+})();
+
+// Forms that read as text until "Edit" is pressed ([data-edit-form]); inline row inputs; filters that apply on change.
+(() => {
+    document.querySelectorAll('[data-edit-form]').forEach((form) => {
+        const fields = form.querySelector('fieldset');
+        const blanks = () => form.querySelectorAll('fieldset input.form-control:not(.combobox-input), fieldset textarea.form-control');
+        const setEditing = (editing) => {
+            form.classList.toggle('form-reading', !editing);
+            form.classList.toggle('form-editing', editing);
+            // Reading: an empty field shows a dash, and an empty date doesn't show the browser's mm/dd/yyyy.
+            blanks().forEach((field) => {
+                if (!editing) {
+                    if (field.dataset.placeholder === undefined) field.dataset.placeholder = field.placeholder || '';
+                    field.placeholder = '—';
+                    if (field.type === 'date') {
+                        field.dataset.type = 'date';
+                        field.dataset.value = field.value;
+                        const [y, m, d] = field.value.split('-').map(Number);
+                        field.type = 'text';
+                        field.value = y ? new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(y, m - 1, d)) : '';
+                    }
+                } else {
+                    if (field.dataset.type) { field.type = field.dataset.type; field.value = field.dataset.value ?? ''; delete field.dataset.type; delete field.dataset.value; }
+                    if (field.dataset.placeholder !== undefined) field.placeholder = field.dataset.placeholder;
+                }
+            });
+            if (fields) fields.disabled = !editing;
+            form.querySelectorAll('.combobox-input').forEach((i) => { i.disabled = !editing; });
+        };
+        form.querySelectorAll('[data-edit-start]').forEach((b) => b.addEventListener('click', () => {
+            setEditing(true);
+            const first = form.querySelector('fieldset input:not([type=hidden]), fieldset textarea');
+            if (first) first.focus();
+        }));
+        form.querySelectorAll('[data-edit-cancel]').forEach((b) => b.addEventListener('click', () => { form.reset(); form.querySelectorAll('select').forEach((s) => s.dispatchEvent(new Event('change'))); setEditing(false); }));
+        form.addEventListener('keydown', (e) => { if (e.key === 'Escape' && form.classList.contains('form-editing')) form.querySelector('[data-edit-cancel]')?.click(); });
+        setEditing(form.dataset.editForm === 'editing');
+    });
+
+    document.querySelectorAll('.inline-input').forEach((input) => {
+        const original = input.value;
+        input.addEventListener('keydown', (e) => { if (e.key === 'Escape') { input.value = original; input.blur(); } });
+    });
+
+    document.querySelectorAll('[data-autosubmit]').forEach((control) => control.addEventListener('change', () => control.form?.requestSubmit()));
+})();

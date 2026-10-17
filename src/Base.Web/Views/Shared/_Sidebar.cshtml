@@ -11,6 +11,7 @@
     <div class="nav-section">
         <div class="nav-section-label">Workspace</div>
         <a class="nav-link-app @Active("Home")" aria-current="@Current("Home")" asp-controller="Home" asp-action="Index" title="Home" data-palette-label="Home"><icon name="layout-dashboard" /><span class="nav-label">Home</span></a>
+        <a class="nav-link-app @Active("People")" aria-current="@Current("People")" asp-controller="People" asp-action="Index" asp-permission="@PermissionCodes.People.View" title="People"><icon name="contact" /><span class="nav-label">People</span></a>
         <a class="nav-link-app @Active("Documents")" aria-current="@Current("Documents")" asp-controller="Documents" asp-action="Index" asp-permission="@PermissionCodes.Documents.Create" asp-feature="@FeatureCodes.Documents" title="Documents"><icon name="file-text" /><span class="nav-label">Documents</span></a>
         <a class="nav-link-app @Active("Imports", "Exports")" aria-current="@Current("Imports", "Exports")" asp-controller="Imports" asp-action="Index" asp-feature="@FeatureCodes.DataExchange" title="Import and export"><icon name="database" /><span class="nav-label">Import &amp; export</span></a>
         <a class="nav-link-app @Active("Notifications")" aria-current="@Current("Notifications")" asp-controller="Notifications" asp-action="Index" title="Inbox"><icon name="inbox" /><span class="nav-label">Inbox</span></a>
@@ -21,6 +22,7 @@
         <a class="nav-link-app @Active("RoleAdmin")" aria-current="@Current("RoleAdmin")" asp-controller="RoleAdmin" asp-action="Index" asp-permission="@PermissionCodes.Roles.Manage" title="Roles"><icon name="shield-check" /><span class="nav-label">Roles</span></a>
         <a class="nav-link-app @Active("NotificationAdmin")" aria-current="@Current("NotificationAdmin")" asp-controller="NotificationAdmin" asp-action="Index" asp-permission="@PermissionCodes.Notifications.View" title="Messages"><icon name="mail" /><span class="nav-label">Messages</span></a>
         <a class="nav-link-app @Active("AuditAdmin")" aria-current="@Current("AuditAdmin")" asp-controller="AuditAdmin" asp-action="Index" asp-permission="@PermissionCodes.Audit.View" title="Audit trail"><icon name="history" /><span class="nav-label">Audit trail</span></a>
+        <a class="nav-link-app @Active("MasterData")" aria-current="@Current("MasterData")" asp-controller="MasterData" asp-action="Index" asp-permission="@PermissionCodes.MasterData.Manage" title="Lookup lists"><icon name="list" /><span class="nav-label">Lookup lists</span></a>
         <a class="nav-link-app @Active("Appearance")" aria-current="@Current("Appearance")" asp-controller="Appearance" asp-action="Index" asp-permission="@PermissionCodes.Settings.Edit" asp-feature="@FeatureCodes.CustomBranding" title="Appearance"><icon name="palette" /><span class="nav-label">Appearance</span></a>
         @if (access.IsRestricted)
         {

@@ -1,0 +1,16 @@
+@model (string List, string Name, IEnumerable<string> Selected)
+@inject Base.Application.MasterData.ILookupService Lookups
+@{
+    var selected = Model.Selected.ToHashSet(StringComparer.Ordinal);
+    var values = (await Lookups.GetAsync(Model.List, includeInactive: true)).Where(v => v.IsActive || selected.Contains(v.Code)).ToList();
+}
+<div class="chip-group" role="group">
+    @foreach (var v in values)
+    {
+        <label class="chip-check">
+            <input type="checkbox" name="@Model.Name" value="@v.Code" checked="@selected.Contains(v.Code)" />
+            <span>@v.Name</span>
+        </label>
+    }
+    @if (values.Count == 0) {<span class="text-muted small">The list is empty.</span>}
+</div>

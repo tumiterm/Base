@@ -1,0 +1,180 @@
+@model PeopleListViewModel
+@inject Base.Application.MasterData.ILookupService Lookups
+@using Base.Application.People
+@using Base.Domain.People
+@{
+    ViewData["Title"] = "People";
+    var q = Model.Query;
+    var results = Model.People;
+    var filtered = !string.IsNullOrEmpty(q.Search) || q.Department is not null || q.Skill is not null;
+    var statuses = new (PersonStatus? Status, string Label)[] { (null, "All"), (PersonStatus.Active, "Active"), (PersonStatus.OnLeave, "On leave"), (PersonStatus.Left, "Left") };
+    var departments = await Lookups.GetAsync(LookupLists.People.Department);
+}
+@functions {
+    private object Route(PeopleListViewModel m, PersonStatus? status = null, bool keepStatus = true, PersonSort? sort = null, bool? desc = null, string? skill = "", int page = 1) => new
+    {
+        search = m.Query.Search,
+        status = keepStatus ? m.Query.Status : status,
+        department = m.Query.Department,
+        skill = skill == "" ? m.Query.Skill : skill,
+        sort = sort ?? m.Query.Sort,
+        desc = desc ?? m.Query.Descending,
+        page,
+    };
+
+    private Microsoft.AspNetCore.Html.IHtmlContent SortHeader(PeopleListViewModel m, PersonSort sort, string label)
+    {
+        var sorted = m.Query.Sort == sort;
+        var url = Url.Action("Index", Route(m, sort: sort, desc: sorted && !m.Query.Descending));
+        var icon = sorted ? (m.Query.Descending ? "chevron-down" : "chevron-up") : "arrow-up-down";
+        return Html.Raw($"<a class=\"sort-link{(sorted ? " is-sorted" : "")}\" href=\"{url}\" aria-sort=\"{(sorted ? (m.Query.Descending ? "descending" : "ascending") : "none")}\">{System.Net.WebUtility.HtmlEncode(label)}<svg class=\"icon\" aria-hidden=\"true\"><use href=\"/img/icons.svg#{icon}\"></use></svg></a>");
+    }
+}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">People</h1>
+        <p class="page-subtitle">Everyone in the organisation, where they work and what they're good at.</p>
+    </div>
+    <div class="page-actions">
+        <partial name="_ExportButtons" model='new ExportButtonsViewModel("people", PermissionCodes.People.View)' />
+        <a class="btn btn-secondary" asp-controller="Imports" asp-action="Index" asp-permission="@PermissionCodes.People.Manage" asp-feature="@FeatureCodes.DataExchange"><icon name="upload" class="icon-sm" /> Import</a>
+        <button class="btn btn-primary" type="button" data-bs-toggle="offcanvas" data-bs-target="#new-person" aria-controls="new-person" asp-permission="@PermissionCodes.People.Manage"><icon name="user-plus" class="icon-sm" /> Add person</button>
+    </div>
+</div>
+
+<div class="toolbar">
+    <nav class="segmented scroll-x" aria-label="Filter by status">
+        @foreach (var s in statuses)
+        {
+            var active = s.Status == q.Status;
+            <a class="@(active ? "is-active" : "")" aria-current="@(active ? "page" : null)" href="@Url.Action("Index", Route(Model, s.Status, keepStatus: false))">@s.Label <span class="count">@Model.Counts.Of(s.Status)</span></a>
+        }
+    </nav>
+    <span class="toolbar-spacer"></span>
+    <form method="get" class="d-flex flex-wrap gap-2 toolbar-search" role="search">
+        <input type="hidden" name="status" value="@q.Status" />
+        <input type="hidden" name="skill" value="@q.Skill" />
+        <input type="hidden" name="sort" value="@q.Sort" />
+        <input type="hidden" name="desc" value="@(q.Descending ? "true" : "false")" />
+        <select class="form-select w-auto" name="department" aria-label="Department" data-autosubmit>
+            <option value="">All departments</option>
+            @foreach (var d in departments)
+            {
+                <option value="@d.Code" selected="@(d.Code == q.Department)">@d.Name</option>
+            }
+        </select>
+        <label class="input-affix flex-grow-1">
+            <icon name="search" class="icon-sm" />
+            <input class="form-control" type="search" name="search" value="@q.Search" placeholder="Name, email or job title" aria-label="Search people" />
+        </label>
+    </form>
+</div>
+
+@if (q.Skill is not null)
+{
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <span class="text-muted small">Filtered by</span>
+        <a class="chip is-active" href="@Url.Action("Index", Route(Model, skill: null))" aria-label="Remove the skill filter">@Model.Labels.Name(LookupLists.People.Skill, q.Skill) <icon name="x" /></a>
+    </div>
+}
+
+@if (results.Total == 0)
+{
+    <div class="empty-state">
+        <icon name="contact" />
+        <div class="empty-state-title">@(filtered || q.Status is not null ? "Nobody matches" : "No people yet")</div>
+        <p class="mb-2">@(filtered || q.Status is not null ? "Try another search, department or status." : "Add the first person, or import a spreadsheet of everyone at once.")</p>
+        @if (filtered || q.Status is not null)
+        {
+            <a class="btn btn-secondary" asp-action="Index">Clear filters</a>
+        }
+        else
+        {
+            <button class="btn btn-primary" type="button" data-bs-toggle="offcanvas" data-bs-target="#new-person" asp-permission="@PermissionCodes.People.Manage">Add person</button>
+        }
+    </div>
+}
+else
+{
+    <table class="table table-entity align-middle">
+        <thead>
+            <tr>
+                <th>@SortHeader(Model, PersonSort.Name, "Name")</th>
+                <th>@SortHeader(Model, PersonSort.Department, "Department")</th>
+                <th>Skills</th>
+                <th>Status</th>
+                <th>@SortHeader(Model, PersonSort.StartDate, "Started")</th>
+                <th><span class="visually-hidden">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var p in results.Items)
+            {
+                <tr>
+                    <td>
+                        <a class="entity text-decoration-none" asp-action="Details" asp-route-id="@p.Id">
+                            <partial name="_PersonAvatar" model="(p.Id, p.DisplayName, p.HasAvatar, string.Empty)" />
+                            <span class="entity-text">
+                                <span class="entity-name">@p.DisplayName</span>
+                                <span class="entity-sub">@(p.JobTitle ?? p.Email ?? "—")</span>
+                            </span>
+                        </a>
+                    </td>
+                    <td>@(Model.Labels.Name(LookupLists.People.Department, p.DepartmentCode) ?? "—")</td>
+                    <td>
+                        <div class="d-flex flex-wrap gap-1">
+                            @foreach (var skill in p.Skills.Take(3))
+                            {
+                                <a class="chip" href="@Url.Action("Index", Route(Model, skill: skill))" title="Everyone with this skill">@Model.Labels.Name(LookupLists.People.Skill, skill)</a>
+                            }
+                            @if (p.Skills.Count > 3) {<span class="chip">+@(p.Skills.Count - 3)</span>}
+                        </div>
+                    </td>
+                    <td><span class="badge text-bg-@PersonDisplay.Tone(p.Status)">@PersonDisplay.Status(p.Status)</span></td>
+                    <td class="text-muted">@(p.StartDate?.ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture) ?? "—")</td>
+                    <td class="text-end cell-actions">
+                        <div class="dropdown">
+                            <button class="icon-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Actions for @p.DisplayName"><icon name="ellipsis" /></button>
+                            <div class="dropdown-menu dropdown-menu-end">
+                                <a class="dropdown-item" asp-action="Details" asp-route-id="@p.Id"><icon name="eye" class="icon-sm" /> Open</a>
+                                <a class="dropdown-item" asp-action="Details" asp-route-id="@p.Id" asp-route-tab="History"><icon name="history" class="icon-sm" /> History</a>
+                                @foreach (var next in Enum.GetValues<PersonStatus>().Where(s => s != p.Status && !(p.Status == PersonStatus.Left && s == PersonStatus.OnLeave)))
+                                {
+                                    <form method="post" asp-action="Status" asp-route-id="@p.Id" asp-permission="@PermissionCodes.People.Manage">
+                                        <input type="hidden" name="status" value="@next" />
+                                        <button class="dropdown-item" type="submit"><icon name="@(next == PersonStatus.Left ? "log-out" : next == PersonStatus.OnLeave ? "circle-pause" : "circle-play")" class="icon-sm" /> Mark @PersonDisplay.Status(next).ToLowerInvariant()</button>
+                                    </form>
+                                }
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <div class="d-flex justify-content-between align-items-center">
+        <span class="text-muted small">@results.Total @(results.Total == 1 ? "person" : "people") · page @results.Page of @results.TotalPages</span>
+        <nav class="btn-group btn-group-sm" aria-label="Pages">
+            <a class="btn btn-outline-secondary @(results.HasPrevious ? "" : "disabled")" href="@Url.Action("Index", Route(Model, page: results.Page - 1))">Previous</a>
+            <a class="btn btn-outline-secondary @(results.HasNext ? "" : "disabled")" href="@Url.Action("Index", Route(Model, page: results.Page + 1))">Next</a>
+        </nav>
+    </div>
+}
+
+<div class="offcanvas offcanvas-end" tabindex="-1" id="new-person" aria-labelledby="new-person-title" asp-permission="@PermissionCodes.People.Manage">
+    <div class="offcanvas-header">
+        <h2 class="offcanvas-title" id="new-person-title">Add a person</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <form method="post" asp-action="New" class="d-flex flex-column flex-grow-1 overflow-hidden">
+        <div class="offcanvas-body">
+            <partial name="_PersonFields" model="(Model.NewPerson, true)" />
+            <p class="text-muted small mb-0">Add a photo, skills and notes on their profile once they're added.</p>
+        </div>
+        <div class="offcanvas-footer">
+            <button type="button" class="btn btn-ghost" data-bs-dismiss="offcanvas">Cancel</button>
+            <button class="btn btn-primary" type="submit"><icon name="user-plus" class="icon-sm" /> Add person</button>
+        </div>
+    </form>
+</div>

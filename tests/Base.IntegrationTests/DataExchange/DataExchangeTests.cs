@@ -188,7 +188,7 @@ public sealed class DataExchangeTests(SqlServerFixture sql) : IAsyncLifetime
         template.FileName.ShouldBe("users-template.xlsx");
         var rows = await ReadRowsAsync(new XlsxReader(), template.Content);
         rows.ShouldBe([["Email", "Name", "Roles"], ["jane@example.com", "Jane Smith", "User"]]);
-        (await As(_admin, sp => Task.FromResult(Imports(sp).Available))).ShouldHaveSingleItem().Code.ShouldBe("users");
+        (await As(_admin, sp => Task.FromResult(Imports(sp).Available))).Select(i => i.Code).ShouldBe(["users", "people"], ignoreOrder: true);
     }
 
     private static IExportService Exports(IServiceProvider sp) => sp.GetRequiredService<IExportService>();

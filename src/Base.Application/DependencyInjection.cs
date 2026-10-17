@@ -4,15 +4,18 @@ using Base.Application.DataExchange;
 using Base.Application.Documents;
 using Base.Application.Documents.Generation;
 using Base.Application.Files;
+using Base.Application.MasterData;
 using Base.Application.Messaging;
 using Base.Application.Notifications;
 using Base.Application.Operations;
+using Base.Application.People;
 using Base.Application.Settings;
 using Base.Application.Subscriptions;
 using Base.Application.Users;
 using Base.Domain.DataExchange;
 using Base.Domain.Notifications;
 using Base.Domain.Subscriptions;
+using Base.Domain.Tenancy;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -32,6 +35,15 @@ public static class DependencyInjection
         services.AddScoped<IAuditTrail, AuditTrailService>();
 
         services.AddScoped<IBrandingService, BrandingService>();
+
+        services.AddScoped<LookupService>();
+        services.AddScoped<ILookupService>(sp => sp.GetRequiredService<LookupService>());
+        services.AddScoped<ILookupDefaults>(sp => sp.GetRequiredService<LookupService>());
+        services.AddScoped<IDomainEventHandler<TenantCreated>, LookupDefaultsForNewTenants>();
+
+        services.AddScoped<IPersonService, PersonService>();
+        services.AddScoped<IExporter, PeopleExporter>();
+        services.AddScoped<IImporter, PeopleImporter>();
 
         services.AddScoped<ITenantEntitlements, TenantEntitlements>();
         services.AddScoped<IPlanAdministration, PlanAdministration>();

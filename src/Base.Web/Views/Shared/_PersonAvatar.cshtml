@@ -1,0 +1,11 @@
+@model (Guid Id, string Name, bool HasPhoto, string Size)
+<span class="avatar @Model.Size" aria-hidden="true">
+    @if (Model.HasPhoto)
+    {
+        <img class="avatar-photo" src="@Url.Action("PhotoFile", "People", new { id = Model.Id })" alt="" loading="lazy" />
+    }
+    else
+    {
+        @Display.Initials(Model.Name)
+    }
+</span>

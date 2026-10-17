@@ -66,6 +66,12 @@ The **default tenant is the platform tenant** (`IPlatformTenant`). Only its user
 `ITenantAdministration` creates tenants (domain + subscription in one transaction, then the first administrator's
 invitation, sent as the new tenant so its links use the tenant's domain).
 
+## Lookup lists and the sample module
+
+- `LookupCatalog` declares lists and their starting values. `LookupValue` rows are per tenant, seeded on startup and
+  on `TenantCreated`, and maintained in the UI. Records hold codes; `ILookupService` reads (cached) and validates them.
+- People (`Person`, `IPersonService`, `PeopleController`) is the reference slice; see `docs/vertical-slice.md`.
+
 ## Plans, subscriptions and entitlements
 
 - `Plan` (platform data) has prices, a trial and entitlements from `EntitlementCatalog` (`FeatureCodes`,

@@ -3,7 +3,9 @@ using Base.Domain.Auditing;
 using Base.Domain.DataExchange;
 using Base.Domain.Documents;
 using Base.Domain.Files;
+using Base.Domain.MasterData;
 using Base.Domain.Notifications;
+using Base.Domain.People;
 using Base.Domain.Settings;
 using Base.Domain.Subscriptions;
 using Base.Domain.Tenancy;
@@ -29,6 +31,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
     public DbSet<Tenant> Tenants => Set<Tenant>();
 
     public DbSet<TenantDomain> TenantDomains => Set<TenantDomain>();
+
+    public DbSet<LookupValue> LookupValues => Set<LookupValue>();
+
+    public DbSet<Person> People => Set<Person>();
 
     public DbSet<Plan> Plans => Set<Plan>();
 

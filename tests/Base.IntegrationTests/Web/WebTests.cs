@@ -441,6 +441,35 @@ public sealed partial class WebTests(SqlServerFixture sql) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task People_and_lookup_pages_render_and_the_api_round_trips()
+    {
+        var client = Client();
+        await SignInAsync(client);
+        var token = await GetMetaTokenAsync(client);
+
+        using var create = new HttpRequestMessage(HttpMethod.Post, "/api/people")
+        {
+            Content = JsonContent.Create(new { firstName = "Web", lastName = "Tester", departmentCode = "it", skills = new[] { "leadership" } }),
+        };
+        create.Headers.Add("X-CSRF-TOKEN", token);
+        var created = await client.SendAsync(create, TestContext.Current.CancellationToken);
+        created.StatusCode.ShouldBe(HttpStatusCode.Created, await created.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        var id = (await created.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken)).GetProperty("id").GetGuid();
+
+        foreach (var path in new[] { "/people", "/people?status=Active&sort=Department&desc=true", "/people/new", $"/people/{id}", $"/people/{id}?tab=History", $"/people/{id}?tab=Documents", "/admin/master-data", "/admin/master-data?list=People.Skill" })
+        {
+            var page = await client.GetAsync(path, TestContext.Current.CancellationToken);
+            page.StatusCode.ShouldBe(HttpStatusCode.OK, path);
+        }
+
+        (await client.GetStringAsync("/people", TestContext.Current.CancellationToken)).ShouldContain("Web Tester");
+        var departments = await client.GetFromJsonAsync<JsonElement>("/api/lookups/People.Department", TestContext.Current.CancellationToken);
+        departments.EnumerateArray().Select(d => d.GetProperty("code").GetString()).ShouldContain("it");
+        (await client.GetAsync("/api/lookups/Nope.List", TestContext.Current.CancellationToken)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        (await Client().GetAsync("/api/people", TestContext.Current.CancellationToken)).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
     public async Task Password_pages_are_anonymous_and_set_password_is_never_cached()
     {
         var client = Client();

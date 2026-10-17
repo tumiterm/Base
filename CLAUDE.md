@@ -6,6 +6,7 @@ cross-cutting feature or adding a package:
 - [docs/adr/](docs/adr/): why it is built this way
 - [docs/base-project-blueprint.md](docs/base-project-blueprint.md): what was kept from FO16, and what is banned
 - [docs/ui-design-direction.md](docs/ui-design-direction.md): the minimum bar for every screen (read before any UI work)
+- [docs/vertical-slice.md](docs/vertical-slice.md): a new module copies the People sample, file by file
 
 ## Commands
 
@@ -39,6 +40,9 @@ cross-cutting feature or adding a package:
   action). Never check plan codes or prices in code. Tenants are created through `ITenantAdministration`,
   subscriptions changed through `ISubscriptionService` (payments come from outside; no gateway in the base).
 - New setting = constant in `SettingCodes` + `SettingCatalog` entry (no migration). Secrets are never settings.
+- Pick-lists (titles, departments, reasons...) are lookup lists: constant in `LookupLists` + `LookupCatalog` entry with
+  defaults. Records store the code; validate with `ILookupService.EnsureValidAsync`, render with `asp-lookup` /
+  `data-combobox` / `_LookupChips`, label with `LookupLabels`. Never a table or enum per list, never ids in code.
 - Files only through `IFileService`: bytes go to object storage. The `Database` provider is only for small files in chosen
   categories (`Files.CategoryProviders`), capped by the `Files.Database.*` settings; it can't be the default. Extra
   upload checks (virus scanning, ...) implement `IFileUploadCheck`.

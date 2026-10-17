@@ -88,6 +88,7 @@ public static class DependencyInjection
         services.AddScoped<IStartupTask, SettingsSeedTask>();
         services.AddScoped<IStartupTask, IdentitySeedTask>();
         services.AddScoped<IStartupTask, SamplePlansSeedTask>();
+        services.AddScoped<IStartupTask, LookupDefaultsSeedTask>();
 
         AddHealthChecks(services, configuration);
 

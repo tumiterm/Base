@@ -21,3 +21,4 @@ otherwise have to reverse-engineer. Format: context → decision → consequence
 | [0014](0014-operations-and-health.md) | One job scheduler, dependency health checks, a recorded error log |
 | [0015](0015-design-system-and-tenant-branding.md) | Own design system on Bootstrap's behaviour, per-tenant branding as generated CSS |
 | [0016](0016-tenants-plans-and-subscriptions.md) | Tenants, plans and subscriptions in the base, with no payment gateway |
+| [0017](0017-lookup-lists-and-the-sample-module.md) | Per-tenant lookup lists from a code catalogue, and People as the sample module |
