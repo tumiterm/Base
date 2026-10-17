@@ -1,0 +1,10 @@
+@model Base.Domain.Documents.DocumentStatus
+@{
+    var css = Model switch
+    {
+        Base.Domain.Documents.DocumentStatus.Final => "text-bg-success",
+        Base.Domain.Documents.DocumentStatus.Archived => "text-bg-secondary",
+        _ => "text-bg-warning",
+    };
+}
+<span class="badge @css">@Model</span>

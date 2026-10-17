@@ -14,6 +14,7 @@ internal sealed partial class FileService(
     IFileStorageProviderResolver providers,
     IStoredFileAccessPolicy accessPolicy,
     IApplicationSettingService settings,
+    IEnumerable<IFileUploadCheck> checks,
     ITenantContext tenant,
     ICurrentUser currentUser,
     TimeProvider time,
@@ -22,6 +23,28 @@ internal sealed partial class FileService(
     private const int BufferSize = 81920;
 
     public async Task<ValidationResponse<FileUploadResult>> UploadAsync(FileUploadRequest request, CancellationToken cancellationToken = default)
+    {
+        var staged = await StageAsync(request, currentUser.UserId, null, serverGenerated: false, cancellationToken);
+        if (!staged.IsSuccess)
+        {
+            return staged.As<FileUploadResult>();
+        }
+
+        await staged.Data!.SaveOrDiscardAsync(unitOfWork, cancellationToken);
+        return staged.Data.Result;
+    }
+
+    /// <summary>
+    /// Validates, checks and stores the bytes, then stages the metadata row without saving, so callers (documents)
+    /// can commit it together with their own rows. Callers save through <see cref="StagedFile.SaveOrDiscardAsync"/>.
+    /// </summary>
+    /// <param name="ownerUserId">Who may read and delete it through <see cref="IFileService"/>; null when another feature owns it.</param>
+    /// <param name="allowedExtensions">
+    /// A further restriction on top of the <c>Files.AllowedExtensions</c> setting; or, when <paramref name="serverGenerated"/>,
+    /// the only one (the setting governs what users may upload, not what the application renders itself).
+    /// </param>
+    internal async Task<ValidationResponse<StagedFile>> StageAsync(
+        FileUploadRequest request, Guid? ownerUserId, IReadOnlyCollection<string>? allowedExtensions, bool serverGenerated, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -37,7 +60,14 @@ internal sealed partial class FileService(
             return Fail("Invalid file category.", nameof(request.Category));
         }
 
-        var allowed = await settings.GetListAsync(SettingCodes.Files.AllowedExtensions, cancellationToken);
+        IEnumerable<string> allowed = serverGenerated && allowedExtensions is not null
+            ? allowedExtensions
+            : await settings.GetListAsync(SettingCodes.Files.AllowedExtensions, cancellationToken);
+        if (allowedExtensions is not null && !serverGenerated)
+        {
+            allowed = allowed.Intersect(allowedExtensions, StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
         if (!allowed.Contains(extension, StringComparer.OrdinalIgnoreCase))
         {
             return Fail($"Files of type '{extension}' are not allowed. Allowed: {string.Join(", ", allowed)}.");
@@ -88,32 +118,38 @@ internal sealed partial class FileService(
 
         var sha256 = Convert.ToHexStringLower(hash.GetHashAndReset());
         var contentType = FileSignatures.ContentTypeFor(extension);
-        var provider = await ResolveUploadProviderAsync(cancellationToken);
+
+        foreach (var check in checks.OrderBy(c => c.Order))
+        {
+            spool.Position = 0;
+            var verdict = await check.CheckAsync(new FileUploadCheckContext(fileName, extension, contentType, request.Category, size, sha256, spool), cancellationToken);
+            if (!verdict.IsSuccess)
+            {
+                return Fail(verdict.Message ?? "The file was rejected.");
+            }
+        }
+
+        var provider = await ResolveUploadProviderAsync(request.Category, cancellationToken);
         var fileId = SequentialGuid.Next();
         var objectKey = ObjectKeys.Build(tenant.TenantId, request.Category, time.GetUtcNow(), fileId, extension);
 
         spool.Position = 0;
-        await provider.UploadAsync(objectKey, spool, contentType, cancellationToken);
+        try
+        {
+            await provider.UploadAsync(objectKey, spool, contentType, cancellationToken);
+        }
+        catch (FileStorageLimitException limit)
+        {
+            return Fail(limit.Message);
+        }
 
-        var file = new StoredFile(provider.Name, objectKey, fileName, contentType, size, sha256, request.Category, currentUser.UserId, request.ExpiresAt)
+        var file = new StoredFile(provider.Name, objectKey, fileName, contentType, size, sha256, request.Category, ownerUserId, request.ExpiresAt)
         {
             Id = fileId,
         };
 
-        try
-        {
-            await unitOfWork.Repository<StoredFile>().AddAsync(file, cancellationToken);
-            await unitOfWork.SaveAsync(cancellationToken);
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            // Compensate: don't leave an orphaned object behind when the metadata row can't be written.
-            LogOrphanCleanup(logger, objectKey, provider.Name);
-            await provider.DeleteAsync(objectKey, CancellationToken.None);
-            throw;
-        }
-
-        return new FileUploadResult(file.Id, fileName, contentType, size, sha256);
+        await unitOfWork.Repository<StoredFile>().AddAsync(file, cancellationToken);
+        return new StagedFile(file, provider, logger);
     }
 
     public async Task<ValidationResponse<FileDownload>> GetDownloadAsync(Guid fileId, CancellationToken cancellationToken = default)
@@ -130,13 +166,20 @@ internal sealed partial class FileService(
             return ValidationResponse.NotFound("File not found.").As<FileDownload>();
         }
 
+        return await OpenAsync(file, file.OriginalFileName, cancellationToken);
+    }
+
+    /// <summary>Opens a file the caller has already authorised (no access policy check).</summary>
+    internal async Task<FileDownload> OpenAsync(StoredFile file, string downloadFileName, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(file);
         var provider = providers.Get(file.ProviderName);
         var minutes = await settings.GetIntAsync(SettingCodes.Files.DownloadLinkMinutes, cancellationToken);
-        var url = await provider.GetDownloadUrlAsync(file.ObjectKey, file.OriginalFileName, file.ContentType, TimeSpan.FromMinutes(minutes), cancellationToken);
+        var url = await provider.GetDownloadUrlAsync(file.ObjectKey, downloadFileName, file.ContentType, TimeSpan.FromMinutes(minutes), cancellationToken);
 
         return url is not null
-            ? new FileDownload(file.OriginalFileName, file.ContentType, url, null)
-            : new FileDownload(file.OriginalFileName, file.ContentType, null, await provider.OpenReadAsync(file.ObjectKey, cancellationToken));
+            ? new FileDownload(downloadFileName, file.ContentType, url, null)
+            : new FileDownload(downloadFileName, file.ContentType, null, await provider.OpenReadAsync(file.ObjectKey, cancellationToken));
     }
 
     public async Task<ValidationResponse> DeleteAsync(Guid fileId, CancellationToken cancellationToken = default)
@@ -148,23 +191,34 @@ internal sealed partial class FileService(
             return ValidationResponse.NotFound("File not found.");
         }
 
-        // Soft delete only: the object stays until a retention job purges it, so deletes can be undone and audited.
+        // Soft delete only: the object stays until the retention job purges it, so deletes can be undone and audited.
         repository.Remove(file);
         await unitOfWork.SaveAsync(cancellationToken);
         return ValidationResponse.Success("File deleted.");
     }
 
-    private async Task<IFileStorageProvider> ResolveUploadProviderAsync(CancellationToken cancellationToken)
+    private async Task<IFileStorageProvider> ResolveUploadProviderAsync(string category, CancellationToken cancellationToken)
     {
-        var configured = await settings.GetAsync(SettingCodes.Files.DefaultProvider, cancellationToken);
+        var configured = ProviderForCategory(await settings.GetListAsync(SettingCodes.Files.CategoryProviders, cancellationToken), category)
+            ?? await settings.GetAsync(SettingCodes.Files.DefaultProvider, cancellationToken);
         if (configured is not null && providers.TryGet(configured, out var provider))
         {
             return provider;
         }
 
+        // The database provider is capped and meant for chosen categories, so it is the fallback of last resort.
         LogProviderFallback(logger, configured);
-        return providers.Get(providers.Names.First());
+        var fallback = providers.Names.FirstOrDefault(n => !string.Equals(n, FileStorageProviderNames.Database, StringComparison.Ordinal)) ?? providers.Names.First();
+        return providers.Get(fallback);
     }
+
+    /// <summary>The provider a <c>category=Provider</c> entry names for <paramref name="category"/>, if any.</summary>
+    internal static string? ProviderForCategory(IEnumerable<string> entries, string category) =>
+        entries
+            .Select(e => e.Split('=', 2, StringSplitOptions.TrimEntries))
+            .Where(p => p.Length == 2 && p[1].Length > 0 && string.Equals(p[0], category, StringComparison.OrdinalIgnoreCase))
+            .Select(p => p[1])
+            .FirstOrDefault();
 
     /// <summary>
     /// Display name only (the object key never uses it): strips any client path, Windows or Unix, and control characters.
@@ -175,12 +229,36 @@ internal sealed partial class FileService(
         return new string(name.Where(c => !char.IsControl(c)).ToArray()).Trim();
     }
 
-    private static ValidationResponse<FileUploadResult> Fail(string message, string field = "file") =>
-        ValidationResponse.Failure(new ValidationError(field, message, "file.invalid")).As<FileUploadResult>();
-
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Metadata save failed; deleting orphaned object {ObjectKey} from {Provider}")]
-    private static partial void LogOrphanCleanup(ILogger logger, string objectKey, string provider);
+    private static ValidationResponse<StagedFile> Fail(string message, string field = "file") =>
+        ValidationResponse.Failure(new ValidationError(field, message, "file.invalid")).As<StagedFile>();
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Configured file provider {Provider} is not registered; using the first registered provider")]
     private static partial void LogProviderFallback(ILogger logger, string? provider);
+}
+
+/// <summary>Bytes already in storage plus a metadata row staged on the unit of work, waiting for the caller's save.</summary>
+internal sealed partial class StagedFile(StoredFile file, IFileStorageProvider provider, ILogger logger)
+{
+    public StoredFile File { get; } = file;
+
+    public FileUploadResult Result => new(File.Id, File.OriginalFileName, File.ContentType, File.SizeBytes, File.Sha256);
+
+    /// <summary>Saves the unit of work; if that fails, deletes the stored object so no orphan is left behind.</summary>
+    public async Task SaveOrDiscardAsync(IUnitOfWork unitOfWork, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(unitOfWork);
+        try
+        {
+            await unitOfWork.SaveAsync(cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            LogOrphanCleanup(logger, File.ObjectKey, provider.Name);
+            await provider.DeleteAsync(File.ObjectKey, CancellationToken.None);
+            throw;
+        }
+    }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Metadata save failed; deleting orphaned object {ObjectKey} from {Provider}")]
+    private static partial void LogOrphanCleanup(ILogger logger, string objectKey, string provider);
 }

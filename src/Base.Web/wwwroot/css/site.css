@@ -11,3 +11,24 @@ html {
 body {
   min-height: 100vh;
 }
+
+.drop-zone {
+  border: 2px dashed var(--bs-border-color);
+  border-radius: var(--bs-border-radius);
+  padding: 1rem;
+  text-align: center;
+}
+
+.drop-zone-active {
+  border-color: var(--bs-primary);
+  background-color: var(--bs-primary-bg-subtle);
+}
+
+.drop-zone-hint {
+  margin-top: 0.5rem;
+}
+
+/* MVC hides an empty validation summary with an inline style, which the CSP (style-src 'self') blocks. */
+.validation-summary-valid {
+  display: none;
+}

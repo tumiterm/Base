@@ -48,6 +48,7 @@ public static class FileSignatures
             [".zip"] = "application/zip",
             [".txt"] = "text/plain",
             [".csv"] = "text/csv",
+            [".html"] = "text/html",
         }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>True when the header matches the extension's signature, or the extension has no known signature.</summary>

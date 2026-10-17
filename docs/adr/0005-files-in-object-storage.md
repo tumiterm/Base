@@ -1,5 +1,7 @@
 # 0005: File bytes in object storage, metadata in SQL
 
+_Amended by [0012](0012-documents-and-capped-database-storage.md): a capped database provider exists for chosen categories._
+
 **Context.** FO's production database filled up with uploaded files (September 2026).
 
 **Decision.** There is no database provider. Bytes go to S3-compatible storage (R2/S3/MinIO) or Azure Blob, with local

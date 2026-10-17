@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Base.Application.Common.Persistence;
+using Base.Application.Common.Text;
 using Base.Application.Settings;
 using Base.Domain.Notifications;
 
@@ -62,7 +63,7 @@ internal sealed class NotificationComposer(IUnitOfWork unitOfWork, INotification
 
     public async Task<Dictionary<string, string?>> ValuesAsync(NotificationTemplateDefinition template, object? data, NotificationRecipientSnapshot recipient, CancellationToken cancellationToken)
     {
-        var values = NotificationData.From(data);
+        var values = TemplateValues.From(data);
         values[NotificationCatalog.AppNameVariable] = await settings.GetAsync(SettingCodes.General.ApplicationName, cancellationToken);
         values[NotificationCatalog.PublicBaseUrlVariable] = (await settings.GetAsync(SettingCodes.General.PublicBaseUrl, cancellationToken))?.TrimEnd('/');
         values.TryAdd(NotificationCatalog.RecipientNameVariable, string.IsNullOrWhiteSpace(recipient.Name) ? "there" : recipient.Name);

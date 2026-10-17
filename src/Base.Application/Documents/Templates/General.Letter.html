@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>{{ Subject }}</title>
+    <style>
+        @page { size: A4; margin: 25mm 20mm; }
+        body { font-family: "Helvetica Neue", Arial, sans-serif; font-size: 11pt; line-height: 1.5; color: #1a1a1a; }
+        header { display: flex; justify-content: space-between; border-bottom: 2px solid #1a1a1a; padding-bottom: 8px; margin-bottom: 32px; }
+        header .org { font-size: 16pt; font-weight: bold; }
+        h1 { font-size: 13pt; margin: 24px 0 16px; }
+        .body { white-space: pre-line; }
+    </style>
+</head>
+<body>
+    <header>
+        <span class="org">{{ AppName }}</span>
+        <span>{{ Today }}</span>
+    </header>
+    <p>Dear {{ RecipientName }},</p>
+    <h1>{{ Subject }}</h1>
+    <div class="body">{{ Body }}</div>
+    <p>Kind regards,<br>{{ AppName }}</p>
+</body>
+</html>

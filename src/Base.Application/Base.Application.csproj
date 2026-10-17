@@ -12,6 +12,7 @@
   <ItemGroup>
     <!-- Logical names without the assembly prefix, so a renamed project (scripts/new-project.cs) still finds them. -->
     <EmbeddedResource Include="Notifications\Templates\*.txt" LogicalName="Notifications.%(Filename).txt" />
+    <EmbeddedResource Include="Documents\Templates\*.html" LogicalName="Documents.%(Filename).html" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Base.IntegrationTests" />

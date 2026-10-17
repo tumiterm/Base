@@ -1,0 +1,49 @@
+@model GenerateDocumentViewModel
+@{
+    ViewData["Title"] = "Generate a document";
+}
+<nav class="mb-2"><a asp-action="Index">&larr; Documents</a></nav>
+<h1 class="h3 mb-3">Generate a document</h1>
+<form method="get" class="row g-2 align-items-end mb-4">
+    <div class="col-md-6">
+        <label class="form-label small" for="template">Template</label>
+        <select class="form-select" id="template" name="template">
+            <option value="">Choose…</option>
+            @foreach (var t in Model.Templates) { <option value="@t.Code" selected="@(t.Code == Model.Selected?.Code)">@t.Name</option> }
+        </select>
+    </div>
+    <div class="col-md-2"><button class="btn btn-outline-primary" type="submit">Use template</button></div>
+</form>
+@if (Model.Selected is { } template)
+{
+    <div asp-validation-summary="All" class="alert alert-danger" role="alert"></div>
+    <p class="text-muted">@template.Description</p>
+    <form method="post" asp-action="Generate">
+        <input type="hidden" name="template" value="@template.Code" />
+        <div class="row g-2 mb-3">
+            <div class="col-md-6"><label class="form-label small" for="title">Document title</label><input class="form-control" id="title" name="title" value="@(Model.Title ?? template.Name)" maxlength="200" /></div>
+            <div class="col-md-3">
+                <label class="form-label small" for="format">Format</label>
+                <select class="form-select" id="format" name="format">
+                    @foreach (var format in Model.Formats) { <option value="@format" selected="@(format == Model.Format)">@format.ToUpperInvariant()</option> }
+                </select>
+            </div>
+        </div>
+        @foreach (var variable in template.Variables)
+        {
+            <div class="mb-3">
+                <label class="form-label" for="v-@variable">@variable</label>
+                <textarea class="form-control" id="v-@variable" name="values[@variable]" rows="@(variable == "Body" ? 6 : 1)">@Model.Values.GetValueOrDefault(variable)</textarea>
+            </div>
+        }
+        <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="finalize" name="finalize" value="true" checked="@Model.Finalize" />
+            <label class="form-check-label" for="finalize">Mark as final (locked) straight away</label>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-primary" type="submit">Generate and save</button>
+            <button class="btn btn-outline-secondary" type="submit" name="preview" value="true">Preview</button>
+        </div>
+        <p class="small text-muted mt-3">Filled in automatically: @string.Join(", ", Base.Application.Documents.Generation.DocumentTemplateCatalog.BuiltInVariables).</p>
+    </form>
+}

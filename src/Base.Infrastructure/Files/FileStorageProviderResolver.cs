@@ -10,7 +10,8 @@ internal sealed class FileStorageProviderResolver : IFileStorageProviderResolver
     public FileStorageProviderResolver(IEnumerable<IFileStorageProvider> providers)
     {
         _providers = providers.ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase);
-        if (_providers.Count == 0)
+        // The database provider is always there but capped for small files, so it doesn't count as "configured".
+        if (!_providers.Keys.Any(n => !string.Equals(n, FileStorageProviderNames.Database, StringComparison.OrdinalIgnoreCase)))
         {
             throw new InvalidOperationException("No file storage provider is configured. Configure FileStorage:LocalDisk, :S3 or :AzureBlob.");
         }

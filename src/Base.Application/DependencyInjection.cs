@@ -1,4 +1,6 @@
 using Base.Application.Auditing;
+using Base.Application.Documents;
+using Base.Application.Documents.Generation;
 using Base.Application.Files;
 using Base.Application.Messaging;
 using Base.Application.Notifications;
@@ -18,8 +20,16 @@ public static class DependencyInjection
         services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly, includeInternalTypes: true);
 
         services.AddScoped<IApplicationSettingService, ApplicationSettingService>();
-        services.AddScoped<IFileService, FileService>();
+        services.AddScoped<FileService>();
+        services.AddScoped<IFileService>(sp => sp.GetRequiredService<FileService>());
         services.AddScoped<IAuditTrail, AuditTrailService>();
+
+        services.AddScoped<DocumentService>();
+        services.AddScoped<IDocumentService>(sp => sp.GetRequiredService<DocumentService>());
+        services.AddScoped<IDocumentRetention, DocumentRetention>();
+        services.AddScoped<IDocumentGenerator, DocumentGenerator>();
+        services.AddSingleton<IDocumentRenderer, HtmlDocumentRenderer>();
+        services.TryAddScoped<IDocumentAccessPolicy, DefaultDocumentAccessPolicy>();
 
         services.AddScoped<NotificationComposer>();
         services.AddScoped<INotificationService, NotificationService>();

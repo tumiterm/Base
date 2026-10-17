@@ -1,6 +1,7 @@
 using Base.Application.Common.Abstractions;
 using Base.Application.Common.Persistence;
 using Base.Application.Common.Results;
+using Base.Application.Common.Text;
 using Base.Domain.Notifications;
 
 namespace Base.Application.Notifications;

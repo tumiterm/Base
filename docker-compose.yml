@@ -1,6 +1,8 @@
 # Local development dependencies.
 #   docker compose up -d                  SQL Server + OpenTelemetry dashboard
 #   docker compose --profile s3 up -d     ... plus MinIO (S3-compatible storage)
+#   docker compose --profile pdf up -d    ... plus Gotenberg (HTML to PDF):  Documents__Pdf__Gotenberg__BaseUrl=http://localhost:3000/
+#   docker compose --profile scan up -d   ... plus ClamAV (virus scanning):  FileScanning__ClamAv__Host=localhost
 #   docker compose --profile app up -d    ... plus the app itself, built from src/Base.Web/Dockerfile
 # Passwords here are for local containers only. Real credentials go in user-secrets or environment variables.
 name: base
@@ -44,6 +46,20 @@ services:
       - "9001:9001"
     volumes:
       - miniodata:/data
+
+  # HTML-to-PDF for document generation (MIT). Keep it on an internal network: it renders whatever HTML it is sent.
+  gotenberg:
+    profiles: ["pdf"]
+    image: gotenberg/gotenberg:8
+    ports:
+      - "3000:3000"
+
+  # Virus scanning for uploads. Downloads signatures on first start, which takes a few minutes.
+  clamav:
+    profiles: ["scan"]
+    image: clamav/clamav:1.4
+    ports:
+      - "3310:3310"
 
   web:
     profiles: ["app"]

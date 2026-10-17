@@ -42,6 +42,7 @@ public sealed class FileServiceTests
         _settings.GetIntAsync(SettingCodes.Files.MaxUploadSizeMb, Arg.Any<CancellationToken>()).Returns(1);
         _settings.GetIntAsync(SettingCodes.Files.DownloadLinkMinutes, Arg.Any<CancellationToken>()).Returns(5);
         _settings.GetAsync(SettingCodes.Files.DefaultProvider, Arg.Any<CancellationToken>()).Returns("LocalDisk");
+        _settings.GetListAsync(SettingCodes.Files.CategoryProviders, Arg.Any<CancellationToken>()).Returns([]);
 
         var tenant = Substitute.For<ITenantContext>();
         tenant.TenantId.Returns(TenantId);
@@ -49,7 +50,7 @@ public sealed class FileServiceTests
         _user.IsAuthenticated.Returns(true);
 
         _service = new FileService(
-            _unitOfWork, resolver, new DefaultStoredFileAccessPolicy(_user), _settings, tenant, _user,
+            _unitOfWork, resolver, new DefaultStoredFileAccessPolicy(_user), _settings, [], tenant, _user,
             new FakeTimeProvider(new DateTimeOffset(2026, 10, 16, 12, 0, 0, TimeSpan.Zero)), NullLogger<FileService>.Instance);
     }
 
