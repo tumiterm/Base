@@ -6,6 +6,7 @@ using Base.Application.Common.Persistence;
 using Base.Application.DataExchange;
 using Base.Application.Documents.Generation;
 using Base.Application.Files;
+using Base.Application.Integrations;
 using Base.Application.Messaging;
 using Base.Application.Notifications;
 using Base.Application.Operations;
@@ -18,6 +19,7 @@ using Base.Infrastructure.Documents;
 using Base.Infrastructure.Files;
 using Base.Infrastructure.Health;
 using Base.Infrastructure.Identity;
+using Base.Infrastructure.Integrations;
 using Base.Infrastructure.Jobs;
 using Base.Infrastructure.Notifications;
 using Base.Infrastructure.Notifications.Providers;
@@ -309,6 +311,8 @@ public static class DependencyInjection
         services.AddScoped<IScheduledJob, FileRetentionJob>();
         services.AddScoped<IScheduledJob, OutboxCleanupJob>();
         services.AddScoped<IScheduledJob, ErrorLogRetentionJob>();
+        services.AddScoped<IScheduledJob, IdempotencyCleanupJob>();
+        services.AddScoped<IIdempotencyStore, IdempotencyStore>();
         services.AddScoped<IErrorLog, ErrorLog>();
         services.AddScoped<ISystemStatus, SystemStatus>();
     }

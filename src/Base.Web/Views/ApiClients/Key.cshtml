@@ -1,0 +1,33 @@
+@model ApiKeyViewModel
+@{
+    ViewData["Title"] = Model.Name;
+}
+<nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-action="Index">API clients</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">@Model.Name</span></nav>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">@(Model.Created ? "Client created" : "New key issued")</h1>
+        <p class="page-subtitle">Copy the key into the other system's secret store now. It is shown only once; if it's lost, rotate it.</p>
+    </div>
+</div>
+<section class="panel key-panel" aria-labelledby="key-title">
+    <div class="panel-header"><h2 class="panel-title" id="key-title">API key for @Model.Name</h2><span class="text-muted small">Valid until <local-time value="Model.Key.ExpiresAt" format="d MMMM yyyy" /></span></div>
+    <div class="panel-body stack">
+        <div class="key-value">
+            <code id="api-key">@Model.Key.Key</code>
+            <button class="btn btn-primary" type="button" data-copy="#api-key"><icon name="copy" class="icon-sm" /> <span data-copy-label>Copy</span></button>
+        </div>
+        <div class="alert alert-warning d-flex gap-2 mb-0" role="note">
+            <icon name="triangle-alert" />
+            <div>Anyone with this key can act with the client's permissions. Don't put it in source code, chat or email; keep it in a secret store and send it only over HTTPS.</div>
+        </div>
+        <div>
+            <div class="form-label">Use it like this</div>
+            <pre class="code-sample mb-0"><code>curl -H "Authorization: Bearer @Model.Key.Key" \
+     -H "Idempotency-Key: $(uuidgen)" \
+     @(Context.Request.Scheme)://@(Context.Request.Host)/api/people</code></pre>
+        </div>
+    </div>
+    <div class="panel-footer d-flex justify-content-end gap-2">
+        <a class="btn btn-secondary" asp-action="Details" asp-route-id="@Model.Key.ClientId">Done, I've stored it</a>
+    </div>
+</section>

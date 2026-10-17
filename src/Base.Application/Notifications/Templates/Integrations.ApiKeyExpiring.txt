@@ -1,0 +1,16 @@
+--- email.subject
+The API key for {{ClientName}} expires on {{ExpiresOn}}
+--- email.html
+<p>Hello {{RecipientName}},</p>
+<p>The API key for <strong>{{ClientName}}</strong> expires on <strong>{{ExpiresOn}}</strong>. After that, the system using it can no longer call {{AppName}}.</p>
+<p>Rotate the key under Administration → API clients and give the new key to the system that uses it: <a href="{{PublicBaseUrl}}/admin/api-clients">{{PublicBaseUrl}}/admin/api-clients</a>.</p>
+--- email.text
+Hello {{RecipientName}},
+
+The API key for {{ClientName}} expires on {{ExpiresOn}}. After that, the system using it can no longer call {{AppName}}.
+
+Rotate the key under Administration > API clients and give the new key to the system that uses it: {{PublicBaseUrl}}/admin/api-clients
+--- inapp.title
+API key for {{ClientName}} expires on {{ExpiresOn}}
+--- inapp.body
+Rotate it under Administration → API clients before it stops working.

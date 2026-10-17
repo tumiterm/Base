@@ -48,6 +48,11 @@ public static class PermissionCodes
         public const string View = "Audit.View";
     }
 
+    public static class Api
+    {
+        public const string ClientsManage = "Api.Clients.Manage";
+    }
+
     public static class MasterData
     {
         public const string Manage = "MasterData.Manage";

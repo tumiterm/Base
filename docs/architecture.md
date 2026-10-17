@@ -30,9 +30,11 @@ Order matters; this is `WebApplicationExtensions.UseWeb`:
 5. Security headers (CSP, frame, referrer, permissions policies)
 6. Correlation id (accepts a well-formed `X-Correlation-ID`, otherwise the trace id; added to every log line)
 7. Serilog request logging, static assets
-8. Routing → rate limiter → **tenant resolution** (before authentication, because users are tenant-scoped)
-9. Authentication → authorization (fallback policy: authenticated user)
-10. Health checks, OpenAPI (development), Hangfire dashboard (if enabled), controllers
+8. Routing → CORS (only if `Api:AllowedOrigins` is set) → **tenant resolution** (before authentication, because users
+   and API keys are tenant-scoped)
+9. Authentication (cookie, or API key on `/api`) → rate limiter (per API client, person or IP) → subscription gate →
+   authorization (fallback policy: authenticated) → idempotency (`Idempotency-Key` on unsafe `/api` calls)
+10. Branding, health checks, OpenAPI (per `Api:Documentation`), Hangfire dashboard (if enabled), controllers
 
 ## Persistence rules
 
@@ -65,6 +67,15 @@ The **default tenant is the platform tenant** (`IPlatformTenant`). Only its user
 (`PermissionDefinition.IsPlatform`: tenants, plans, roles); the claims factory drops them for everyone else.
 `ITenantAdministration` creates tenants (domain + subscription in one transaction, then the first administrator's
 invitation, sent as the new tenant so its links use the tenant's domain).
+
+## API
+
+- Authentication is a policy scheme: the Identity cookie, or `ApiKeyAuthenticationHandler` when a `bk_` key is sent
+  to `/api`. Key callers have permission claims and no user id; `ICurrentUser.AuditName` is "API: name".
+- `AntiforgeryUnlessApiKeyFilter` checks the token on unsafe cookie requests (pages and the API the pages use).
+- Pipeline order around authentication: tenant resolution → authentication → rate limiter (per caller) → subscription
+  gate → authorization → `IdempotencyMiddleware` → endpoint.
+- Asp.Versioning (`api-version`, default 1.0) and OpenAPI per version (`Api:Documentation`). See `docs/api.md`.
 
 ## Lookup lists and the sample module
 

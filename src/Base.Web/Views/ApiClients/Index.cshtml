@@ -1,0 +1,72 @@
+@model ApiClientListViewModel
+@inject Base.Web.Api.ApiDocumentationState Docs
+@{
+    ViewData["Title"] = "API clients";
+}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">API clients</h1>
+        <p class="page-subtitle">Keys for other systems to call the API, each with only the permissions it needs.</p>
+    </div>
+    <div class="page-actions">
+        <a class="btn btn-secondary" href="/scalar" target="_blank" rel="noopener" hidden="@(!Docs.Enabled)"><icon name="external-link" class="icon-sm" /> API reference</a>
+        <button class="btn btn-primary" type="button" data-bs-toggle="offcanvas" data-bs-target="#new-client" aria-controls="new-client"><icon name="key-round" class="icon-sm" /> New API client</button>
+    </div>
+</div>
+
+@if (Model.Clients.Count == 0)
+{
+    <div class="empty-state">
+        <icon name="key-round" />
+        <div class="empty-state-title">No API clients yet</div>
+        <p class="mb-2">Create one for each system that calls the API (billing, HR, a reporting tool), so each can be limited and revoked on its own.</p>
+        <button class="btn btn-primary" type="button" data-bs-toggle="offcanvas" data-bs-target="#new-client">New API client</button>
+    </div>
+}
+else
+{
+    <table class="table table-entity align-middle">
+        <thead>
+            <tr><th>Client</th><th>Permissions</th><th>Status</th><th>Expires</th><th>Last used</th><th class="text-end">Per minute</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var c in Model.Clients)
+            {
+                var (tone, label) = ApiClientDisplay.State(c.State);
+                <tr class="@(c.State == Base.Application.Integrations.ApiClientState.Revoked ? "text-muted" : "")">
+                    <td>
+                        <a class="entity text-decoration-none" asp-action="Details" asp-route-id="@c.Id">
+                            <span class="avatar avatar-square" aria-hidden="true"><icon name="key-round" class="icon-sm" /></span>
+                            <span class="entity-text">
+                                <span class="entity-name">@c.Name</span>
+                                <span class="entity-sub font-monospace">@c.MaskedKey</span>
+                            </span>
+                        </a>
+                    </td>
+                    <td><span class="chip" title="@string.Join(", ", c.Permissions)">@c.Permissions.Count permission@(c.Permissions.Count == 1 ? "" : "s")</span></td>
+                    <td><span class="badge text-bg-@tone">@label</span></td>
+                    <td><local-time value="c.ExpiresAt" format="d MMM yyyy" /></td>
+                    <td class="text-muted">@if (c.LastUsedAt is { } used) {<local-time value="used" />} else {<text>Never</text>}</td>
+                    <td class="text-end tabular">@(c.RequestsPerMinute?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "Default")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<div class="offcanvas offcanvas-end" tabindex="-1" id="new-client" aria-labelledby="new-client-title" data-open-on-load="@(Model.OpenForm ? "true" : null)">
+    <div class="offcanvas-header">
+        <h2 class="offcanvas-title" id="new-client-title">New API client</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <form method="post" asp-action="Create" class="d-flex flex-column flex-grow-1 overflow-hidden">
+        <div class="offcanvas-body">
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+            <partial name="_ApiClientFields" model="(Model.NewClient, true)" />
+        </div>
+        <div class="offcanvas-footer">
+            <button type="button" class="btn btn-ghost" data-bs-dismiss="offcanvas">Cancel</button>
+            <button class="btn btn-primary" type="submit"><icon name="key-round" class="icon-sm" /> Create and show key</button>
+        </div>
+    </form>
+</div>

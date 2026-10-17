@@ -89,6 +89,13 @@ scripts/new-project.cs  Creates a renamed copy for a new project.
   toasts, and tables that become cards on phones. Each tenant sets its accent colour, logo and default theme at
   Administration → Appearance, and readable text colours are derived automatically. The bar for every screen is in
   [docs/ui-design-direction.md](docs/ui-design-direction.md).
+- **API for integrations** ([docs/api.md](docs/api.md)):
+  - **Keys per client:** each client gets least-privilege permissions; keys expire, can be rotated and revoked, and
+    are stored hashed and shown once.
+  - **Safe retries:** `Idempotency-Key` makes a repeated call replay the first answer instead of running twice.
+  - **Rate limits** per client or person (429 with `Retry-After`).
+  - **Versioning:** `api-version`, with unversioned calls treated as 1.0.
+  - **OpenAPI and a reference page,** switched on by configuration; CORS is closed by default.
 - **Sample module: People.** A complete, documented vertical slice to copy ([docs/vertical-slice.md](docs/vertical-slice.md)):
   - a directory with filters, sorting, a drawer to add people, and a profile that is edited in place
   - photos, linked documents, and history from the audit trail

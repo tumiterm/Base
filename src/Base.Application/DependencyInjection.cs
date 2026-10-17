@@ -4,6 +4,7 @@ using Base.Application.DataExchange;
 using Base.Application.Documents;
 using Base.Application.Documents.Generation;
 using Base.Application.Files;
+using Base.Application.Integrations;
 using Base.Application.MasterData;
 using Base.Application.Messaging;
 using Base.Application.Notifications;
@@ -13,6 +14,7 @@ using Base.Application.Settings;
 using Base.Application.Subscriptions;
 using Base.Application.Users;
 using Base.Domain.DataExchange;
+using Base.Domain.Integrations;
 using Base.Domain.Notifications;
 using Base.Domain.Subscriptions;
 using Base.Domain.Tenancy;
@@ -40,6 +42,11 @@ public static class DependencyInjection
         services.AddScoped<ILookupService>(sp => sp.GetRequiredService<LookupService>());
         services.AddScoped<ILookupDefaults>(sp => sp.GetRequiredService<LookupService>());
         services.AddScoped<IDomainEventHandler<TenantCreated>, LookupDefaultsForNewTenants>();
+
+        services.AddScoped<IApiClientAdministration, ApiClientAdministration>();
+        services.AddScoped<IApiKeyAuthenticator, ApiKeyAuthenticator>();
+        services.AddScoped<IScheduledJob, ApiKeyExpiryJob>();
+        services.AddScoped<IDomainEventHandler<ApiKeyExpiring>, ApiKeyExpiryNotice>();
 
         services.AddScoped<IPersonService, PersonService>();
         services.AddScoped<IExporter, PeopleExporter>();

@@ -1,0 +1,75 @@
+@model (ApiClientForm Form, bool IsNew)
+@{
+    var f = Model.Form;
+    var chosen = f.Permissions.ToHashSet(StringComparer.Ordinal);
+}
+<section class="form-section">
+    <div>
+        <h2 class="form-section-title">Client</h2>
+        <p class="form-section-desc">Name it after the system that uses it, so its calls are recognisable in the audit trail ("API: name").</p>
+    </div>
+    <div class="row g-3">
+        <div class="col-12">
+            <label class="form-label" for="Name">Name</label>
+            <input class="form-control" id="Name" name="Name" value="@f.Name" maxlength="100" required placeholder="e.g. Billing sync" />
+            @Html.ValidationMessage("Name", null, new { @class = "text-danger" })
+        </div>
+        <div class="col-12">
+            <label class="form-label" for="Description">What it's for <span class="text-muted fw-normal">(optional)</span></label>
+            <input class="form-control" id="Description" name="Description" value="@f.Description" maxlength="500" placeholder="Who owns it, where the key is stored" />
+            @Html.ValidationMessage("Description", null, new { @class = "text-danger" })
+        </div>
+    </div>
+</section>
+
+<section class="form-section">
+    <div>
+        <h2 class="form-section-title">Permissions</h2>
+        <p class="form-section-desc">Give only what the integration needs. You can only give permissions you hold.</p>
+    </div>
+    <div class="stack">
+        @foreach (var module in f.Grantable.GroupBy(p => p.Module))
+        {
+            <div>
+                <div class="form-label">@module.Key</div>
+                <div class="chip-group" role="group" aria-label="@module.Key permissions">
+                    @foreach (var p in module)
+                    {
+                        <label class="chip-check" title="@p.Description">
+                            <input type="checkbox" name="Permissions" value="@p.Key" checked="@chosen.Contains(p.Key)" />
+                            <span>@p.Label</span>
+                        </label>
+                    }
+                </div>
+            </div>
+        }
+        @Html.ValidationMessage("Permissions", null, new { @class = "text-danger" })
+    </div>
+</section>
+
+<section class="form-section">
+    <div>
+        <h2 class="form-section-title">Limits</h2>
+        <p class="form-section-desc">Keys always expire; you're reminded two weeks before. Calls over the rate limit get 429 and Retry-After.</p>
+    </div>
+    <div class="row g-3">
+        @if (Model.IsNew)
+        {
+            <div class="col-12">
+                <div class="form-label">Key valid for</div>
+                <div class="segmented" role="radiogroup" aria-label="Key lifetime">
+                    @foreach (var days in ApiClientForm.LifetimeChoices.Where(d => d <= f.MaxLifetimeDays))
+                    {
+                        <input type="radio" name="ExpiresInDays" id="exp-@days" value="@days" checked="@(f.ExpiresInDays == days)" /><label for="exp-@days">@(days == 365 ? "1 year" : days + " days")</label>
+                    }
+                </div>
+                @Html.ValidationMessage("ExpiresInDays", null, new { @class = "text-danger d-block" })
+            </div>
+        }
+        <div class="col-sm-6">
+            <label class="form-label" for="RequestsPerMinute">Requests per minute</label>
+            <input class="form-control tabular" id="RequestsPerMinute" name="RequestsPerMinute" type="number" min="1" max="100000" value="@f.RequestsPerMinute" placeholder="Default: @f.DefaultRequestsPerMinute" />
+            @Html.ValidationMessage("RequestsPerMinute", null, new { @class = "text-danger" })
+        </div>
+    </div>
+</section>

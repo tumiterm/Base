@@ -3,6 +3,7 @@ using Base.Domain.Auditing;
 using Base.Domain.DataExchange;
 using Base.Domain.Documents;
 using Base.Domain.Files;
+using Base.Domain.Integrations;
 using Base.Domain.MasterData;
 using Base.Domain.Notifications;
 using Base.Domain.People;
@@ -11,6 +12,7 @@ using Base.Domain.Subscriptions;
 using Base.Domain.Tenancy;
 using Base.Infrastructure.Files;
 using Base.Infrastructure.Identity;
+using Base.Infrastructure.Integrations;
 using Base.Infrastructure.Jobs;
 using Base.Infrastructure.Operations;
 using Base.Infrastructure.Outbox;
@@ -31,6 +33,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
     public DbSet<Tenant> Tenants => Set<Tenant>();
 
     public DbSet<TenantDomain> TenantDomains => Set<TenantDomain>();
+
+    public DbSet<ApiClient> ApiClients => Set<ApiClient>();
+
+    public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
     public DbSet<LookupValue> LookupValues => Set<LookupValue>();
 

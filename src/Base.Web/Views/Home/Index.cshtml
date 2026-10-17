@@ -15,6 +15,7 @@
         ("shield-check", "Roles", "Group permissions into roles", "RoleAdmin", PermissionCodes.Roles.Manage, null),
         ("history", "Audit trail", "Who changed what, and when", "AuditAdmin", PermissionCodes.Audit.View, null),
         ("list", "Lookup lists", "Titles, departments, skills and other choices", "MasterData", PermissionCodes.MasterData.Manage, null),
+        ("key-round", "API clients", "Keys for other systems to call the API", "ApiClients", PermissionCodes.Api.ClientsManage, FeatureCodes.Api),
         ("palette", "Appearance", "Colour, logo and default theme", "Appearance", PermissionCodes.Settings.Edit, FeatureCodes.CustomBranding),
         ("credit-card", "Subscription", "Your plan, usage and renewal", "Subscription", access.IsRestricted ? PermissionCodes.Subscription.View : "", null),
         ("building-2", "Tenants", "Organisations, domains and subscriptions", "PlatformTenants", PermissionCodes.Platform.TenantsView, null),

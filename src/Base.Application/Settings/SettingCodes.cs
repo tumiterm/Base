@@ -26,6 +26,18 @@ public static class SettingCodes
         public const string LogoFileId = "Branding.LogoFileId";
     }
 
+    public static class Api
+    {
+        /// <summary>Requests a minute an API client may make when it has no limit of its own.</summary>
+        public const string DefaultRequestsPerMinute = "Api.DefaultRequestsPerMinute";
+
+        /// <summary>The longest an API key may be valid; keys can't be made to last forever.</summary>
+        public const string KeyLifetimeDays = "Api.KeyLifetimeDays";
+
+        /// <summary>How long a response is kept for replay under its Idempotency-Key.</summary>
+        public const string IdempotencyHours = "Api.IdempotencyHours";
+    }
+
     public static class Subscriptions
     {
         /// <summary>Days a past-due subscription keeps access before it is suspended.</summary>

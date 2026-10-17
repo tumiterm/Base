@@ -1,6 +1,7 @@
 using System.Threading.RateLimiting;
 using Base.Application.Common.Abstractions;
 using Base.Infrastructure.Jobs;
+using Base.Web.Api;
 using Base.Web.Errors;
 using Base.Web.Http;
 using Base.Web.Security;
@@ -16,7 +17,6 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
-using Scalar.AspNetCore;
 using Serilog;
 
 namespace Base.Web;
@@ -24,6 +24,7 @@ namespace Base.Web;
 internal static class WebApplicationExtensions
 {
     public const string AuthRateLimitPolicy = "auth";
+    private const string SmartScheme = "Smart";
 
     public static IServiceCollection AddWeb(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
@@ -35,9 +36,9 @@ internal static class WebApplicationExtensions
 
         services.AddControllersWithViews(options =>
             {
-                // Every unsafe request (POST/PUT/PATCH/DELETE) needs an antiforgery token, API calls included,
-                // because the API is authenticated by the same cookie. site.js sends it as a header.
-                options.Filters.Add(new AutoValidateAntiforgeryTokenAttribute());
+                // Every unsafe request (POST/PUT/PATCH/DELETE) authenticated by cookie needs an antiforgery token, API
+                // calls included; site.js sends it as a header. API-key calls carry no cookie and are exempt.
+                options.Filters.Add<AntiforgeryUnlessApiKeyFilter>();
             })
             // Enums travel as names ("Sms", "Sent"), not numbers, so API consumers read and send them as words.
             .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
@@ -75,13 +76,20 @@ internal static class WebApplicationExtensions
             }
         });
 
-        services.AddOpenApi();
+        services.AddApiHardening(configuration, environment);
         return services;
     }
 
     private static void AddAuth(IServiceCollection services, CookieSecurePolicy cookieSecurity)
     {
-        services.AddAuthentication(IdentityConstants.ApplicationScheme).AddIdentityCookies();
+        // The sign-in cookie, or an API key on /api: a policy scheme picks per request.
+        services.AddAuthentication(SmartScheme)
+            .AddPolicyScheme(SmartScheme, "Cookie or API key", o => o.ForwardDefaultSelector = context =>
+                ApiKeyAuthenticationHandler.KeyFrom(context.Request) is not null && context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)
+                    ? ApiKeyAuthenticationHandler.SchemeName
+                    : IdentityConstants.ApplicationScheme)
+            .AddScheme<AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(ApiKeyAuthenticationHandler.SchemeName, null)
+            .AddIdentityCookies();
         services.ConfigureApplicationCookie(options =>
         {
             options.Cookie.Name = "base.auth";
@@ -148,21 +156,23 @@ internal static class WebApplicationExtensions
         app.MapStaticAssets().AllowAnonymous(); // the fallback policy would otherwise send the sign-in page unstyled
 
         app.UseRouting();
-        app.UseRateLimiter();
+        if (app.Services.GetRequiredService<IOptions<ApiOptions>>().Value.AllowedOrigins.Count > 0)
+        {
+            app.UseCors(ApiExtensions.CorsPolicy);
+        }
+
         app.UseMiddleware<TenantResolutionMiddleware>();
         app.UseAuthentication();
+        app.UseRateLimiter(); // after authentication: limits are per API client or person, not just per IP
         app.UseMiddleware<SubscriptionGateMiddleware>();
         app.UseAuthorization();
+        app.UseMiddleware<IdempotencyMiddleware>();
 
         app.MapBranding();
         app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false }).AllowAnonymous();
         app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = c => c.Tags.Contains("ready") }).AllowAnonymous();
 
-        if (app.Environment.IsDevelopment())
-        {
-            app.MapOpenApi().AllowAnonymous();
-            app.MapScalarApiReference().AllowAnonymous();
-        }
+        app.MapApiDocumentation();
 
         var hangfire = app.Services.GetRequiredService<IOptions<HangfireOptions>>().Value;
         if (hangfire.Enabled)

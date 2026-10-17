@@ -7,6 +7,7 @@ cross-cutting feature or adding a package:
 - [docs/base-project-blueprint.md](docs/base-project-blueprint.md): what was kept from FO16, and what is banned
 - [docs/ui-design-direction.md](docs/ui-design-direction.md): the minimum bar for every screen (read before any UI work)
 - [docs/vertical-slice.md](docs/vertical-slice.md): a new module copies the People sample, file by file
+- [docs/api.md](docs/api.md): API keys, idempotency, limits, versions and CORS
 
 ## Commands
 
@@ -40,6 +41,10 @@ cross-cutting feature or adding a package:
   action). Never check plan codes or prices in code. Tenants are created through `ITenantAdministration`,
   subscriptions changed through `ISubscriptionService` (payments come from outside; no gateway in the base).
 - New setting = constant in `SettingCodes` + `SettingCatalog` entry (no migration). Secrets are never settings.
+- API controllers are `[ApiController]` under `api/...`, gated by `[HasPermission]` (API clients carry permissions
+  too), return problem details through `ToActionResult`, and are version 1.0 unless marked `[ApiVersion]`. Never read a
+  key or token from the query string, never add per-endpoint auth: callers are a person (cookie) or an `ApiClient`
+  (key). `Idempotency-Key` retries are handled by middleware; endpoints need nothing for it.
 - Pick-lists (titles, departments, reasons...) are lookup lists: constant in `LookupLists` + `LookupCatalog` entry with
   defaults. Records store the code; validate with `ILookupService.EnsureValidAsync`, render with `asp-lookup` /
   `data-combobox` / `_LookupChips`, label with `LookupLabels`. Never a table or enum per list, never ids in code.

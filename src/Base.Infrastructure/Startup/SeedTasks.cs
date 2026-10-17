@@ -218,6 +218,7 @@ internal sealed class SamplePlansSeedTask(AppDbContext db, IOptions<SeedOptions>
         plan.SetEntitlement(FeatureCodes.Documents, 1);
         plan.SetEntitlement(FeatureCodes.DataExchange, dataExchange ? 1 : 0);
         plan.SetEntitlement(FeatureCodes.CustomBranding, branding ? 1 : 0);
+        plan.SetEntitlement(FeatureCodes.Api, branding ? 1 : 0);
         plan.SetEntitlement(LimitCodes.Users, users);
         plan.SetEntitlement(LimitCodes.StorageMb, storageMb);
         return plan;

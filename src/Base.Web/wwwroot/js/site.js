@@ -392,3 +392,27 @@ document.querySelectorAll('.drop-zone').forEach((zone) => {
 
     document.querySelectorAll('[data-autosubmit]').forEach((control) => control.addEventListener('change', () => control.form?.requestSubmit()));
 })();
+
+// Copy-to-clipboard: <button data-copy="#element-id">, with a "Copied" confirmation on the button.
+(() => {
+    document.querySelectorAll('[data-copy]').forEach((button) => button.addEventListener('click', async () => {
+        const source = document.querySelector(button.dataset.copy);
+        if (!source || !navigator.clipboard) return;
+        await navigator.clipboard.writeText(source.textContent.trim());
+        const label = button.querySelector('[data-copy-label]');
+        if (label) {
+            const original = label.textContent;
+            label.textContent = 'Copied';
+            setTimeout(() => { label.textContent = original; }, 2000);
+        }
+    }));
+})();
+
+// A drawer or dialog that must open when the page loads (e.g. its form came back with errors).
+(() => {
+    document.querySelectorAll('[data-open-on-load="true"]').forEach((el) => {
+        if (!window.bootstrap) return;
+        const Kind = el.classList.contains('offcanvas') ? window.bootstrap.Offcanvas : window.bootstrap.Modal;
+        Kind.getOrCreateInstance(el).show();
+    });
+})();

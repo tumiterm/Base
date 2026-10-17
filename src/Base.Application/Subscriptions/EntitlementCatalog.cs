@@ -13,6 +13,7 @@ public static class FeatureCodes
     public const string Documents = "Feature.Documents";
     public const string DataExchange = "Feature.DataExchange";
     public const string CustomBranding = "Feature.CustomBranding";
+    public const string Api = "Feature.Api";
 }
 
 /// <summary>Limits a plan sets. Same rule as features: each one is enforced somewhere.</summary>
@@ -51,6 +52,7 @@ public static class EntitlementCatalog
         new(FeatureCodes.Documents, "Documents", EntitlementKind.Feature, "Versioned documents, generation from templates.", 1),
         new(FeatureCodes.DataExchange, "Import & export", EntitlementKind.Feature, "Excel and CSV exports of lists, and file imports.", 1),
         new(FeatureCodes.CustomBranding, "Custom branding", EntitlementKind.Feature, "Own accent colour, logo and default theme.", 0),
+        new(FeatureCodes.Api, "API access", EntitlementKind.Feature, "Other systems can call the API with API keys.", 0),
         new(LimitCodes.Users, "Users", EntitlementKind.Limit, "User accounts, invited or active.", 5),
         new(LimitCodes.StorageMb, "File storage", EntitlementKind.Limit, "Total size of stored files.", 1024, "MB", 1024L * 1024L),
     ];

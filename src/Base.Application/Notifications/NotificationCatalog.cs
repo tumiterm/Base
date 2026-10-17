@@ -25,6 +25,11 @@ public static class NotificationTemplates
         public const string StatusChanged = "Subscriptions.StatusChanged";
     }
 
+    public static class Integrations
+    {
+        public const string ApiKeyExpiring = "Integrations.ApiKeyExpiring";
+    }
+
     public static class DataExchange
     {
         public const string ExportReady = "DataExchange.ExportReady";
@@ -95,6 +100,9 @@ public static class NotificationCatalog
             "A large export finished in the background (or failed).", [NotificationChannel.InApp], ["Export", "Outcome"]),
         new(NotificationTemplates.DataExchange.ImportFinished, "Import finished", NotificationCategories.Activity,
             "An import finished applying, with how many rows went in.", [NotificationChannel.InApp], ["Import", "Outcome"]),
+        new(NotificationTemplates.Integrations.ApiKeyExpiring, "API key expiring", NotificationCategories.Security,
+            "Tells whoever created an API client that its key expires in two weeks, so an integration doesn't stop without warning.",
+            [NotificationChannel.Email, NotificationChannel.InApp], ["ClientName", "ExpiresOn"], IsMandatory: true),
         new(NotificationTemplates.Subscriptions.TrialEnding, "Trial ending", NotificationCategories.Billing,
             "Tells the organisation's contact that the trial ends soon.", [NotificationChannel.Email], ["PlanName", "EndsOn"], IsMandatory: true),
         new(NotificationTemplates.Subscriptions.StatusChanged, "Subscription status changed", NotificationCategories.Billing,

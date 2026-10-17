@@ -1,0 +1,82 @@
+@model ApiClientDetailsViewModel
+@{
+    var c = Model.Client;
+    ViewData["Title"] = c.Name;
+    var (tone, label) = ApiClientDisplay.State(c.State);
+    var revoked = c.State == Base.Application.Integrations.ApiClientState.Revoked;
+}
+<nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-action="Index">API clients</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">@c.Name</span></nav>
+<div class="page-header">
+    <div class="entity">
+        <span class="avatar avatar-lg avatar-square" aria-hidden="true"><icon name="key-round" /></span>
+        <div class="entity-text">
+            <h1 class="page-title">@c.Name <span class="badge text-bg-@tone">@label</span></h1>
+            <p class="page-subtitle font-monospace">@c.MaskedKey</p>
+        </div>
+    </div>
+    @if (!revoked)
+    {
+        <div class="page-actions">
+            <button class="btn btn-secondary" type="button" data-bs-toggle="modal" data-bs-target="#rotate-dialog"><icon name="refresh-cw" class="icon-sm" /> Rotate key</button>
+            <button class="btn btn-outline-danger" type="button" data-bs-toggle="modal" data-bs-target="#revoke-dialog"><icon name="ban" class="icon-sm" /> Revoke</button>
+        </div>
+    }
+</div>
+
+<div class="detail-grid">
+    <form method="post" asp-action="Details" asp-route-id="@c.Id" class="panel">
+        <div class="panel-header"><h2 class="panel-title">Settings</h2></div>
+        <fieldset class="panel-body" disabled="@revoked">
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+            <partial name="_ApiClientFields" model="(Model.Form, false)" />
+        </fieldset>
+        @if (!revoked)
+        {
+            <div class="panel-footer d-flex justify-content-end"><button class="btn btn-primary" type="submit"><icon name="check" class="icon-sm" /> Save</button></div>
+        }
+    </form>
+    <aside class="stack">
+        <section class="panel">
+            <div class="panel-header"><h2 class="panel-title">Key</h2></div>
+            <div class="panel-body">
+                <dl class="kv">
+                    <dt>Expires</dt><dd><local-time value="c.ExpiresAt" format="d MMMM yyyy" /></dd>
+                    <dt>Last used</dt><dd>@if (c.LastUsedAt is { } used) {<local-time value="used" />} else {<text>Never</text>}</dd>
+                    @if (c.RevokedAt is { } at) {<dt>Revoked</dt><dd><local-time value="at" /></dd>}
+                    <dt>Created</dt><dd><local-time value="c.DateCreated" format="d MMM yyyy" /> by @(c.UserCreated ?? "System")</dd>
+                </dl>
+            </div>
+            <div class="panel-footer small text-muted">Its calls appear in the audit trail as "API: @c.Name".</div>
+        </section>
+    </aside>
+</div>
+
+@if (!revoked)
+{
+    <div class="modal fade" id="rotate-dialog" tabindex="-1" aria-labelledby="rotate-title" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <form class="modal-content" method="post" asp-action="Rotate" asp-route-id="@c.Id">
+                <div class="modal-header"><h2 class="modal-title" id="rotate-title">Rotate the key</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body stack">
+                    <p class="text-muted mb-0">A new key is issued and the current one stops working immediately. Have the other system ready to take the new key.</p>
+                    <div class="segmented" role="radiogroup" aria-label="New key lifetime">
+                        @foreach (var days in ApiClientForm.LifetimeChoices.Where(d => d <= Model.Form.MaxLifetimeDays))
+                        {
+                            <input type="radio" name="expiresInDays" id="rot-@days" value="@days" checked="@(days == 90)" /><label for="rot-@days">@(days == 365 ? "1 year" : days + " days")</label>
+                        }
+                    </div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" type="submit">Rotate and show key</button></div>
+            </form>
+        </div>
+    </div>
+    <div class="modal fade" id="revoke-dialog" tabindex="-1" aria-labelledby="revoke-title" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <form class="modal-content" method="post" asp-action="Revoke" asp-route-id="@c.Id">
+                <div class="modal-header"><h2 class="modal-title" id="revoke-title">Revoke @c.Name?</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body"><p class="text-muted mb-0">Its key stops working at once and can't be restored. The system using it will get 401 until it's given a new client.</p></div>
+                <div class="modal-footer"><button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button><button class="btn btn-danger" type="submit">Revoke</button></div>
+            </form>
+        </div>
+    </div>
+}

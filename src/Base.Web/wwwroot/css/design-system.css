@@ -727,3 +727,9 @@ dl dt { color: var(--text-3); font-weight: 500; font-size: var(--text-sm); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; scroll-behavior: auto !important; }
 }
+
+/* ---------- Secrets shown once, and code samples ---------- */
+.key-value { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); padding: var(--s-3); border: 1px dashed var(--border-strong); border-radius: var(--radius); background: var(--surface-sunken); }
+.key-value code { flex: 1 1 18rem; min-width: 0; overflow-wrap: anywhere; color: var(--text); font-size: var(--text-md); user-select: all; }
+.code-sample { padding: var(--s-3); border-radius: var(--radius); background: var(--surface-sunken); border: 1px solid var(--border); color: var(--text-2); font-size: var(--text-sm); white-space: pre-wrap; overflow-wrap: anywhere; }
+.key-value code, .code-sample code { padding: 0; border: 0; background: none; }
