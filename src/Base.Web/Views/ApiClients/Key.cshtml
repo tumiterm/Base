@@ -21,8 +21,8 @@
             <div>Anyone with this key can act with the client's permissions. Don't put it in source code, chat or email; keep it in a secret store and send it only over HTTPS.</div>
         </div>
         <div>
-            <div class="form-label">Use it like this</div>
-            <pre class="code-sample mb-0"><code>curl -H "Authorization: Bearer @Model.Key.Key" \
+            <div class="form-label">Use it like this, with the key in <code>BASE_API_KEY</code></div>
+            <pre class="code-sample mb-0"><code>curl -H "X-Api-Key: $BASE_API_KEY" \
      -H "Idempotency-Key: $(uuidgen)" \
      @(Context.Request.Scheme)://@(Context.Request.Host)/api/people</code></pre>
         </div>
