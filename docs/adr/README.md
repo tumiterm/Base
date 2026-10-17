@@ -16,3 +16,4 @@ otherwise have to reverse-engineer. Format: context → decision → consequence
 | [0009](0009-invite-only-onboarding-and-escalation-guard.md) | Invite-only onboarding, escalation guard, NIST passwords |
 | [0010](0010-audit-trail-in-the-same-transaction.md) | Audit trail written by an interceptor in the same transaction |
 | [0011](0011-notifications.md) | One notification service, pluggable providers, outbox delivery |
+| [0012](0012-documents-and-capped-database-storage.md) | Documents on top of files, capped database storage, engine-free generation |

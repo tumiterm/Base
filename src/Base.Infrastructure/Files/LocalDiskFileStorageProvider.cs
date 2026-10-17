@@ -7,7 +7,7 @@ internal sealed class LocalDiskFileStorageProvider(string rootPath) : IFileStora
 {
     private readonly string _root = Path.GetFullPath(rootPath);
 
-    public string Name => "LocalDisk";
+    public string Name => FileStorageProviderNames.LocalDisk;
 
     public async Task UploadAsync(string objectKey, Stream content, string contentType, CancellationToken cancellationToken = default)
     {

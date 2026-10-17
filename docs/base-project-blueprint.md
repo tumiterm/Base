@@ -317,3 +317,7 @@ redaction, append-only entries, tenant isolation, retention, the `/admin/audit` 
 **Round 5 (Oct 2026): notifications.** Email, SMS, WhatsApp and in-app behind one service. Pluggable providers
 (SMTP, SendGrid, Twilio, Clickatell, BulkSMS, Meta). Channels switched on individually. Outbox delivery with retry
 and fallback, preferences, file templates with tenant overrides, delivery log, inbox (ADR 0011).
+
+**Round 6 (Oct 2026): documents.** Versioned documents with types, tags, links to any record, Draft → Final → Archived
+and per-type retention; generation from HTML templates (HTML built in, PDF via Gotenberg); a capped database storage
+provider per category; upload-check hook with ClamAV; purge of deleted files (ADR 0012).

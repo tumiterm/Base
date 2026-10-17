@@ -3,11 +3,13 @@ using Amazon.S3;
 using Azure.Storage.Blobs;
 using Base.Application.Common.Abstractions;
 using Base.Application.Common.Persistence;
+using Base.Application.Documents.Generation;
 using Base.Application.Files;
 using Base.Application.Messaging;
 using Base.Application.Notifications;
 using Base.Application.Users;
 using Base.Infrastructure.Auditing;
+using Base.Infrastructure.Documents;
 using Base.Infrastructure.Files;
 using Base.Infrastructure.Identity;
 using Base.Infrastructure.Jobs;
@@ -54,6 +56,7 @@ public static class DependencyInjection
         AddIdentityCore(services);
         AddFileStorage(services, configuration, environment);
         AddNotifications(services);
+        AddDocuments(services, configuration);
         AddHangfire(services, configuration, connectionString);
 
         services.AddScoped<ITenantContext, TenantContext>();
@@ -202,6 +205,16 @@ public static class DependencyInjection
             services.AddSingleton<IFileStorageProvider>(new LocalDiskFileStorageProvider(fullRoot));
         }
 
+        services.AddHostedService<FileRetentionService>();
+
+        if (!string.IsNullOrWhiteSpace(configuration[ClamAvOptions.SectionName + ":" + nameof(ClamAvOptions.Host)]))
+        {
+            services.AddOptions<ClamAvOptions>().BindConfiguration(ClamAvOptions.SectionName).ValidateDataAnnotations().ValidateOnStart();
+            services.AddScoped<IFileUploadCheck, ClamAvUploadCheck>();
+        }
+
+        // Always available, used only for the categories Files.CategoryProviders sends to it (capped by settings).
+        services.AddSingleton<IFileStorageProvider, DatabaseFileStorageProvider>();
         services.AddSingleton<IFileStorageProviderResolver, FileStorageProviderResolver>();
     }
 
@@ -215,6 +228,23 @@ public static class DependencyInjection
         services.AddScoped<IEmailSender, NotificationEmailSender>();
         services.AddScoped<IStartupTask, NotificationConfigurationCheck>();
         services.AddHostedService<NotificationRetentionService>();
+    }
+
+    private static void AddDocuments(IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddHostedService<DocumentRetentionService>();
+
+        var gotenberg = configuration.GetSection(GotenbergOptions.SectionName).Get<GotenbergOptions>();
+        if (gotenberg?.BaseUrl is { } baseUrl)
+        {
+            services.AddOptions<GotenbergOptions>().BindConfiguration(GotenbergOptions.SectionName).ValidateDataAnnotations().ValidateOnStart();
+            services.AddHttpClient(GotenbergPdfRenderer.HttpClientName, client =>
+            {
+                client.BaseAddress = baseUrl;
+                client.Timeout = TimeSpan.FromSeconds(gotenberg.TimeoutSeconds);
+            });
+            services.AddSingleton<IDocumentRenderer, GotenbergPdfRenderer>();
+        }
     }
 
     private static void AddHangfire(IServiceCollection services, IConfiguration configuration, string connectionString)

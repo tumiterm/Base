@@ -32,7 +32,12 @@ cross-cutting feature or adding a package:
 - Use cases return `ValidationResponse`/`ValidationResponse<T>`; Web maps them with `ToActionResult` / `AddToModelState`.
 - New permission = constant in `PermissionCodes` + `PermissionCatalog` entry; gate with `[HasPermission]`.
   New setting = constant in `SettingCodes` + `SettingCatalog` entry (no migration). Secrets are never settings.
-- Files only through `IFileService`: bytes go to object storage, never SQL.
+- Files only through `IFileService`: bytes go to object storage. The `Database` provider is only for small files in chosen
+  categories (`Files.CategoryProviders`), capped by the `Files.Database.*` settings; it can't be the default. Extra
+  upload checks (virus scanning, ...) implement `IFileUploadCheck`.
+- Documents (titled, versioned, linked to any record) go through `IDocumentService`. New document type = constant in
+  `DocumentTypes` + `DocumentTypeCatalog` entry; new generated document = constant in `DocumentTemplates` + catalogue
+  entry + `Documents/Templates/{Code}.html`. Output formats are `IDocumentRenderer`s; no licensed engine in the base.
 - Notify people only through `INotificationService` (template code + recipient + data). New template = constant in
   `NotificationTemplates` + `NotificationCatalog` entry + `Notifications/Templates/{Code}.txt` (tests check they match).
   Templates containing secrets are `IsSensitive` (sent at once, stored without content). Providers are configured

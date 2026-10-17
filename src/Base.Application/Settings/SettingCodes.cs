@@ -20,6 +20,17 @@ public static class SettingCodes
         public const string AllowedExtensions = "Files.AllowedExtensions";
         public const string DefaultProvider = "Files.DefaultProvider";
         public const string DownloadLinkMinutes = "Files.DownloadLinkMinutes";
+
+        /// <summary><c>category=Provider</c> pairs that send some categories somewhere other than the default provider.</summary>
+        public const string CategoryProviders = "Files.CategoryProviders";
+
+        /// <summary>Days a deleted (or expired) file is kept before its bytes are purged.</summary>
+        public const string DeletedRetentionDays = "Files.DeletedRetentionDays";
+
+        public const string DatabaseMaxFileSizeKb = "Files.Database.MaxFileSizeKb";
+
+        /// <summary>Total bytes one tenant may keep in the database provider; 0 means no limit.</summary>
+        public const string DatabaseTenantQuotaMb = "Files.Database.TenantQuotaMb";
     }
 
     public static class Audit

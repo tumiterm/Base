@@ -1,0 +1,24 @@
+@model LinkedDocumentsViewModel
+<section class="mb-4">
+    <h2 class="h5">Documents</h2>
+    @if (Model.Documents.Count == 0)
+    {
+        <p class="text-muted small">No documents yet.</p>
+    }
+    else
+    {
+        <ul class="list-group mb-3">
+            @foreach (var d in Model.Documents)
+            {
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <a asp-controller="Documents" asp-action="Details" asp-route-id="@d.Id">@d.Title</a>
+                    <span><partial name="~/Views/Documents/_StatusBadge.cshtml" model="d.Status" /> <span class="small text-muted">v@(d.CurrentVersion)</span></span>
+                </li>
+            }
+        </ul>
+    }
+    @if (Model.CanCreate)
+    {
+        <partial name="~/Views/Documents/_UploadForm.cshtml" model="((string?)Model.EntityType, (string?)Model.EntityId, (string?)(Context.Request.Path + Context.Request.QueryString))" />
+    }
+</section>

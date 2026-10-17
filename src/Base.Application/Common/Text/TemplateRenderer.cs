@@ -1,7 +1,7 @@
 using System.Net;
 using System.Text.RegularExpressions;
 
-namespace Base.Application.Notifications;
+namespace Base.Application.Common.Text;
 
 /// <summary>
 /// Fills <c>{{ Variable }}</c> placeholders. Deliberately tiny: no logic in templates. Values are HTML-encoded in HTML

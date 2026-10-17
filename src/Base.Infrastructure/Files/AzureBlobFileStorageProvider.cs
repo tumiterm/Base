@@ -7,7 +7,7 @@ namespace Base.Infrastructure.Files;
 
 internal sealed class AzureBlobFileStorageProvider(BlobContainerClient container, TimeProvider time) : IFileStorageProvider
 {
-    public string Name => "AzureBlob";
+    public string Name => FileStorageProviderNames.AzureBlob;
 
     public async Task UploadAsync(string objectKey, Stream content, string contentType, CancellationToken cancellationToken = default)
     {

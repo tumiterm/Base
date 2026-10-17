@@ -1,0 +1,109 @@
+@model Base.Application.Documents.DocumentDetails
+@using Base.Application.Documents
+@using Base.Domain.Documents
+@{
+    ViewData["Title"] = Model.Title;
+    var editable = Model.Can.Edit && Model.Status != DocumentStatus.Archived;
+}
+<nav class="mb-2"><a asp-action="Index">&larr; Documents</a></nav>
+<div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+        <h1 class="h3 mb-1">@Model.Title <partial name="_StatusBadge" model="Model.Status" /></h1>
+        <div class="text-muted small">
+            @(DocumentTypeCatalog.Find(Model.DocumentType)?.Name ?? Model.DocumentType)
+            @if (Model.LinkedEntityType is not null) { <span>· linked to @Model.LinkedEntityType @Model.LinkedEntityId</span> }
+            · created by @Model.UserCreated <local-time value="@Model.DateCreated" />
+        </div>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-primary" asp-action="Download" asp-route-id="@Model.Id">Download v@(Model.CurrentVersion)</a>
+        @if (Model.Can.Edit && Model.Status == DocumentStatus.Draft)
+        {
+            <form asp-action="ChangeStatus" asp-route-id="@Model.Id" asp-route-change="finalize" method="post"><button class="btn btn-outline-success" type="submit">Finalise</button></form>
+        }
+        @if (Model.Can.Manage && Model.Status == DocumentStatus.Final)
+        {
+            <form asp-action="ChangeStatus" asp-route-id="@Model.Id" asp-route-change="reopen" method="post"><button class="btn btn-outline-secondary" type="submit">Reopen</button></form>
+        }
+        @if (Model.Can.Manage && Model.Status != DocumentStatus.Archived)
+        {
+            <form asp-action="ChangeStatus" asp-route-id="@Model.Id" asp-route-change="archive" method="post"><button class="btn btn-outline-secondary" type="submit">Archive</button></form>
+        }
+        @if (Model.Can.Manage && Model.Status == DocumentStatus.Archived)
+        {
+            <form asp-action="ChangeStatus" asp-route-id="@Model.Id" asp-route-change="restore" method="post"><button class="btn btn-outline-secondary" type="submit">Restore</button></form>
+        }
+        @if (Model.Can.Edit)
+        {
+            <form asp-action="Delete" asp-route-id="@Model.Id" method="post" class="confirm-submit" data-confirm="Delete this document and all its versions?"><button class="btn btn-outline-danger" type="submit">Delete</button></form>
+        }
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-5">
+        <h2 class="h5">Details</h2>
+        @if (editable)
+        {
+            <form asp-action="Update" asp-route-id="@Model.Id" method="post">
+                <div class="mb-2"><label class="form-label small" for="title">Title</label><input class="form-control" id="title" name="title" value="@Model.Title" maxlength="200" required /></div>
+                <div class="mb-2"><label class="form-label small" for="description">Description</label><textarea class="form-control" id="description" name="description" rows="3" maxlength="2000">@Model.Description</textarea></div>
+                <div class="mb-2"><label class="form-label small" for="tags">Tags</label><input class="form-control" id="tags" name="tags" value="@string.Join(", ", Model.Tags)" /></div>
+                <button class="btn btn-outline-primary" type="submit">Save details</button>
+            </form>
+        }
+        else
+        {
+            <dl>
+                <dt>Description</dt><dd>@(Model.Description ?? "—")</dd>
+                <dt>Tags</dt><dd>@(Model.Tags.Count == 0 ? "—" : string.Join(", ", Model.Tags))</dd>
+                @if (Model.FinalizedAt is { } finalized) { <dt>Finalised</dt><dd><local-time value="@finalized" /></dd> }
+                @if (Model.ArchivedAt is { } archived) { <dt>Archived</dt><dd><local-time value="@archived" /></dd> }
+            </dl>
+        }
+    </div>
+    <div class="col-lg-7">
+        <h2 class="h5">Versions</h2>
+        <table class="table table-sm align-top">
+            <thead><tr><th>#</th><th>File</th><th>Source</th><th>Added</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var v in Model.Versions)
+                {
+                    <tr>
+                        <td>v@(v.Number)</td>
+                        <td class="text-break">@v.FileName<div class="small text-muted">@Size(v.SizeBytes) @if (v.Comment is not null) { <span>· @v.Comment</span> }</div></td>
+                        <td class="small">@(v.Source == DocumentSource.Generated ? $"Generated ({v.TemplateCode})" : "Uploaded")</td>
+                        <td class="small text-nowrap">@v.CreatedBy<div><local-time value="@v.CreatedAt" /></div></td>
+                        <td><a class="btn btn-sm btn-outline-secondary" asp-action="Download" asp-route-id="@Model.Id" asp-route-version="@v.Number">Download</a></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        @if (Model.Can.Edit && Model.Status == DocumentStatus.Draft)
+        {
+            <form asp-action="AddVersion" asp-route-id="@Model.Id" method="post" enctype="multipart/form-data" class="card card-body">
+                <div class="drop-zone mb-2">
+                    <input class="form-control" type="file" name="file" id="version-file" required />
+                    <div class="drop-zone-hint small text-muted">or drop the new version here</div>
+                </div>
+                <div class="mb-2"><label class="form-label small" for="comment">What changed</label><input class="form-control" id="comment" name="comment" maxlength="500" /></div>
+                <div><button class="btn btn-outline-primary" type="submit">Upload new version</button></div>
+            </form>
+        }
+        else if (Model.Status == DocumentStatus.Final)
+        {
+            <p class="text-muted small">Final documents are locked. @(Model.Can.Manage ? "Reopen it to add a version." : "")</p>
+        }
+    </div>
+</div>
+@functions {
+    private static string Size(long bytes)
+    {
+        if (bytes < 1024)
+        {
+            return $"{bytes} bytes";
+        }
+
+        return bytes < 1024 * 1024 ? $"{bytes / 1024.0:0.#} KB" : $"{bytes / 1024.0 / 1024.0:0.#} MB";
+    }
+}

@@ -1,0 +1,68 @@
+@model DocumentListViewModel
+@using Base.Application.Documents
+@using Base.Domain.Documents
+@{
+    ViewData["Title"] = "Documents";
+    var results = Model.Documents;
+    var f = Model.Filter;
+}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">Documents</h1>
+    @if (Model.CanCreate)
+    {
+        <a class="btn btn-outline-primary" asp-action="Generate">Generate from a template</a>
+    }
+</div>
+@if (Model.CanCreate)
+{
+    <partial name="_UploadForm" model="((string?)null, (string?)null, (string?)null)" />
+}
+<form method="get" class="row g-2 align-items-end mb-3">
+    <div class="col-md-3"><label class="form-label small" for="Search">Title</label><input class="form-control" id="Search" name="Search" value="@f.Search" /></div>
+    <div class="col-md-2">
+        <label class="form-label small" for="Type">Type</label>
+        <select class="form-select" id="Type" name="Type">
+            <option value="">All</option>
+            @foreach (var t in DocumentTypeCatalog.All) { <option value="@t.Code" selected="@(t.Code == f.Type)">@t.Name</option> }
+        </select>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label small" for="Status">Status</label>
+        <select class="form-select" id="Status" name="Status">
+            <option value="">Not archived</option>
+            @foreach (var s in Enum.GetValues<DocumentStatus>()) { <option value="@s" selected="@(s == f.Status)">@s</option> }
+        </select>
+    </div>
+    <div class="col-md-2"><label class="form-label small" for="Tag">Tag</label><input class="form-control" id="Tag" name="Tag" value="@f.Tag" /></div>
+    <div class="col-md-3 d-flex gap-2"><button class="btn btn-primary" type="submit">Filter</button><a class="btn btn-link" asp-action="Index">Clear</a></div>
+</form>
+@if (results.Total == 0)
+{
+    <p class="text-muted">No documents match.</p>
+}
+else
+{
+    <table class="table align-middle">
+        <thead><tr><th>Title</th><th>Type</th><th>Status</th><th>Version</th><th>Linked to</th><th>Updated</th></tr></thead>
+        <tbody>
+            @foreach (var d in results.Items)
+            {
+                <tr>
+                    <td><a asp-action="Details" asp-route-id="@d.Id">@d.Title</a>@foreach (var tag in d.Tags) { <span class="badge text-bg-light ms-1">@tag</span> }</td>
+                    <td>@(DocumentTypeCatalog.Find(d.DocumentType)?.Name ?? d.DocumentType)</td>
+                    <td><partial name="_StatusBadge" model="d.Status" /></td>
+                    <td>v@(d.CurrentVersion)</td>
+                    <td class="small">@if (d.LinkedEntityType is not null) { @($"{d.LinkedEntityType} {d.LinkedEntityId}") }</td>
+                    <td class="text-nowrap small"><local-time value="@d.DateModified" /></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <nav class="d-flex justify-content-between">
+        <span class="text-muted small">@results.Total document(s), page @results.Page of @results.TotalPages</span>
+        <div class="btn-group">
+            <a class="btn btn-outline-secondary btn-sm @(results.HasPrevious ? "" : "disabled")" asp-route-Page="@(results.Page - 1)" asp-route-Search="@f.Search" asp-route-Type="@f.Type" asp-route-Status="@f.Status" asp-route-Tag="@f.Tag">Previous</a>
+            <a class="btn btn-outline-secondary btn-sm @(results.HasNext ? "" : "disabled")" asp-route-Page="@(results.Page + 1)" asp-route-Search="@f.Search" asp-route-Type="@f.Type" asp-route-Status="@f.Status" asp-route-Tag="@f.Tag">Next</a>
+        </div>
+    </nav>
+}

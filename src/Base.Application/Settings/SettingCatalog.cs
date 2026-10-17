@@ -1,4 +1,5 @@
 using System.Collections.Frozen;
+using Base.Application.Files;
 
 namespace Base.Application.Settings;
 
@@ -22,10 +23,22 @@ public static class SettingCatalog
         new(SettingCodes.Files.AllowedExtensions, "Allowed file types", SettingDataType.StringList, ".pdf,.png,.jpg,.jpeg,.docx,.xlsx", "Files",
             "Comma-separated extensions. Content is also checked against the file signature."),
         new(SettingCodes.Files.DefaultProvider, "Storage provider for new files", SettingDataType.String, "LocalDisk", "Files",
-            "Where new uploads are stored. Existing files stay readable from the provider they were written to.",
-            SettingScope.Platform, AllowedValues: ["LocalDisk", "S3", "AzureBlob"]),
+            "Where new uploads are stored. Existing files stay readable from the provider they were written to. The capped Database provider is chosen per category instead (Files.CategoryProviders).",
+            SettingScope.Platform, AllowedValues: [FileStorageProviderNames.LocalDisk, FileStorageProviderNames.S3, FileStorageProviderNames.AzureBlob]),
         new(SettingCodes.Files.DownloadLinkMinutes, "Download link lifetime (minutes)", SettingDataType.Integer, "5", "Files",
             "How long a pre-signed download link stays valid.", Min: 1, Max: 60),
+        new(SettingCodes.Files.CategoryProviders, "Storage provider per category", SettingDataType.StringList, null, "Files",
+            "Comma-separated category=Provider pairs, e.g. avatar=Database,signature=Database. Other categories use the default provider.",
+            SettingScope.Platform, IsRequired: false),
+        new(SettingCodes.Files.DeletedRetentionDays, "Keep deleted files (days)", SettingDataType.Integer, "30", "Files",
+            "Deleted and expired files can be restored for this long; then a daily job removes their content for good.",
+            SettingScope.Platform, Min: 1, Max: 3650),
+        new(SettingCodes.Files.DatabaseMaxFileSizeKb, "Database storage: largest file (KB)", SettingDataType.Integer, "1024", "Files",
+            "Files stored in the database provider may be at most this big. Larger files belong in blob storage.",
+            SettingScope.Platform, Min: 1, Max: 51200),
+        new(SettingCodes.Files.DatabaseTenantQuotaMb, "Database storage: quota per tenant (MB)", SettingDataType.Integer, "100", "Files",
+            "Total size of the files one tenant may keep in the database provider, including deleted files not yet purged. 0 = no limit.",
+            SettingScope.Platform, Min: 0, Max: 102400),
 
         new(SettingCodes.Audit.RetentionDays, "Audit retention (days)", SettingDataType.Integer, "730", "Audit",
             "Audit entries older than this are deleted by a daily job. Check your legal retention obligations first.",

@@ -22,6 +22,14 @@ public static partial class ObjectKeys
         return $"{tenantId:N}/{category}/{utc:yyyy}/{utc:MM}/{fileId:N}{ext}";
     }
 
+    /// <summary>The tenant a key belongs to (its first segment), or null for a key this class didn't build.</summary>
+    public static Guid? TenantOf(string objectKey)
+    {
+        ArgumentNullException.ThrowIfNull(objectKey);
+        var slash = objectKey.IndexOf('/', StringComparison.Ordinal);
+        return slash > 0 && Guid.TryParseExact(objectKey.AsSpan(0, slash), "N", out var tenantId) ? tenantId : null;
+    }
+
     public static bool IsValidCategory(string? category) => category is not null && SafeCategory().IsMatch(category);
 
     [GeneratedRegex("^[a-z0-9][a-z0-9-]{0,49}$", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 100)]

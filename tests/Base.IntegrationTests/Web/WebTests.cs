@@ -213,6 +213,61 @@ public sealed partial class WebTests(SqlServerFixture sql) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Documents_are_uploaded_generated_and_downloaded_through_the_api_and_pages()
+    {
+        var client = Client();
+        await SignInAsync(client);
+        var token = await GetMetaTokenAsync(client);
+        var pdf = "%PDF-1.7 web test"u8.ToArray();
+
+        using var form = new MultipartFormDataContent
+        {
+            { new ByteArrayContent(pdf), "File", "contract.pdf" },
+            { new StringContent("Contract"), "Title" },
+            { new StringContent("general"), "Type" },
+            { new StringContent("legal, signed"), "Tags" },
+        };
+        using var upload = new HttpRequestMessage(HttpMethod.Post, "/api/documents") { Content = form };
+        upload.Headers.Add("X-CSRF-TOKEN", token);
+        var created = await client.SendAsync(upload, TestContext.Current.CancellationToken);
+        created.StatusCode.ShouldBe(HttpStatusCode.Created, await created.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        var document = await created.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
+        var id = document.GetProperty("id").GetString();
+        document.GetProperty("status").GetString().ShouldBe("Draft");
+
+        (await client.GetByteArrayAsync($"/api/documents/{id}/download", TestContext.Current.CancellationToken)).ShouldBe(pdf);
+
+        using var generate = new HttpRequestMessage(HttpMethod.Post, "/api/documents/generate")
+        {
+            Content = JsonContent.Create(new
+            {
+                templateCode = "General.Letter",
+                format = "html",
+                data = new { RecipientName = "Ann", Subject = "Welcome", Body = "Hello" },
+                finalize = true,
+            }),
+        };
+        generate.Headers.Add("X-CSRF-TOKEN", token);
+        var generated = await client.SendAsync(generate, TestContext.Current.CancellationToken);
+        generated.StatusCode.ShouldBe(HttpStatusCode.Created, await generated.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+
+        var letters = await client.GetFromJsonAsync<JsonElement>("/api/documents?type=letter", TestContext.Current.CancellationToken);
+        letters.GetProperty("total").GetInt32().ShouldBe(1);
+        (await client.GetStringAsync("/api/documents/templates", TestContext.Current.CancellationToken)).ShouldContain("General.Letter");
+
+        foreach (var path in new[] { "/documents", $"/documents/{id}", "/documents/generate", "/documents/generate?template=General.Letter" })
+        {
+            var response = await client.GetAsync(path, TestContext.Current.CancellationToken);
+            response.StatusCode.ShouldBe(HttpStatusCode.OK, path);
+        }
+
+        var detailsPage = await client.GetStringAsync($"/documents/{id}", TestContext.Current.CancellationToken);
+        detailsPage.ShouldContain("contract.pdf");
+        detailsPage.ShouldContain($"href=\"/documents/{id}/download?version=1\"", customMessage: "pages link to pages, not the API");
+        (await client.GetStringAsync("/documents", TestContext.Current.CancellationToken)).ShouldContain("action=\"/documents\"");
+    }
+
+    [Fact]
     public async Task Password_pages_are_anonymous_and_set_password_is_never_cached()
     {
         var client = Client();

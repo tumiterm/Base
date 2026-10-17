@@ -27,6 +27,9 @@
                     <li class="nav-item" asp-permission="@PermissionCodes.Roles.Manage">
                         <a class="nav-link" asp-controller="RoleAdmin" asp-action="Index">Roles</a>
                     </li>
+                    <li class="nav-item" asp-permission="@PermissionCodes.Documents.Create">
+                        <a class="nav-link" asp-controller="Documents" asp-action="Index">Documents</a>
+                    </li>
                     <li class="nav-item" asp-permission="@PermissionCodes.Notifications.View">
                         <a class="nav-link" asp-controller="NotificationAdmin" asp-action="Index">Messages</a>
                     </li>

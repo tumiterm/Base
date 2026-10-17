@@ -149,6 +149,28 @@ configured provider under `{tenant}/{category}/{yyyy}/{MM}/{id}{ext}`; SQL store
 can't be saved, the object is deleted. Reads use the provider recorded on the file, check
 `IStoredFileAccessPolicy` (owner or `Files.ReadAll`), and redirect to a short-lived pre-signed URL when possible.
 
+The provider is chosen per category: `Files.CategoryProviders` (e.g. `avatar=Database`) wins over `Files.DefaultProvider`.
+The `Database` provider keeps bytes in `FileContents`, capped per file and per tenant by `Files.Database.*` settings (read
+on every upload, so changes apply at once). Before storing, each registered `IFileUploadCheck` runs in `Order`; ClamAV
+is one, registered when `FileScanning:ClamAv:Host` is set. Deletes are soft. A daily job purges files that have been
+deleted or expired for longer than `Files.DeletedRetentionDays`: it deletes the object first and the row second, so no
+bytes are ever orphaned.
+
+## Documents
+
+`IDocumentService` adds titles, types, tags, record links (`LinkedEntityType`/`LinkedEntityId`, no foreign key) and
+versions on top of files. Each version is a `StoredFile` with no owner, so it is reachable only through the document,
+whose `IDocumentAccessPolicy` decides: `Documents.View` reads everything, `Documents.Manage` does everything, and
+`Documents.Create` lets people work on their own drafts. The new file and the document row are saved in one
+`SaveAsync`; if it fails, the stored object is deleted. Final documents take no new versions until reopened. A daily
+job applies each `DocumentTypeCatalog` type's `ArchiveAfterDays` and `DeleteAfterDays` across tenants.
+
+`IDocumentGenerator` fills an HTML template from `Documents/Templates/{Code}.html` (values HTML-encoded, plus
+`AppName` and `Today`) and hands it to the `IDocumentRenderer` for the requested format. `html` is built in; `pdf` is
+`GotenbergPdfRenderer` when `Documents:Pdf:Gotenberg:BaseUrl` is set. The output is stored like an upload (size limit
+and checks apply, but not the upload allow-list) or returned for preview. `LinkedDocuments` is a view component that
+lists and uploads a record's documents on any page.
+
 ## Background work
 
 - **Outbox** (`OutboxProcessor`): due messages are claimed with an atomic lease, so several instances are safe.

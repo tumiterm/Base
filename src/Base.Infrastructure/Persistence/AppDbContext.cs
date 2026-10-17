@@ -1,9 +1,11 @@
 using Base.Application.Common.Abstractions;
 using Base.Domain.Auditing;
+using Base.Domain.Documents;
 using Base.Domain.Files;
 using Base.Domain.Notifications;
 using Base.Domain.Settings;
 using Base.Domain.Tenancy;
+using Base.Infrastructure.Files;
 using Base.Infrastructure.Identity;
 using Base.Infrastructure.Outbox;
 using Base.Infrastructure.Persistence.Conventions;
@@ -27,6 +29,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
     public DbSet<ApplicationSetting> ApplicationSettings => Set<ApplicationSetting>();
 
     public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
+
+    public DbSet<FileContent> FileContents => Set<FileContent>();
+
+    public DbSet<Document> Documents => Set<Document>();
+
+    public DbSet<DocumentVersion> DocumentVersions => Set<DocumentVersion>();
 
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 

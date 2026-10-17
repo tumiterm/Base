@@ -1,4 +1,5 @@
 using System.Reflection;
+using Base.Application.Common.Text;
 using Base.Application.Notifications;
 using Base.Domain.Notifications;
 

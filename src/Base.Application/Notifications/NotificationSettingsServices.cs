@@ -1,6 +1,7 @@
 using Base.Application.Common.Abstractions;
 using Base.Application.Common.Persistence;
 using Base.Application.Common.Results;
+using Base.Application.Common.Text;
 using Base.Domain.Notifications;
 
 namespace Base.Application.Notifications;
@@ -89,10 +90,10 @@ internal sealed class NotificationPreferences(IUnitOfWork unitOfWork, ICurrentUs
         return ValidationResponse.Success("Preference saved.");
     }
 
-    private static IEnumerable<(string Category, IReadOnlyList<NotificationChannel> Channels)> ChannelsByCategory() =>
+    private static IEnumerable<(string Category, List<NotificationChannel> Channels)> ChannelsByCategory() =>
         NotificationCatalog.All
             .GroupBy(t => t.Category, StringComparer.Ordinal)
-            .Select(g => (g.Key, (IReadOnlyList<NotificationChannel>)g.SelectMany(t => t.Channels.Concat(t.Fallback ?? [])).Distinct().Order().ToList()));
+            .Select(g => (g.Key, g.SelectMany(t => t.Channels.Concat(t.Fallback ?? [])).Distinct().Order().ToList()));
 }
 
 internal sealed class NotificationTemplateAdmin(IUnitOfWork unitOfWork) : INotificationTemplateAdmin

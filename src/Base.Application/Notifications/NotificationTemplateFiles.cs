@@ -54,12 +54,9 @@ public static class NotificationTemplateFiles
 
         void Flush()
         {
-            if (current is not null)
+            if (current is not null && !parts.TryAdd(current, string.Join('\n', buffer).Trim()))
             {
-                if (!parts.TryAdd(current, string.Join('\n', buffer).Trim()))
-                {
-                    throw new FormatException($"Template section '{current}' appears twice.");
-                }
+                throw new FormatException($"Template section '{current}' appears twice.");
             }
 
             buffer.Clear();

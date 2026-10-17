@@ -8,7 +8,7 @@ namespace Base.Infrastructure.Files;
 /// <summary>S3-compatible storage: AWS S3, Cloudflare R2 (no egress fees) and MinIO for local development.</summary>
 internal sealed class S3FileStorageProvider(IAmazonS3 client, string bucket, TimeProvider time) : IFileStorageProvider
 {
-    public string Name => "S3";
+    public string Name => FileStorageProviderNames.S3;
 
     public async Task UploadAsync(string objectKey, Stream content, string contentType, CancellationToken cancellationToken = default)
     {

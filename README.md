@@ -112,9 +112,16 @@ scripts/new-project.cs  Creates a renamed copy for a new project.
   in the interceptor. Single-tenant deployments run as one default tenant.
 - **Settings:** a typed, validated catalogue; tenant → platform → default resolution; HybridCache with tag
   invalidation; a seeder that never overwrites an administrator's value.
-- **Files:** the bytes go to object storage and SQL holds only a metadata row. Uploads are streamed with size
-  limits, signature (magic-byte) checks and SHA-256. Object keys never contain user input, every download goes
-  through an access check, and downloads use pre-signed URLs.
+- **Files:** the bytes go to object storage (S3-compatible, Azure Blob, local disk) and SQL holds only a metadata
+  row. The exception is a `Database` provider for small files in categories you choose, with a per-file size cap and a
+  per-tenant quota set in settings. Uploads are streamed with size limits, signature (magic-byte) checks and
+  SHA-256, plus any extra checks you register (ClamAV virus scanning is built in). Object keys never contain user
+  input, every download goes through an access check, downloads use pre-signed URLs, and deleted files are purged
+  after a retention period.
+- **Documents:** titled, typed, tagged documents with versions, Draft → Final → Archived, links to any record and
+  retention rules per type. There are screens at `/documents`, an API at `/api/documents`, and a `LinkedDocuments`
+  component you can drop onto any page. Documents can be generated from HTML templates: HTML is built in, PDF uses
+  Gotenberg, and you can plug in your own engine.
 - **Reliability:** transactional outbox (domain events saved with the change, dispatched with retries, backoff and
   dead-lettering, safe across instances); startup tasks; health probes (`/health/live`, `/health/ready`).
 - **Diagnostics:** ProblemDetails everywhere with a ticket number; correlation ids; redacted logging; throttled,
@@ -132,6 +139,8 @@ scripts/new-project.cs  Creates a renamed copy for a new project.
 | `Tenancy` | `MultiTenant`, `DefaultTenantCode`, `FallbackToDefaultTenant`. |
 | `FileStorage` | `LocalDisk`, `S3` (Bucket, ServiceUrl, Region, AccessKey, SecretKey, ForcePathStyle), `AzureBlob`. |
 | `Notifications` | Channels on/off and provider instances (see below). Default: email to the log, in-app on, SMS/WhatsApp off. |
+| `FileScanning:ClamAv` | `Host`, `Port`, `TimeoutSeconds`. Set `Host` to scan every upload with clamd (uploads are refused if it is down). |
+| `Documents:Pdf:Gotenberg` | `BaseUrl` (e.g. `http://gotenberg:3000/`), `TimeoutSeconds`. Set it to generate PDFs. |
 | `Outbox` | Poll interval, batch size, max attempts, retention. |
 | `Hangfire` | Optional job server and dashboard (`Enabled: false` by default). |
 | `Seed` | First administrator (`AdminEmail`; `AdminPassword` from user-secrets only). |
@@ -161,6 +170,17 @@ Keep the secrets in user-secrets or environment variables:
 Types: `Log`, `Smtp`, `SendGrid`, `TwilioSms`, `TwilioWhatsApp`, `Clickatell`, `BulkSms`, `MetaWhatsApp`. A switched-on
 channel that points at a missing provider stops startup with a message naming it. To add your own provider, implement
 `INotificationProvider` and register it in DI; its `Name` becomes a valid `Provider` value.
+
+### Storing files and generating PDFs
+
+- To keep a category's files in SQL Server, set the `Files.CategoryProviders` setting, for example
+  `avatar=Database,signature=Database`. The `Files.Database.MaxFileSizeKb` (default 1024) and
+  `Files.Database.TenantQuotaMb` (default 100, 0 = no limit) settings cap what it accepts. Every other category uses
+  `Files.DefaultProvider`.
+- For PDFs, run `docker compose --profile pdf up -d` and set `Documents:Pdf:Gotenberg:BaseUrl` to
+  `http://localhost:3000/`. Without it, generation offers HTML only. To use another engine, implement
+  `IDocumentRenderer` and register it.
+- For virus scanning, run `docker compose --profile scan up -d` and set `FileScanning:ClamAv:Host` to `localhost`.
 
 Set the `General.PublicBaseUrl` setting to the address users reach the app at: invite and reset emails link to it.
 It is a setting, not the request's `Host` header, so a forged header can't redirect those links.
