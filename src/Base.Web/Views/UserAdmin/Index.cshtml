@@ -1,66 +1,100 @@
 @model UserListViewModel
+@inject ICurrentUser CurrentUser
 @{
     ViewData["Title"] = "Users";
     var results = Model.Users;
+    var canManage = CurrentUser.HasPermission(PermissionCodes.Users.Manage);
 }
 <div class="page-header">
     <div>
         <h1 class="page-title">Users</h1>
-        <p class="page-subtitle">People with access to this organisation.</p>
+        <p class="page-subtitle">Everyone who can sign in to this organisation, and what they're allowed to do.</p>
     </div>
     <div class="page-actions">
         <partial name="_ExportButtons" model='new ExportButtonsViewModel("users", PermissionCodes.Users.View)' />
-        <a class="btn btn-outline-primary" asp-controller="Imports" asp-action="Index" asp-permission="@PermissionCodes.Users.Manage">Import</a>
-        <a class="btn btn-primary" asp-action="Invite" asp-permission="@PermissionCodes.Users.Manage">Invite user</a>
+        <a class="btn btn-secondary" asp-controller="Imports" asp-action="Index" asp-permission="@PermissionCodes.Users.Manage" asp-feature="@FeatureCodes.DataExchange"><icon name="upload" class="icon-sm" /> Import</a>
+        <a class="btn btn-primary" asp-action="Invite" asp-permission="@PermissionCodes.Users.Manage"><icon name="user-plus" class="icon-sm" /> Invite someone</a>
     </div>
 </div>
-<form method="get" class="mb-3" role="search">
-    <div class="input-group">
-        <input name="search" value="@Model.Search" class="form-control" placeholder="Search by name or email" aria-label="Search users" />
-        <button class="btn btn-outline-secondary" type="submit">Search</button>
-    </div>
-</form>
+
+<div class="toolbar">
+    <span class="text-muted small">@results.Total @(results.Total == 1 ? "person" : "people")</span>
+    <span class="toolbar-spacer"></span>
+    <form method="get" class="toolbar-search" role="search">
+        <label class="input-affix">
+            <icon name="search" class="icon-sm" />
+            <input class="form-control" type="search" name="search" value="@Model.Search" placeholder="Name or email" aria-label="Search users" />
+        </label>
+    </form>
+</div>
+
 @if (results.Total == 0)
 {
-    <p class="text-muted">No users match.</p>
+    <div class="empty-state">
+        <icon name="users" />
+        <div class="empty-state-title">@(Model.Search is null ? "Nobody here yet" : "Nobody matches")</div>
+        <p class="mb-2">@(Model.Search is null ? "Invite the first person; they'll set their own password." : "Try another name or email address.")</p>
+        @if (Model.Search is not null)
+        {
+            <a class="btn btn-secondary" asp-action="Index">Clear search</a>
+        }
+    </div>
 }
 else
 {
-    <table class="table table-hover align-middle">
+    <table class="table table-entity align-middle">
         <thead>
-            <tr><th>Name</th><th>Email</th><th>Roles</th><th>Status</th><th>Last sign-in</th></tr>
+            <tr><th>Name</th><th>Roles</th><th>Status</th><th>Last signed in</th><th><span class="visually-hidden">Actions</span></th></tr>
         </thead>
         <tbody>
             @foreach (var user in results.Items)
             {
+                var status = UserDisplay.Status(user.IsLockedOut, user.HasPassword, user.LastSignInAt);
                 <tr>
-                    <td><a asp-action="Edit" asp-route-id="@user.Id">@user.DisplayName</a></td>
-                    <td>@user.Email</td>
-                    <td>@string.Join(", ", user.Roles)</td>
                     <td>
-                        @if (user.IsLockedOut)
-                        {
-                            <span class="badge text-bg-danger">Locked</span>
-                        }
-                        else if (!user.HasPassword)
-                        {
-                            <span class="badge text-bg-warning">Invited</span>
-                        }
-                        else
-                        {
-                            <span class="badge text-bg-success">Active</span>
-                        }
+                        <a class="entity text-decoration-none" asp-action="Edit" asp-route-id="@user.Id">
+                            <span class="avatar" aria-hidden="true">@Display.Initials(user.DisplayName)</span>
+                            <span class="entity-text">
+                                <span class="entity-name">@user.DisplayName</span>
+                                <span class="entity-sub">@user.Email</span>
+                            </span>
+                        </a>
                     </td>
-                    <td>@if (user.LastSignInAt is { } at) { <local-time value="@at" /> } else { <span class="text-muted">Never</span> }</td>
+                    <td><div class="d-flex flex-wrap gap-1">@foreach (var role in user.Roles) {<span class="chip">@role</span>}</div></td>
+                    <td><span class="badge text-bg-@status.Tone">@status.Label</span></td>
+                    <td class="text-muted text-nowrap">@if (user.LastSignInAt is { } at) {<local-time value="at" format="d MMM yyyy, HH:mm" />} else {<text>Never</text>}</td>
+                    <td class="text-end cell-actions">
+                        <div class="dropdown">
+                            <button class="icon-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Actions for @user.DisplayName"><icon name="ellipsis" /></button>
+                            <div class="dropdown-menu dropdown-menu-end">
+                                <a class="dropdown-item" asp-action="Edit" asp-route-id="@user.Id"><icon name="pencil" class="icon-sm" /> Open</a>
+                                @if (canManage)
+                                {
+                                    <form method="post" asp-action="SendPasswordReset" asp-route-id="@user.Id">
+                                        <button class="dropdown-item" type="submit"><icon name="send" class="icon-sm" /> @(user.HasPassword ? "Email a password reset" : "Resend invitation")</button>
+                                    </form>
+                                    <div class="dropdown-divider"></div>
+                                    @if (user.IsLockedOut)
+                                    {
+                                        <form method="post" asp-action="Unlock" asp-route-id="@user.Id"><button class="dropdown-item" type="submit"><icon name="circle-play" class="icon-sm" /> Unlock</button></form>
+                                    }
+                                    else
+                                    {
+                                        <form method="post" asp-action="Lock" asp-route-id="@user.Id"><button class="dropdown-item text-danger" type="submit"><icon name="ban" class="icon-sm" /> Lock account</button></form>
+                                    }
+                                }
+                            </div>
+                        </div>
+                    </td>
                 </tr>
             }
         </tbody>
     </table>
-    <nav aria-label="Pages" class="d-flex justify-content-between align-items-center">
-        <span class="text-muted small">@results.Total user(s), page @results.Page of @results.TotalPages</span>
-        <div class="btn-group">
-            <a class="btn btn-outline-secondary btn-sm @(results.HasPrevious ? "" : "disabled")" asp-route-page="@(results.Page - 1)" asp-route-search="@Model.Search">Previous</a>
-            <a class="btn btn-outline-secondary btn-sm @(results.HasNext ? "" : "disabled")" asp-route-page="@(results.Page + 1)" asp-route-search="@Model.Search">Next</a>
-        </div>
-    </nav>
+    <div class="d-flex justify-content-between align-items-center">
+        <span class="text-muted small">Page @results.Page of @results.TotalPages</span>
+        <nav class="btn-group btn-group-sm" aria-label="Pages">
+            <a class="btn btn-outline-secondary @(results.HasPrevious ? "" : "disabled")" asp-route-page="@(results.Page - 1)" asp-route-search="@Model.Search">Previous</a>
+            <a class="btn btn-outline-secondary @(results.HasNext ? "" : "disabled")" asp-route-page="@(results.Page + 1)" asp-route-search="@Model.Search">Next</a>
+        </nav>
+    </div>
 }

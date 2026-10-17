@@ -1,3 +1,4 @@
+using Base.Domain.Auditing;
 using Base.Domain.Common;
 
 namespace Base.Domain.Settings;
@@ -27,6 +28,13 @@ public sealed class ApplicationSetting : EntityBase
 
     public string? Value { get; private set; }
 
+    /// <summary>
+    /// For secret settings only: the value encrypted with ASP.NET Core Data Protection. <see cref="Value"/> stays
+    /// empty, so a secret never appears in plain text in the database, the cache or the audit trail.
+    /// </summary>
+    [AuditRedacted]
+    public string? ProtectedValue { get; private set; }
+
     public Guid? TenantId { get; private set; }
 
     /// <summary>True once an administrator has changed the value; seeders never overwrite such values.</summary>
@@ -36,6 +44,25 @@ public sealed class ApplicationSetting : EntityBase
     {
         Value = value;
         IsOverridden = true;
+    }
+
+    /// <summary>Stores an encrypted secret (null clears it).</summary>
+    public void ChangeProtectedValue(string? protectedValue)
+    {
+        Value = null;
+        ProtectedValue = protectedValue;
+        IsOverridden = true;
+    }
+
+    /// <summary>
+    /// Undoes an administrator's change: a platform row goes back to the catalogue default, and a tenant row stops
+    /// overriding, so the tenant inherits the platform value again.
+    /// </summary>
+    public void Revert(string? defaultValue)
+    {
+        Value = defaultValue;
+        ProtectedValue = null;
+        IsOverridden = false;
     }
 
     /// <summary>Used by the seeder only: refreshes a value that no administrator has touched.</summary>

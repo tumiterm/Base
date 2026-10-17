@@ -1,0 +1,95 @@
+# Changelog
+
+Every change a project built on the Base would notice, newest first. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [SemVer](https://semver.org/):
+
+- **Major**: a project has to change its own code to take the release (a public type, setting code, permission or
+  configuration key renamed or removed; a rule tightened so existing code no longer builds or passes; a migration
+  that changes existing columns).
+- **Minor**: something new that existing projects can ignore (a module, a setting, a screen, an optional switch).
+- **Patch**: fixes that change nothing a project relies on.
+
+Add a line under **Unreleased** with every change. A release moves those lines under a new version heading, bumps
+`BaseVersion` in `Directory.Build.props` and is tagged `vX.Y.Z` (see [ADR 0019](adr/0019-versioning-the-base.md)).
+
+## [Unreleased]
+
+Nothing yet.
+
+## [1.0.0] - 2026-10-17
+
+The first versioned release: everything the Base has today.
+
+### Foundations
+
+- .NET 10 solution in four layers (Domain, Application, Infrastructure, Web) with architecture tests that enforce
+  the dependency rules; warnings are errors, analyzers on, NuGet audit, central package versions.
+- `EntityBase` with audit columns, soft delete, row version and domain events; SQL Server-sequential GUID keys.
+- `TimeProvider` everywhere and UTC `DateTimeOffset` storage; `DateTime.Now`/`UtcNow` banned at compile time.
+- Repositories and `IUnitOfWork`, `ValidationResponse` results mapped to pages and problem details.
+- `scripts/new-project.cs` creates a renamed copy; it now records the Base version it came from.
+
+### Security and identity
+
+- ASP.NET Core Identity with invitations (users set their own password), password reset, lockout and NIST-style
+  password rules; current user from claims only.
+- Permissions as data (`PermissionCatalog`, `[HasPermission]`), roles, and `PermissionGuard` so nobody grants what
+  they don't hold.
+- Strict content security policy (no inline script or style), security headers, antiforgery on every form.
+
+### Tenancy and subscriptions
+
+- Tenants resolved by domain, isolated by a named query filter that fails closed.
+- Plans with features and limits, subscriptions with trials, grace periods, suspension and reinstatement; payments
+  recorded from outside.
+- Tenant pages list each tenant's users with their status, show a getting-started checklist (address,
+  administrator, email delivery, first sign-in), and send the first administrator a welcome email with what to do
+  next. Administrators can be invited and welcomes resent from the tenant.
+
+### Data and audit
+
+- Audit trail of every change with redaction (`[AuditRedacted]`) and noise filtering (`[NotAudited]`).
+- Transactional outbox for side effects after commit, with idempotent handlers.
+- Lookup lists for pick-lists, with defaults per tenant.
+
+### Files and documents
+
+- `IFileService` over local disk, S3 and Azure Blob, a capped database provider for small files, signature checks
+  and pluggable upload checks.
+- Versioned documents linked to any record, finalising, archiving, generation from templates.
+- Documents open in the browser: PDFs, images, text and generated HTML are previewed on the page and in a drawer
+  from any list (sandboxed, framed by the application only); other files offer a download.
+- Linked records are shown by name ("Thandi Nkosi") instead of their id, through `IRecordLabelProvider`.
+
+### Notifications
+
+- `INotificationService` with templates per channel (email, SMS, WhatsApp, in-app), fallbacks, preferences,
+  retries and a delivery log; providers for SMTP, SendGrid, Twilio, Clickatell, BulkSMS and Meta WhatsApp.
+- Email can be set up on the settings screen (SMTP server, sign-in, sender) with a test email that reports the
+  server's answer at once.
+
+### Settings
+
+- Settings by category on one screen, with typed editors, switches, defaults, "changed" markers and reset.
+- Platform-wide settings are shown to, and can only be changed by, the platform tenant.
+- Secret settings (the SMTP password) are encrypted with Data Protection, never shown again and kept out of the
+  audit trail.
+- New switches: password reset by email, document previews, and an announcement banner across every page.
+
+### Data exchange and operations
+
+- Exports (`IExporter`) and imports (`IImporter`) through existing use cases, in the background when large.
+- Scheduled jobs with leases and history, health checks, error log with ticket numbers, system page.
+- The running version is shown on the System page and in the account menu, and returned by `GET api/system/version`.
+
+### API
+
+- API clients with hashed keys, per-caller rate limits, `Idempotency-Key` replay, versioning and OpenAPI per version,
+  CORS allowlist.
+
+### Interface
+
+- Design system (tokens, components, light and dark, phone layouts) and per-tenant branding.
+- People sample module showing the vertical slice end to end.
+- Settings, users, invitations, documents and tenant pages rebuilt on the design system; row menus inside tables
+  are no longer cut off.

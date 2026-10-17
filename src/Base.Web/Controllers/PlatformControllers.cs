@@ -1,8 +1,10 @@
 using Base.Application.Common.Persistence;
 using Base.Application.Common.Results;
+using Base.Application.Notifications;
 using Base.Application.Security;
 using Base.Application.Subscriptions;
 using Base.Application.Tenancy;
+using Base.Domain.Notifications;
 using Base.Domain.Subscriptions;
 using Base.Web.Results;
 using Base.Web.Security;
@@ -14,7 +16,7 @@ namespace Base.Web.Controllers;
 /// <summary>The platform's tenants: list, create, and run each one's domains and subscription.</summary>
 [Route("platform/tenants")]
 [HasPermission(PermissionCodes.Platform.TenantsView)]
-public sealed class PlatformTenantsController(ITenantAdministration tenants, ISubscriptionService subscriptions, IPlanAdministration plans) : Controller
+public sealed class PlatformTenantsController(ITenantAdministration tenants, ISubscriptionService subscriptions, IPlanAdministration plans, INotificationChannels channels) : Controller
 {
     [HttpGet("")]
     public async Task<IActionResult> Index(string? search, SubscriptionStatus? status, int page = 1, CancellationToken cancellationToken = default) =>
@@ -38,7 +40,10 @@ public sealed class PlatformTenantsController(ITenantAdministration tenants, ISu
             cancellationToken);
         if (result.IsSuccess)
         {
-            this.Flash(result);
+            var email = await channels.DescribeAsync(NotificationChannel.Email, cancellationToken);
+            this.Flash(email.Delivers
+                ? result
+                : ValidationResponse.Success($"{result.Message} Email isn't being delivered yet, though: set it up under Settings → Email, then resend the welcome from here."));
             return RedirectToAction(nameof(Details), new { id = result.Data });
         }
 
@@ -57,9 +62,24 @@ public sealed class PlatformTenantsController(ITenantAdministration tenants, ISu
     {
         var result = await tenants.GetAsync(id, cancellationToken);
         return result.IsSuccess
-            ? View(new TenantDetailsViewModel(result.Data!, await plans.ListAsync(includeRetired: false, cancellationToken)))
+            ? View(new TenantDetailsViewModel(
+                result.Data!, await plans.ListAsync(includeRetired: false, cancellationToken), await channels.DescribeAsync(NotificationChannel.Email, cancellationToken)))
             : NotFound();
     }
+
+    [HttpPost("{id:guid}/administrators")]
+    [HasPermission(PermissionCodes.Platform.TenantsManage)]
+    public async Task<IActionResult> InviteAdministrator(Guid id, string email, string name, CancellationToken cancellationToken)
+    {
+        var result = await tenants.InviteAdministratorAsync(id, email, name, cancellationToken);
+        this.Flash(result.IsSuccess || result.Errors.Count == 0 ? result : ValidationResponse.Failure(string.Join(" ", result.Errors.Select(e => e.Message))));
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
+    [HttpPost("{id:guid}/users/{userId:guid}/resend")]
+    [HasPermission(PermissionCodes.Platform.TenantsManage)]
+    public Task<IActionResult> ResendWelcome(Guid id, Guid userId, CancellationToken cancellationToken) =>
+        Run(id, tenants.ResendWelcomeAsync(id, userId, cancellationToken));
 
     [HttpPost("{id:guid}")]
     [HasPermission(PermissionCodes.Platform.TenantsManage)]

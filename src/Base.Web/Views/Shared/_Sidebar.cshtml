@@ -25,6 +25,7 @@
         <a class="nav-link-app @Active("ApiClients")" aria-current="@Current("ApiClients")" asp-controller="ApiClients" asp-action="Index" asp-permission="@PermissionCodes.Api.ClientsManage" asp-feature="@FeatureCodes.Api" title="API clients"><icon name="key-round" /><span class="nav-label">API clients</span></a>
         <a class="nav-link-app @Active("MasterData")" aria-current="@Current("MasterData")" asp-controller="MasterData" asp-action="Index" asp-permission="@PermissionCodes.MasterData.Manage" title="Lookup lists"><icon name="list" /><span class="nav-label">Lookup lists</span></a>
         <a class="nav-link-app @Active("Appearance")" aria-current="@Current("Appearance")" asp-controller="Appearance" asp-action="Index" asp-permission="@PermissionCodes.Settings.Edit" asp-feature="@FeatureCodes.CustomBranding" title="Appearance"><icon name="palette" /><span class="nav-label">Appearance</span></a>
+        <a class="nav-link-app @Active("SettingsAdmin")" aria-current="@Current("SettingsAdmin")" asp-controller="SettingsAdmin" asp-action="Index" asp-permission="@PermissionCodes.Settings.View" title="Settings"><icon name="settings" /><span class="nav-label">Settings</span></a>
         @if (access.IsRestricted)
         {
             <a class="nav-link-app @Active("Subscription")" aria-current="@Current("Subscription")" asp-controller="Subscription" asp-action="Index" asp-permission="@PermissionCodes.Subscription.View" title="Subscription"><icon name="credit-card" /><span class="nav-label">Subscription</span></a>

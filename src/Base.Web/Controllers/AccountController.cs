@@ -1,3 +1,4 @@
+using Base.Application.Settings;
 using Base.Application.Users;
 using Base.Infrastructure.Identity;
 using Base.Web.Results;
@@ -14,6 +15,7 @@ public sealed partial class AccountController(
     SignInManager<ApplicationUser> signInManager,
     UserManager<ApplicationUser> userManager,
     IAccountService accounts,
+    IApplicationSettingService settings,
     TimeProvider time,
     ILogger<AccountController> logger) : Controller
 {
@@ -65,7 +67,8 @@ public sealed partial class AccountController(
 
     [AllowAnonymous]
     [HttpGet("forgot-password")]
-    public IActionResult ForgotPassword() => View(new ForgotPasswordViewModel());
+    public async Task<IActionResult> ForgotPassword(CancellationToken cancellationToken) =>
+        await settings.GetBoolAsync(SettingCodes.Security.PasswordResetEnabled, cancellationToken) ? View(new ForgotPasswordViewModel()) : NotFound();
 
     [AllowAnonymous]
     [EnableRateLimiting(WebApplicationExtensions.AuthRateLimitPolicy)]

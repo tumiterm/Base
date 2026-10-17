@@ -117,8 +117,13 @@ internal sealed partial class IdentitySeedTask(
             var isNew = role is null;
             if (role is null)
             {
-                role = new ApplicationRole(roleName);
+                role = new ApplicationRole(roleName) { Description = RoleNames.DescriptionOf(roleName) };
                 EnsureSucceeded(await roles.CreateAsync(role), $"create role {roleName}");
+            }
+            else if (role.Description is null)
+            {
+                role.Description = RoleNames.DescriptionOf(roleName);
+                EnsureSucceeded(await roles.UpdateAsync(role), $"describe role {roleName}");
             }
 
             var isAdministrator = string.Equals(roleName, RoleNames.Administrator, StringComparison.Ordinal);

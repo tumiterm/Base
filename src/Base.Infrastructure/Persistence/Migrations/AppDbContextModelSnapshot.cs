@@ -1165,6 +1165,10 @@ namespace Base.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsOverridden")
                         .HasColumnType("bit");
 
+                    b.Property<string>("ProtectedValue")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .IsRequired()

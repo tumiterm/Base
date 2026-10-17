@@ -1,12 +1,16 @@
 @model SystemViewModel
 @inject TimeProvider Time
+@inject IWebHostEnvironment Env
 @inject Microsoft.Extensions.Options.IOptions<Base.Infrastructure.Jobs.HangfireOptions> Hangfire
 @{
     ViewData["Title"] = "System";
     var now = Time.GetUtcNow();
 }
 <div class="page-header">
-    <h1 class="page-title">System <partial name="_HealthBadge" model="Model.Health.State" /></h1>
+    <div>
+        <h1 class="page-title">System <partial name="_HealthBadge" model="Model.Health.State" /></h1>
+        <p class="page-subtitle" title="@Base.Application.Operations.AppVersion.Informational">Version @Base.Application.Operations.AppVersion.Describe() · .NET @Environment.Version · @Env.EnvironmentName</p>
+    </div>
     <div class="page-actions">
         <a class="btn btn-outline-secondary" asp-action="Errors">Errors</a>
         @if (Hangfire.Value.Enabled)

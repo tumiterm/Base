@@ -1,0 +1,148 @@
+@model SettingsPageViewModel
+@using Base.Application.Notifications
+@using Base.Application.Settings
+@{
+    ViewData["Title"] = "Settings";
+    var managed = Model.Search is null ? SettingsDisplay.ManagedOn(Model.Category) : null;
+    var canEdit = Model.CanEdit && managed is null;
+    var platformWide = Model.Settings.Count(s => s.Definition.Scope == SettingScope.Platform);
+    var mixed = Model.IsPlatform && platformWide > 0 && platformWide < Model.Settings.Count;
+}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Settings</h1>
+        <p class="page-subtitle">How the application behaves@(Model.IsPlatform ? ", for every tenant and for this one" : " for your organisation"). Changes apply straight away.</p>
+    </div>
+    <form method="get" class="page-actions" role="search">
+        <label class="input-affix">
+            <icon name="search" class="icon-sm" />
+            <input class="form-control" type="search" name="q" value="@Model.Search" placeholder="Find a setting" aria-label="Find a setting" />
+        </label>
+    </form>
+</div>
+
+<div class="master-detail">
+    <nav class="panel list-nav" aria-label="Setting categories">
+        @foreach (var c in Model.Categories)
+        {
+            var active = Model.Search is null && c.Name == Model.Category;
+            <a class="@(active ? "is-active" : "")" aria-current="@(active ? "page" : null)" asp-action="Index" asp-route-category="@c.Name">
+                <span class="d-inline-flex align-items-center gap-2"><icon name="@SettingsDisplay.Icon(c.Name)" class="icon-sm" /> @c.Name</span>
+                @if (c.Changed > 0) {<span class="count" title="@c.Changed changed">@c.Changed</span>}
+            </a>
+        }
+    </nav>
+
+    <div class="stack">
+        @if (Model.Search is not null)
+        {
+            <section class="panel">
+                <div class="panel-header">
+                    <h2 class="panel-title">@Model.Settings.Count setting@(Model.Settings.Count == 1 ? "" : "s") match “@Model.Search”</h2>
+                    <a class="btn btn-ghost btn-sm" asp-action="Index">Clear</a>
+                </div>
+                @if (Model.Settings.Count == 0)
+                {
+                    <div class="empty-state border-0"><icon name="search" /><div class="empty-state-title">Nothing matches</div><p class="mb-0">Try another word, or browse the categories.</p></div>
+                }
+                else
+                {
+                    <ul class="version-list">
+                        @foreach (var s in Model.Settings)
+                        {
+                            <li>
+                                <span class="file-tile" aria-hidden="true"><icon name="@SettingsDisplay.Icon(s.Definition.Category)" /></span>
+                                <div class="version-main">
+                                    <a class="version-file d-block" href="@Url.Action("Index", new { category = s.Definition.Category })#s-@s.Definition.Code.Replace('.', '-')-row">@s.Definition.Name</a>
+                                    <div class="version-meta">@s.Definition.Category · @(s.Definition.IsSecret ? (s.HasSecret ? "stored" : "not set") : SettingsDisplay.Format(s.Definition, s.Value))</div>
+                                    <div class="version-comment">@s.Definition.Description</div>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
+            </section>
+        }
+        else
+        {
+            @if (Model.EmailRoute is { } route)
+            {
+                <section class="panel" aria-labelledby="delivery-title">
+                    <div class="panel-header"><h2 class="panel-title" id="delivery-title">Delivery</h2></div>
+                    <div class="panel-body stack">
+                        <div class="status-callout @(route.Delivers ? "is-ok" : "is-warning")">
+                            <icon name="@(route.Delivers ? "mail-check" : "triangle-alert")" />
+                            <div>
+                                <div class="status-callout-title">@(route.Delivers ? "Email is being sent" : "Email isn't being delivered")</div>
+                                <div>
+                                    @route.Description
+                                    @(route.Source switch
+                                    {
+                                        ChannelRouteSource.EmailSettings => "Set up below.",
+                                        ChannelRouteSource.TenantChoice => "Chosen in this tenant's Notifications settings.",
+                                        ChannelRouteSource.Configuration when route.Delivers => "Set up in the server's configuration.",
+                                        ChannelRouteSource.Configuration => "Fill in the SMTP server below and switch it on to send for real.",
+                                        _ => "",
+                                    })
+                                </div>
+                            </div>
+                        </div>
+                        @if (Model.CanEdit)
+                        {
+                            <form method="post" asp-action="TestEmail" class="d-flex flex-wrap gap-2 align-items-start">
+                                <div class="flex-grow-1">
+                                    <label class="visually-hidden" for="test-to">Send a test email to</label>
+                                    <input class="form-control" type="email" id="test-to" name="to" value="@Model.TestAddress" placeholder="you@example.com" required />
+                                    <span class="text-danger small">@ViewData.ModelState["to"]?.Errors.FirstOrDefault()?.ErrorMessage</span>
+                                </div>
+                                <button class="btn btn-secondary" type="submit"><icon name="send" class="icon-sm" /> Send a test email</button>
+                            </form>
+                            <p class="form-text m-0">Sent at once through the route above, so you see straight away what the server answers. Save changes first.</p>
+                        }
+                    </div>
+                </section>
+            }
+
+            <form method="post" asp-action="Save" class="panel" aria-labelledby="category-title" novalidate>
+                <input type="hidden" name="category" value="@Model.Category" />
+                <div class="panel-header">
+                    <div class="entity">
+                        <span class="file-tile" aria-hidden="true"><icon name="@SettingsDisplay.Icon(Model.Category)" /></span>
+                        <div class="entity-text">
+                            <h2 class="panel-title entity-name" id="category-title">@Model.Category</h2>
+                            <span class="entity-sub">@SettingsDisplay.Describe(Model.Category)</span>
+                        </div>
+                    </div>
+                    @if (Model.IsPlatform && platformWide == Model.Settings.Count && platformWide > 0)
+                    {
+                        <span class="chip" title="One value for the whole installation"><icon name="globe" /> Applies to all tenants</span>
+                    }
+                </div>
+                <div class="panel-body">
+                    @if (managed is { } other)
+                    {
+                        <div class="alert alert-info d-flex align-items-center gap-2" role="note">
+                            <icon name="info" />
+                            <div class="flex-grow-1">These are changed on the @other.Label page, which previews them as you go.</div>
+                            <a class="btn btn-secondary btn-sm" asp-controller="@other.Controller" asp-action="@other.Action">Open @other.Label</a>
+                        </div>
+                    }
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+                    <div class="setting-list">
+                        @foreach (var s in Model.Settings)
+                        {
+                            <partial name="_SettingField" model="new SettingFieldViewModel(s, Model.ValueOf(s), canEdit, Model.IsPlatform, Model.ProviderChoices.GetValueOrDefault(s.Definition.Code), mixed)" />
+                        }
+                    </div>
+                </div>
+                @if (canEdit)
+                {
+                    <div class="panel-footer d-flex justify-content-end gap-2">
+                        <button class="btn btn-ghost" type="reset">Discard changes</button>
+                        <button class="btn btn-primary" type="submit"><icon name="check" class="icon-sm" /> Save @Model.Category.ToLowerInvariant() settings</button>
+                    </div>
+                }
+            </form>
+        }
+    </div>
+</div>

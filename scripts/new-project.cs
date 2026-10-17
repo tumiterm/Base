@@ -6,6 +6,8 @@
 // Copies the repository (without build output, git history or local data), renames the Base.* projects,
 // namespaces and solution to <Name>.*, and gives the web project a fresh user-secrets id so projects never
 // share secrets. Identifiers that merely contain "Base" (EntityBase, ControllerBase, Database) are untouched.
+// The new project keeps BaseVersion (the Base it came from), starts its own version at 0.1.0 with a fresh
+// docs/changelog.md, and keeps the Base's changelog as docs/base-changelog.md for upgrades.
 
 using System.Text.RegularExpressions;
 
@@ -35,6 +37,8 @@ string[] binaryExtensions = [".png", ".jpg", ".jpeg", ".gif", ".ico", ".woff", "
 var projectToken = new Regex(@"(?<![A-Za-z0-9_])Base(?=\.(Domain|Application|Infrastructure|Web|UnitTests|IntegrationTests|ArchitectureTests|slnx)\b)", RegexOptions.ExplicitCapture, timeout);
 var productToken = new Regex(@"(?<=<(Company|Product)>)Base(?=</)|(?<=SetApplicationName\("")Base(?=""\))", RegexOptions.ExplicitCapture, timeout);
 var userSecretsId = new Regex("<UserSecretsId>[^<]+</UserSecretsId>", RegexOptions.None, timeout);
+var productVersion = new Regex(@"<VersionPrefix>\$\(BaseVersion\)</VersionPrefix>", RegexOptions.None, timeout);
+var baseVersion = Regex.Match(File.ReadAllText(Path.Combine(source, "Directory.Build.props")), "<BaseVersion>(?<v>[^<]+)</BaseVersion>", RegexOptions.ExplicitCapture, timeout).Groups["v"].Value;
 
 var copied = 0;
 foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
@@ -58,15 +62,24 @@ foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirec
         text = projectToken.Replace(text, name);
         text = productToken.Replace(text, name);
         text = userSecretsId.Replace(text, $"<UserSecretsId>{name.ToLowerInvariant()}-{Guid.NewGuid()}</UserSecretsId>");
+        text = productVersion.Replace(text, "<VersionPrefix>0.1.0</VersionPrefix>");
+        if (string.Equals(relative, "docs/changelog.md", StringComparison.Ordinal))
+        {
+            // The Base's history stays available for upgrades; the project's own history starts empty.
+            File.WriteAllText(Path.Combine(Path.GetDirectoryName(destination)!, "base-changelog.md"), text);
+            text = $"# Changelog\n\nEvery change people would notice, newest first. Versions follow SemVer.\n\n## [Unreleased]\n\n- Created from Base {baseVersion}.\n";
+        }
+
         File.WriteAllText(destination, text);
     }
 
     copied++;
 }
 
-Console.WriteLine($"Created {name} in {target} ({copied} files).");
+Console.WriteLine($"Created {name} in {target} ({copied} files) from Base {baseVersion}.");
 Console.WriteLine("Next:");
 Console.WriteLine($"  cd {target}");
 Console.WriteLine("  git init && dotnet tool restore && dotnet build && dotnet test");
 Console.WriteLine("  Review CLAUDE.md and README.md, then replace the initial migration if you change the model before first release.");
+Console.WriteLine("  To take later Base releases: git remote add base <Base repository URL>, then see docs/adr/0019-versioning-the-base.md.");
 return 0;

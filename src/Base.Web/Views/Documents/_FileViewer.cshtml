@@ -1,0 +1,46 @@
+@model FileViewerViewModel
+@using Base.Application.Files
+@{
+    var kind = Model.PreviewEnabled ? FilePreviews.KindOf(Model.ContentType) : PreviewKind.None;
+}
+@if (kind == PreviewKind.None)
+{
+    var off = !Model.PreviewEnabled && FilePreviews.CanPreview(Model.ContentType);
+    <div class="viewer-stage">
+        <div class="viewer-empty">
+            <span class="file-tile file-tile-lg @FileDisplay.TileClass(Model.ContentType, Model.FileName)"><icon name="@FileDisplay.Icon(Model.ContentType, Model.FileName)" /></span>
+            @if (off)
+            {
+                <div class="viewer-empty-title">Previews are switched off</div>
+                <p class="mb-2">An administrator has set documents to download only.</p>
+            }
+            else
+            {
+                <div class="viewer-empty-title">There's no preview for this @FileDisplay.Describe(Model.ContentType, Model.FileName)</div>
+                <p class="mb-2">Browsers can't show this type of file safely. Download it to open it in the app it belongs to.</p>
+            }
+            <a class="btn btn-primary" href="@Model.DownloadUrl"><icon name="download" class="icon-sm" /> Download @FileDisplay.Size(Model.SizeBytes)</a>
+        </div>
+    </div>
+}
+else if (kind == PreviewKind.Image)
+{
+    <div class="viewer-stage is-image"><img src="@Model.PreviewUrl" alt="@Model.FileName" loading="lazy" /></div>
+}
+else if (kind == PreviewKind.Video)
+{
+    <div class="viewer-stage"><video src="@Model.PreviewUrl" controls preload="metadata"></video></div>
+}
+else if (kind == PreviewKind.Audio)
+{
+    <div class="viewer-stage is-media"><audio src="@Model.PreviewUrl" controls preload="metadata"></audio></div>
+}
+else if (kind == PreviewKind.Pdf)
+{
+    <div class="viewer-stage"><iframe src="@Model.PreviewUrl" title="Preview of @Model.FileName" loading="lazy"></iframe></div>
+}
+else
+{
+    @* Text and generated HTML: sandboxed twice over (this attribute, and the response's CSP), so nothing in the file runs. *@
+    <div class="viewer-stage"><iframe src="@Model.PreviewUrl" title="Preview of @Model.FileName" sandbox="" loading="lazy"></iframe></div>
+}

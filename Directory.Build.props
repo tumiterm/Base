@@ -24,6 +24,12 @@
 
     <Company>Base</Company>
     <Product>Base</Product>
+
+    <!-- Versions (docs/adr/0019-versioning-the-base.md). BaseVersion is the version of the Base starter this code is
+         built from; VersionPrefix is this product's own version. In the Base itself they are the same. Bump on
+         release, add the docs/changelog.md section, tag vX.Y.Z. -->
+    <BaseVersion>1.0.0</BaseVersion>
+    <VersionPrefix>$(BaseVersion)</VersionPrefix>
     <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
 
@@ -31,6 +37,11 @@
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Readable at run time (see AppVersion), so screens, health checks and support tickets can name the base. -->
+    <AssemblyMetadata Include="BaseVersion" Value="$(BaseVersion)" />
+  </ItemGroup>
 
   <ItemGroup>
     <!-- BannedSymbols.txt turns the blueprint's "never" list into compile errors. -->

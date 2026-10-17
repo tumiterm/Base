@@ -12,6 +12,7 @@ People is the base's worked example of a business module. Every file below exist
 | Application | `People/PersonContracts.cs` | Query, summary, details and save records; a sort enum; counts for the filter. Contracts never expose entities. |
 | | `People/PersonValidators.cs` | FluentValidation for shape (lengths, formats, dates via `TimeProvider`). |
 | | `People/PersonService.cs` | The use-case service: validate → check lookups (`ILookupService.EnsureValidAsync`) → stage through repositories → one `SaveAsync`; returns `ValidationResponse`. Paging, filtering and sorting run in SQL. Files (the photo) go through `FileService`. |
+| | `People/PersonRecordLabels.cs` | An `IRecordLabelProvider`: documents (and anything else) linked to a person show their name, only to people who may see it. |
 | | `People/PersonDataExchange.cs` | An `Exporter<TRow>` that pages the same search the screen uses, and an `Importer` that applies each row through the service (so the form's rules apply). |
 | | `DependencyInjection.cs` | Registers the service, exporter and importer. |
 | | `Security/PermissionCodes.cs` + `PermissionCatalog.cs` | `People.View` / `People.Manage`. |
@@ -24,6 +25,7 @@ People is the base's worked example of a business module. Every file below exist
 | | `Views/People/Index.cshtml` | List: page header, segmented status filter with counts, auto-applying department filter, search, sortable headers, skill chips that filter, row action menu, empty states, a drawer to add without leaving the list, export/import. Turns into cards on phones. |
 | | `Views/People/Details.cshtml` | Master record: header with a segmented status control and an actions menu; tabs for profile, linked documents (`LinkedDocuments`) and history (the audit trail as a timeline); a form that reads as text until Edit is pressed; dialogs (bottom sheets on phones) for the photo and removal. |
 | | `Views/People/_PersonFields.cshtml` | One set of fields for the drawer, the full form and the profile. Uses `asp-lookup` selects, the searchable combobox (`data-combobox`) and chip multi-select (`_LookupChips`). |
+| | `Formatting/RecordLinks.cs` | The row that sends a linked person's name to their page, with its icon. |
 | | `Views/Shared/_Sidebar.cshtml`, `Views/Home/Index.cshtml` | Navigation and a home shortcut, gated by permission. |
 | Tests | `tests/Base.IntegrationTests/People/PeopleTests.cs` | Real SQL Server and a real acting user: lookups, validation, filtering and sorting, the audit trail's redaction, export and import, photos. |
 | | `tests/Base.IntegrationTests/Web/WebTests.cs` | Pages render, the API round-trips, anonymous calls are refused. |
@@ -32,9 +34,10 @@ People is the base's worked example of a business module. Every file below exist
 
 1. Entity in `Base.Domain/<Module>`; rules live in its methods. Mark personal fields `[AuditRedacted]`.
 2. Lists the module needs: constants in `LookupLists` + `LookupCatalog` entries. Store codes; label with `LookupLabels`.
-3. Contracts, validator, service, exporter/importer in `Base.Application/<Module>`; register in DI.
+3. Contracts, validator, service, exporter/importer and record label provider in `Base.Application/<Module>`;
+   register in DI, and add the module's page to `RecordLinks`.
 4. Permissions in `PermissionCodes` + `PermissionCatalog`. Plan-dependent? A feature in `FeatureCodes` + `[RequiresFeature]`.
 5. Configuration + `DbSet`, then a generated migration and the drift check.
 6. Controller, API, views from the design system; sidebar entry and home shortcut.
-7. Integration tests like `PeopleTests`; a web smoke test.
+7. Integration tests like `PeopleTests`; a web smoke test. A line in `docs/changelog.md` under Unreleased.
 8. Not needed in your project? Delete `People` (the files above, its lookup lists, permissions, sidebar entry and tests) and add a migration that drops the table.

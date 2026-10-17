@@ -1,24 +1,59 @@
 @model LinkedDocumentsViewModel
-<section class="mb-4">
-    <h2 class="h5">Documents</h2>
+@using Base.Application.Documents
+@using Base.Application.Files
+<section class="panel" aria-labelledby="linked-documents-title">
+    <div class="panel-header">
+        <h2 class="panel-title" id="linked-documents-title">Documents <span class="text-muted fw-normal">@Model.Documents.Count</span></h2>
+        @if (Model.CanCreate)
+        {
+            <button class="btn btn-secondary btn-sm" type="button" data-bs-toggle="offcanvas" data-bs-target="#upload-linked" aria-controls="upload-linked"><icon name="upload" class="icon-sm" /> Upload</button>
+        }
+    </div>
     @if (Model.Documents.Count == 0)
     {
-        <p class="text-muted small">No documents yet.</p>
+        <div class="empty-state border-0">
+            <icon name="file-text" />
+            <div class="empty-state-title">No documents yet</div>
+            <p class="mb-0">Contracts, certificates and letters for this record live here.</p>
+        </div>
     }
     else
     {
-        <ul class="list-group mb-3">
+        <ul class="version-list">
             @foreach (var d in Model.Documents)
             {
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    <a asp-controller="Documents" asp-action="Details" asp-route-id="@d.Id">@d.Title</a>
-                    <span><partial name="~/Views/Documents/_StatusBadge.cshtml" model="d.Status" /> <span class="small text-muted">v@(d.CurrentVersion)</span></span>
+                var kind = Model.PreviewEnabled ? FilePreviews.KindOf(d.ContentType) : PreviewKind.None;
+                <li class="align-items-center">
+                    <span class="file-tile @FileDisplay.TileClass(d.ContentType, d.FileName)" aria-hidden="true"><icon name="@FileDisplay.Icon(d.ContentType, d.FileName)" /></span>
+                    <div class="version-main">
+                        <a class="version-file d-block" asp-controller="Documents" asp-action="Details" asp-route-id="@d.Id">@d.Title</a>
+                        <div class="version-meta">@(DocumentTypeCatalog.Find(d.DocumentType)?.Name ?? d.DocumentType) · v@(d.CurrentVersion)@(d.FileName is null ? "" : " · " + FileDisplay.Size(d.SizeBytes)) · <local-time value="d.DateModified" format="d MMM yyyy" /></div>
+                    </div>
+                    <span class="badge text-bg-@FileDisplay.Tone(d.Status)">@FileDisplay.Status(d.Status)</span>
+                    @if (kind != PreviewKind.None)
+                    {
+                        <button class="icon-btn" type="button" title="Preview" aria-label="Preview @d.Title"
+                                data-preview="@kind.ToString().ToLowerInvariant()"
+                                data-preview-src="@Url.Action("Preview", "Documents", new { id = d.Id })"
+                                data-preview-name="@d.Title"
+                                data-preview-filename="@d.FileName · @FileDisplay.Size(d.SizeBytes)"
+                                data-preview-icon="@FileDisplay.Icon(d.ContentType, d.FileName)"
+                                data-preview-tone="@FileDisplay.TileClass(d.ContentType, d.FileName)"
+                                data-preview-download-url="@Url.Action("Download", "Documents", new { id = d.Id })"
+                                data-preview-open-url="@Url.Action("Details", "Documents", new { id = d.Id })"><icon name="eye" /></button>
+                    }
+                    else
+                    {
+                        <span class="icon-btn invisible" aria-hidden="true"></span>
+                    }
+                    <a class="icon-btn" asp-controller="Documents" asp-action="Download" asp-route-id="@d.Id" title="Download" aria-label="Download @d.Title"><icon name="download" /></a>
                 </li>
             }
         </ul>
     }
-    @if (Model.CanCreate)
-    {
-        <partial name="~/Views/Documents/_UploadForm.cshtml" model="((string?)Model.EntityType, (string?)Model.EntityId, (string?)(Context.Request.Path + Context.Request.QueryString))" />
-    }
 </section>
+<partial name="~/Views/Documents/_PreviewDrawer.cshtml" />
+@if (Model.CanCreate)
+{
+    <partial name="~/Views/Documents/_UploadDrawer.cshtml" model='new UploadDrawerViewModel("upload-linked", Model.EntityType, Model.EntityId, Context.Request.Path + Context.Request.QueryString)' />
+}

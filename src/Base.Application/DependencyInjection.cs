@@ -1,5 +1,6 @@
 using Base.Application.Auditing;
 using Base.Application.Branding;
+using Base.Application.Common.Records;
 using Base.Application.DataExchange;
 using Base.Application.Documents;
 using Base.Application.Documents.Generation;
@@ -32,6 +33,7 @@ public static class DependencyInjection
         services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly, includeInternalTypes: true);
 
         services.AddScoped<IApplicationSettingService, ApplicationSettingService>();
+        services.AddScoped<IEmailDeliveryTest, EmailDeliveryTest>();
         services.AddScoped<FileService>();
         services.AddScoped<IFileService>(sp => sp.GetRequiredService<FileService>());
         services.AddScoped<IAuditTrail, AuditTrailService>();
@@ -48,7 +50,10 @@ public static class DependencyInjection
         services.AddScoped<IScheduledJob, ApiKeyExpiryJob>();
         services.AddScoped<IDomainEventHandler<ApiKeyExpiring>, ApiKeyExpiryNotice>();
 
+        services.AddScoped<IRecordLabels, RecordLabels>();
+
         services.AddScoped<IPersonService, PersonService>();
+        services.AddScoped<IRecordLabelProvider, PersonRecordLabels>();
         services.AddScoped<IExporter, PeopleExporter>();
         services.AddScoped<IImporter, PeopleImporter>();
 

@@ -1,8 +1,10 @@
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @inject ICurrentUser CurrentUser
 @inject Base.Application.Branding.IBrandingService Branding
+@inject Base.Application.Settings.IApplicationSettingService Settings
 @{
     var theme = await Branding.GetAsync();
+    var announcement = await Settings.GetAsync(Base.Application.Settings.SettingCodes.General.Announcement);
     var csrf = Antiforgery.GetAndStoreTokens(Context).RequestToken;
     var initials = string.Concat(CurrentUser.AuditName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(w => char.ToUpperInvariant(w[0])));
 }
@@ -67,6 +69,7 @@
                                 <button type="submit" class="dropdown-item"><icon name="log-out" /> Sign out</button>
                             </form>
                         </li>
+                        <li><span class="dropdown-item-text text-muted small" title="@Base.Application.Operations.AppVersion.Informational">Version @Base.Application.Operations.AppVersion.Describe()</span></li>
                     </ul>
                 </div>
             }
@@ -95,6 +98,10 @@
                     <a class="btn btn-primary btn-sm" asp-controller="Account" asp-action="Login">Sign in</a>
                 }
             </header>
+            @if (!string.IsNullOrWhiteSpace(announcement))
+            {
+                <div class="app-banner app-banner-info" role="status"><icon name="info" class="icon-sm" /> <span>@announcement</span></div>
+            }
             @await Component.InvokeAsync("SubscriptionNotice")
             <main class="app-content" id="content" role="main" tabindex="-1">
                 @RenderBody()

@@ -1,19 +1,18 @@
 @model (IReadOnlyList<Base.Application.Users.RoleSummary> Available, IList<string> Selected)
-<fieldset class="mb-3">
-    <legend class="form-label fs-6">Roles</legend>
-    @foreach (var role in Model.Available)
-    {
-        var id = "role-" + role.Id.ToString("N");
-        <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="Roles" value="@role.Name" id="@id" checked="@Model.Selected.Contains(role.Name, StringComparer.OrdinalIgnoreCase)" />
-            <label class="form-check-label" for="@id">
-                @role.Name
-                @if (!string.IsNullOrEmpty(role.Description))
-                {
-                    <span class="text-muted small">: @role.Description</span>
-                }
+<div class="stack">
+    <div class="choice-grid choice-grid-roles" role="group" aria-label="Roles">
+        @foreach (var role in Model.Available)
+        {
+            var id = "role-" + role.Id.ToString("N");
+            <label class="choice-card" for="@id">
+                <input type="checkbox" name="Roles" value="@role.Name" id="@id" checked="@Model.Selected.Contains(role.Name, StringComparer.OrdinalIgnoreCase)" />
+                <span class="choice-check"><icon name="check" /></span>
+                <span class="choice-title d-flex align-items-center gap-2">@role.Name @if (role.IsSystem) {<span class="chip">Built in</span>}</span>
+                <span class="choice-desc">@(string.IsNullOrEmpty(role.Description) ? "No description." : role.Description)</span>
+                <span class="choice-meta">@role.Permissions.Count permission@(role.Permissions.Count == 1 ? "" : "s") · @role.UserCount @(role.UserCount == 1 ? "person" : "people")</span>
             </label>
-        </div>
-    }
-    <span class="text-danger small" data-valmsg-for="Roles">@Html.ValidationMessage("Roles")</span>
-</fieldset>
+        }
+    </div>
+    <span class="field-validation-error small">@Html.ValidationMessage("Roles")</span>
+    <p class="form-text m-0">You can only grant roles whose permissions you hold yourself. Change them any time.</p>
+</div>

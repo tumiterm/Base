@@ -29,7 +29,7 @@ public sealed class CreateTenantViewModel
     public IReadOnlyList<PlanSummary> Plans { get; set; } = [];
 }
 
-public sealed record TenantDetailsViewModel(TenantDetails Details, IReadOnlyList<PlanSummary> Plans);
+public sealed record TenantDetailsViewModel(TenantDetails Details, IReadOnlyList<PlanSummary> Plans, Base.Application.Notifications.ChannelRoute EmailRoute);
 
 public sealed class PlanEditViewModel
 {

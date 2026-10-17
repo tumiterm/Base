@@ -1,109 +1,230 @@
-@model Base.Application.Documents.DocumentDetails
+@model DocumentPageViewModel
 @using Base.Application.Documents
+@using Base.Application.Files
 @using Base.Domain.Documents
 @{
-    ViewData["Title"] = Model.Title;
-    var editable = Model.Can.Edit && Model.Status != DocumentStatus.Archived;
+    var d = Model.Document;
+    var v = Model.Viewing;
+    ViewData["Title"] = d.Title;
+    var editable = d.Can.Edit && d.Status != DocumentStatus.Archived;
+    var canAddVersion = d.Can.Edit && d.Status == DocumentStatus.Draft;
+    var type = DocumentTypeCatalog.Find(d.DocumentType)?.Name ?? d.DocumentType;
+    var latest = d.Versions.FirstOrDefault();
+    var previewable = Model.PreviewEnabled && v is not null && FilePreviews.CanPreview(v.ContentType);
+    var hasMore = (d.Can.Edit && d.Status == DocumentStatus.Draft) || d.Can.Manage || d.Can.Edit;
 }
-<nav class="mb-2"><a asp-action="Index">&larr; Documents</a></nav>
-<div class="d-flex justify-content-between align-items-start mb-3">
-    <div>
-        <h1 class="page-title mb-1">@Model.Title <partial name="_StatusBadge" model="Model.Status" /></h1>
-        <div class="text-muted small">
-            @(DocumentTypeCatalog.Find(Model.DocumentType)?.Name ?? Model.DocumentType)
-            @if (Model.LinkedEntityType is not null) { <span>· linked to @Model.LinkedEntityType @Model.LinkedEntityId</span> }
-            · created by @Model.UserCreated <local-time value="@Model.DateCreated" />
+<nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-action="Index">Documents</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">@d.Title</span></nav>
+<div class="page-header">
+    <div class="entity">
+        <span class="file-tile file-tile-lg @FileDisplay.TileClass(latest?.ContentType, latest?.FileName)" aria-hidden="true"><icon name="@FileDisplay.Icon(latest?.ContentType, latest?.FileName)" /></span>
+        <div class="entity-text">
+            <h1 class="page-title">@d.Title</h1>
+            <p class="page-subtitle d-flex flex-wrap align-items-center gap-2">
+                <span class="badge text-bg-@FileDisplay.Tone(d.Status)">@FileDisplay.Status(d.Status)</span>
+                <span>@type · version @d.CurrentVersion</span>
+                @if (Model.LinkedTo is not null)
+                {
+                    <span class="d-inline-flex align-items-center gap-1">for <partial name="_RecordLink" model="Model.LinkedTo" /></span>
+                }
+            </p>
         </div>
     </div>
-    <div class="d-flex gap-2">
-        <a class="btn btn-primary" asp-action="Download" asp-route-id="@Model.Id">Download v@(Model.CurrentVersion)</a>
-        @if (Model.Can.Edit && Model.Status == DocumentStatus.Draft)
+    <div class="page-actions">
+        <a class="btn btn-primary" asp-action="Download" asp-route-id="@d.Id"><icon name="download" class="icon-sm" /> Download</a>
+        @if (canAddVersion)
         {
-            <form asp-action="ChangeStatus" asp-route-id="@Model.Id" asp-route-change="finalize" method="post"><button class="btn btn-outline-success" type="submit">Finalise</button></form>
+            <button class="btn btn-secondary" type="button" data-bs-toggle="offcanvas" data-bs-target="#new-version" aria-controls="new-version"><icon name="file-up" class="icon-sm" /> New version</button>
         }
-        @if (Model.Can.Manage && Model.Status == DocumentStatus.Final)
+        @if (hasMore)
         {
-            <form asp-action="ChangeStatus" asp-route-id="@Model.Id" asp-route-change="reopen" method="post"><button class="btn btn-outline-secondary" type="submit">Reopen</button></form>
-        }
-        @if (Model.Can.Manage && Model.Status != DocumentStatus.Archived)
-        {
-            <form asp-action="ChangeStatus" asp-route-id="@Model.Id" asp-route-change="archive" method="post"><button class="btn btn-outline-secondary" type="submit">Archive</button></form>
-        }
-        @if (Model.Can.Manage && Model.Status == DocumentStatus.Archived)
-        {
-            <form asp-action="ChangeStatus" asp-route-id="@Model.Id" asp-route-change="restore" method="post"><button class="btn btn-outline-secondary" type="submit">Restore</button></form>
-        }
-        @if (Model.Can.Edit)
-        {
-            <form asp-action="Delete" asp-route-id="@Model.Id" method="post" class="confirm-submit" data-confirm="Delete this document and all its versions?"><button class="btn btn-outline-danger" type="submit">Delete</button></form>
+            <div class="dropdown">
+                <button class="btn btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false"><icon name="ellipsis" class="icon-sm" /> More</button>
+                <div class="dropdown-menu dropdown-menu-end">
+                    @if (d.Can.Edit && d.Status == DocumentStatus.Draft)
+                    {
+                        <form asp-action="ChangeStatus" asp-route-id="@d.Id" asp-route-change="finalize" method="post"><button class="dropdown-item" type="submit"><icon name="lock" class="icon-sm" /> Finalise</button></form>
+                    }
+                    @if (d.Can.Manage && d.Status == DocumentStatus.Final)
+                    {
+                        <form asp-action="ChangeStatus" asp-route-id="@d.Id" asp-route-change="reopen" method="post"><button class="dropdown-item" type="submit"><icon name="rotate-ccw" class="icon-sm" /> Reopen for changes</button></form>
+                    }
+                    @if (d.Can.Manage && d.Status != DocumentStatus.Archived)
+                    {
+                        <form asp-action="ChangeStatus" asp-route-id="@d.Id" asp-route-change="archive" method="post"><button class="dropdown-item" type="submit"><icon name="package" class="icon-sm" /> Archive</button></form>
+                    }
+                    @if (d.Can.Manage && d.Status == DocumentStatus.Archived)
+                    {
+                        <form asp-action="ChangeStatus" asp-route-id="@d.Id" asp-route-change="restore" method="post"><button class="dropdown-item" type="submit"><icon name="rotate-ccw" class="icon-sm" /> Restore</button></form>
+                    }
+                    @if (d.Can.Edit)
+                    {
+                        <div class="dropdown-divider"></div>
+                        <button class="dropdown-item text-danger" type="button" data-bs-toggle="modal" data-bs-target="#delete-dialog"><icon name="trash-2" class="icon-sm" /> Delete…</button>
+                    }
+                </div>
+            </div>
         }
     </div>
 </div>
 
-<div class="row g-4">
-    <div class="col-lg-5">
-        <h2 class="h5">Details</h2>
-        @if (editable)
+<div class="detail-grid">
+    <section class="panel viewer" aria-label="Preview">
+        @if (v is null)
         {
-            <form asp-action="Update" asp-route-id="@Model.Id" method="post">
-                <div class="mb-2"><label class="form-label small" for="title">Title</label><input class="form-control" id="title" name="title" value="@Model.Title" maxlength="200" required /></div>
-                <div class="mb-2"><label class="form-label small" for="description">Description</label><textarea class="form-control" id="description" name="description" rows="3" maxlength="2000">@Model.Description</textarea></div>
-                <div class="mb-2"><label class="form-label small" for="tags">Tags</label><input class="form-control" id="tags" name="tags" value="@string.Join(", ", Model.Tags)" /></div>
-                <button class="btn btn-outline-primary" type="submit">Save details</button>
-            </form>
+            <div class="viewer-stage">
+                <div class="viewer-empty">
+                    <span class="file-tile file-tile-lg"><icon name="file" /></span>
+                    <div class="viewer-empty-title">No file yet</div>
+                    <p class="mb-0">Upload the first version to see it here.</p>
+                </div>
+            </div>
         }
         else
         {
-            <dl>
-                <dt>Description</dt><dd>@(Model.Description ?? "—")</dd>
-                <dt>Tags</dt><dd>@(Model.Tags.Count == 0 ? "—" : string.Join(", ", Model.Tags))</dd>
-                @if (Model.FinalizedAt is { } finalized) { <dt>Finalised</dt><dd><local-time value="@finalized" /></dd> }
-                @if (Model.ArchivedAt is { } archived) { <dt>Archived</dt><dd><local-time value="@archived" /></dd> }
-            </dl>
-        }
-    </div>
-    <div class="col-lg-7">
-        <h2 class="h5">Versions</h2>
-        <table class="table table-sm align-top">
-            <thead><tr><th>#</th><th>File</th><th>Source</th><th>Added</th><th></th></tr></thead>
-            <tbody>
-                @foreach (var v in Model.Versions)
+            var previewUrl = Url.Action("Preview", new { id = d.Id, version = v.Number })!;
+            var downloadUrl = Url.Action("Download", new { id = d.Id, version = v.Number })!;
+            <div class="viewer-toolbar">
+                <span class="file-tile @FileDisplay.TileClass(v.ContentType, v.FileName)" aria-hidden="true"><icon name="@FileDisplay.Icon(v.ContentType, v.FileName)" /></span>
+                <span class="viewer-name" title="@v.FileName">@v.FileName</span>
+                <span class="text-muted small text-nowrap d-none d-sm-inline">v@(v.Number) · @FileDisplay.Size(v.SizeBytes)</span>
+                @if (previewable)
                 {
-                    <tr>
-                        <td>v@(v.Number)</td>
-                        <td class="text-break">@v.FileName<div class="small text-muted">@Size(v.SizeBytes) @if (v.Comment is not null) { <span>· @v.Comment</span> }</div></td>
-                        <td class="small">@(v.Source == DocumentSource.Generated ? $"Generated ({v.TemplateCode})" : "Uploaded")</td>
-                        <td class="small text-nowrap">@v.CreatedBy<div><local-time value="@v.CreatedAt" /></div></td>
-                        <td><a class="btn btn-sm btn-outline-secondary" asp-action="Download" asp-route-id="@Model.Id" asp-route-version="@v.Number">Download</a></td>
-                    </tr>
+                    <a class="icon-btn" href="@previewUrl" target="_blank" rel="noopener" title="Open in a new tab" aria-label="Open in a new tab"><icon name="maximize-2" /></a>
                 }
-            </tbody>
-        </table>
-        @if (Model.Can.Edit && Model.Status == DocumentStatus.Draft)
-        {
-            <form asp-action="AddVersion" asp-route-id="@Model.Id" method="post" enctype="multipart/form-data" class="card card-body">
-                <div class="drop-zone mb-2">
-                    <input class="form-control" type="file" name="file" id="version-file" required />
-                    <div class="drop-zone-hint small text-muted">or drop the new version here</div>
+                <a class="icon-btn" href="@downloadUrl" title="Download this version" aria-label="Download version @v.Number"><icon name="download" /></a>
+            </div>
+            @if (!Model.IsLatest)
+            {
+                <div class="viewer-note d-flex flex-wrap align-items-center gap-2">
+                    <icon name="history" class="icon-sm" /> You're looking at version @v.Number. The latest is version @d.CurrentVersion.
+                    <a asp-action="Details" asp-route-id="@d.Id">See the latest</a>
                 </div>
-                <div class="mb-2"><label class="form-label small" for="comment">What changed</label><input class="form-control" id="comment" name="comment" maxlength="500" /></div>
-                <div><button class="btn btn-outline-primary" type="submit">Upload new version</button></div>
-            </form>
+            }
+            <partial name="_FileViewer" model="new FileViewerViewModel(previewUrl, downloadUrl, v.FileName, v.ContentType, v.SizeBytes, Model.PreviewEnabled)" />
         }
-        else if (Model.Status == DocumentStatus.Final)
-        {
-            <p class="text-muted small">Final documents are locked. @(Model.Can.Manage ? "Reopen it to add a version." : "")</p>
-        }
-    </div>
-</div>
-@functions {
-    private static string Size(long bytes)
-    {
-        if (bytes < 1024)
-        {
-            return $"{bytes} bytes";
-        }
+    </section>
 
-        return bytes < 1024 * 1024 ? $"{bytes / 1024.0:0.#} KB" : $"{bytes / 1024.0 / 1024.0:0.#} MB";
-    }
+    <aside class="stack">
+        <form method="post" asp-action="Update" asp-route-id="@d.Id" class="panel" data-edit-form="reading">
+            <div class="panel-header">
+                <h2 class="panel-title">Details</h2>
+                @if (editable)
+                {
+                    <button class="btn btn-secondary btn-sm read-only" type="button" data-edit-start><icon name="pencil" class="icon-sm" /> Edit</button>
+                }
+            </div>
+            <fieldset class="panel-body stack" disabled>
+                <div>
+                    <label class="form-label" for="title">Title</label>
+                    <input class="form-control" id="title" name="title" value="@d.Title" maxlength="200" required />
+                </div>
+                <div>
+                    <label class="form-label" for="description">Description</label>
+                    <textarea class="form-control" id="description" name="description" rows="3" maxlength="2000" placeholder="What it is and who it's for">@d.Description</textarea>
+                </div>
+                <div>
+                    <label class="form-label" for="tags">Tags</label>
+                    <input class="form-control" id="tags" name="tags" value="@string.Join(", ", d.Tags)" placeholder="contract, 2026" />
+                    <div class="form-text edit-only">Separate tags with commas.</div>
+                </div>
+            </fieldset>
+            <div class="panel-body pt-0">
+                <dl class="kv small">
+                    <dt>Type</dt><dd>@type</dd>
+                    <dt>Created</dt><dd><local-time value="d.DateCreated" format="d MMM yyyy" /> by @(d.UserCreated ?? "System")</dd>
+                    @if (d.FinalizedAt is { } finalized) {<dt>Finalised</dt><dd><local-time value="finalized" format="d MMM yyyy" /></dd>}
+                    @if (d.ArchivedAt is { } archived) {<dt>Archived</dt><dd><local-time value="archived" format="d MMM yyyy" /></dd>}
+                </dl>
+            </div>
+            @if (editable)
+            {
+                <div class="panel-footer d-flex justify-content-end gap-2 edit-only">
+                    <button class="btn btn-ghost" type="button" data-edit-cancel>Cancel</button>
+                    <button class="btn btn-primary" type="submit"><icon name="check" class="icon-sm" /> Save</button>
+                </div>
+            }
+        </form>
+
+        <section class="panel" aria-labelledby="versions-title">
+            <div class="panel-header">
+                <h2 class="panel-title" id="versions-title">Versions</h2>
+                <span class="text-muted small">@d.Versions.Count</span>
+            </div>
+            <ol class="version-list" reversed>
+                @foreach (var version in d.Versions)
+                {
+                    var viewing = version.Number == v?.Number;
+                    <li class="@(viewing ? "is-viewing" : "")">
+                        <span class="version-badge">v@(version.Number)</span>
+                        <div class="version-main">
+                            @if (viewing)
+                            {
+                                <div class="version-file" aria-current="true">@version.FileName</div>
+                            }
+                            else
+                            {
+                                <a class="version-file d-block" asp-action="Details" asp-route-id="@d.Id" asp-route-version="@(version.Number == d.CurrentVersion ? null : version.Number)">@version.FileName</a>
+                            }
+                            <div class="version-meta">
+                                @FileDisplay.Size(version.SizeBytes) · @(version.Source == DocumentSource.Generated ? "generated" : "uploaded") by @(version.CreatedBy ?? "System") · <local-time value="version.CreatedAt" format="d MMM yyyy, HH:mm" />
+                            </div>
+                            @if (version.Comment is not null) {<div class="version-comment">“@version.Comment”</div>}
+                        </div>
+                        <a class="icon-btn" asp-action="Download" asp-route-id="@d.Id" asp-route-version="@version.Number" aria-label="Download version @version.Number" title="Download"><icon name="download" /></a>
+                    </li>
+                }
+            </ol>
+            @if (d.Status == DocumentStatus.Final)
+            {
+                <div class="panel-footer small text-muted d-flex gap-2"><icon name="lock" class="icon-sm" /> Final documents are locked. @(d.Can.Manage ? "Reopen it to add a version." : "")</div>
+            }
+            else if (canAddVersion)
+            {
+                <div class="panel-footer">
+                    <button class="btn btn-secondary btn-sm" type="button" data-bs-toggle="offcanvas" data-bs-target="#new-version" aria-controls="new-version"><icon name="file-up" class="icon-sm" /> Upload a new version</button>
+                </div>
+            }
+        </section>
+    </aside>
+</div>
+
+@if (canAddVersion)
+{
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="new-version" aria-labelledby="new-version-title">
+        <div class="offcanvas-header">
+            <h2 class="offcanvas-title" id="new-version-title">New version of @d.Title</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <form asp-action="AddVersion" asp-route-id="@d.Id" method="post" enctype="multipart/form-data" class="d-flex flex-column flex-grow-1 overflow-hidden">
+            <div class="offcanvas-body stack">
+                <label class="drop-zone">
+                    <icon name="file-up" class="icon-lg" />
+                    <span class="drop-zone-hint"><strong>Choose a file</strong> or drop it here</span>
+                    <input class="form-control" type="file" name="file" id="version-file" required />
+                </label>
+                <div>
+                    <label class="form-label" for="comment">What changed <span class="text-muted fw-normal">(optional)</span></label>
+                    <input class="form-control" id="comment" name="comment" maxlength="500" placeholder="Signed by both parties" />
+                </div>
+                <p class="text-muted small mb-0">Version @(d.CurrentVersion + 1) becomes the current one. Earlier versions stay available.</p>
+            </div>
+            <div class="offcanvas-footer">
+                <button type="button" class="btn btn-ghost" data-bs-dismiss="offcanvas">Cancel</button>
+                <button class="btn btn-primary" type="submit"><icon name="upload" class="icon-sm" /> Upload version @(d.CurrentVersion + 1)</button>
+            </div>
+        </form>
+    </div>
+}
+
+@if (d.Can.Edit)
+{
+    <div class="modal fade" id="delete-dialog" tabindex="-1" aria-labelledby="delete-title" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <form class="modal-content" method="post" asp-action="Delete" asp-route-id="@d.Id">
+                <div class="modal-header"><h2 class="modal-title" id="delete-title">Delete @d.Title?</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body"><p class="mb-0 text-muted">The document and all @d.Versions.Count version(s) go. An administrator can still restore the files for a while; after that they're removed for good.</p></div>
+                <div class="modal-footer"><button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button><button class="btn btn-danger" type="submit">Delete</button></div>
+            </form>
+        </div>
+    </div>
 }

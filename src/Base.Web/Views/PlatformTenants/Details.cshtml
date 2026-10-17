@@ -7,6 +7,13 @@
     ViewData["Title"] = t.Name;
     var canManage = CurrentUser.HasPermission(PermissionCodes.Platform.TenantsManage);
     var now = Time.GetUtcNow();
+    var admins = Model.Details.Users.Where(u => u.Roles.Contains(RoleNames.Administrator)).ToList();
+    var reachable = Model.Details.Domains.Any(d => d.IsVerified);
+    var accepted = admins.Exists(u => u.HasPassword);
+    var signedIn = admins.Exists(u => u.LastSignInAt is not null);
+    var emailOk = Model.EmailRoute.Delivers;
+    var steps = new[] { true, reachable, admins.Count > 0, emailOk, accepted && signedIn };
+    var done = steps.Count(x => x);
 }
 <nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-action="Index">Tenants</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">@t.Name</span></nav>
 <div class="page-header">
@@ -17,7 +24,7 @@
             <p class="page-subtitle">
                 <span class="font-monospace">@t.Code</span>
                 @if (t.PrimaryHost is not null) {<text> · </text><a href="https://@t.PrimaryHost" rel="noopener" target="_blank">@t.PrimaryHost <icon name="external-link" class="icon-sm" /></a>}
-                · @t.UserCount user(s)
+                · @t.UserCount @(t.UserCount == 1 ? "user" : "users")
             </p>
         </div>
     </div>
@@ -48,6 +55,57 @@
 
 <div class="detail-grid">
     <div class="stack">
+        @if (!t.IsPlatform)
+        {
+            <section class="panel" aria-labelledby="start-title">
+                <div class="panel-header">
+                    <h2 class="panel-title" id="start-title">Getting started</h2>
+                    <span class="text-muted small">@done of @steps.Length done</span>
+                </div>
+                <ol class="checklist">
+                    <li class="is-done">
+                        <icon name="circle-check" />
+                        <div><div class="checklist-title">Organisation created</div><div class="checklist-desc"><local-time value="t.DateCreated" format="d MMM yyyy" />. Its own data, users and settings, separate from every other tenant.</div></div>
+                    </li>
+                    <li class="@(reachable ? "is-done" : "is-alert")">
+                        <icon name="@(reachable ? "circle-check" : "triangle-alert")" />
+                        <div>
+                            <div class="checklist-title">@(reachable ? "Reachable at " + t.PrimaryHost : "No address yet")</div>
+                            <div class="checklist-desc">@(reachable ? "Its people sign in there. Links in its emails point there too." : "Nobody can reach this tenant until it has a verified domain. Add one under Domains, point its DNS at the platform, then mark it verified.")</div>
+                        </div>
+                    </li>
+                    <li class="@(admins.Count > 0 ? "is-done" : "is-alert")">
+                        <icon name="@(admins.Count > 0 ? "circle-check" : "triangle-alert")" />
+                        <div>
+                            <div class="checklist-title">@(admins.Count > 0 ? (admins.Count == 1 ? admins[0].DisplayName + " invited as administrator" : admins.Count + " administrators invited") : "No administrator yet")</div>
+                            <div class="checklist-desc">The welcome email has a link to set a password (valid 3 days), the sign-in address, and the first steps: invite their team, add their logo, check their settings.</div>
+                            @if (canManage && admins.Count == 0)
+                            {
+                                <button class="btn btn-secondary btn-sm mt-2" type="button" data-bs-toggle="modal" data-bs-target="#admin-dialog"><icon name="user-plus" class="icon-sm" /> Invite an administrator</button>
+                            }
+                        </div>
+                    </li>
+                    <li class="@(emailOk ? "is-done" : "is-alert")">
+                        <icon name="@(emailOk ? "circle-check" : "triangle-alert")" />
+                        <div>
+                            <div class="checklist-title">@(emailOk ? "Email is being delivered" : "Email isn't being delivered")</div>
+                            <div class="checklist-desc">@Model.EmailRoute.Description @(emailOk ? "" : "Until it is, invitations only reach the log and nobody receives them.")</div>
+                            @if (!emailOk)
+                            {
+                                <a class="btn btn-secondary btn-sm mt-2" asp-controller="SettingsAdmin" asp-action="Index" asp-route-category="Email" asp-permission="@PermissionCodes.Settings.Edit"><icon name="mail" class="icon-sm" /> Set up email</a>
+                            }
+                        </div>
+                    </li>
+                    <li class="@(accepted && signedIn ? "is-done" : "")">
+                        <icon name="@(accepted && signedIn ? "circle-check" : "circle-dashed")" />
+                        <div>
+                            <div class="checklist-title">@(signedIn ? "Their administrator has signed in" : accepted ? "Password set, not signed in yet" : "Waiting for them to accept")</div>
+                            <div class="checklist-desc">@(signedIn ? "From here they run their own organisation: users, roles, branding and settings." : "Nothing more to do on your side. If the link expired or got lost, resend the welcome from People.")</div>
+                        </div>
+                    </li>
+                </ol>
+            </section>
+        }
         <section class="panel" aria-labelledby="sub-title">
             <div class="panel-header">
                 <h2 class="panel-title" id="sub-title">Subscription</h2>
@@ -174,6 +232,52 @@
             </div>
         </section>
 
+        <section class="panel" aria-labelledby="people-title">
+            <div class="panel-header">
+                <h2 class="panel-title" id="people-title">People</h2>
+                <span class="text-muted small">@t.UserCount</span>
+            </div>
+            @if (Model.Details.Users.Count == 0)
+            {
+                <div class="panel-body text-muted small">No users yet.</div>
+            }
+            else
+            {
+                <ul class="person-list">
+                    @foreach (var u in Model.Details.Users)
+                    {
+                        var state = u.IsLockedOut ? ("Locked", "danger") : !u.HasPassword ? ("Invited", "warning") : u.LastSignInAt is null ? ("Not signed in yet", "secondary") : ("Active", "success");
+                        <li>
+                            <span class="avatar" aria-hidden="true">@Display.Initials(u.DisplayName)</span>
+                            <div class="person-main">
+                                <div class="person-name">@u.DisplayName</div>
+                                <div class="person-sub">@u.Email</div>
+                                <div class="person-sub">
+                                    @string.Join(", ", u.Roles)
+                                    @if (u.LastSignInAt is { } last) {<text> · last signed in <local-time value="last" format="d MMM yyyy" /></text>}
+                                    else if (!u.HasPassword) {<text> · invited <local-time value="u.DateCreated" format="d MMM yyyy" /></text>}
+                                </div>
+                            </div>
+                            <span class="badge text-bg-@state.Item2">@state.Item1</span>
+                            @if (canManage && !u.HasPassword && !u.IsLockedOut)
+                            {
+                                <form method="post" asp-action="ResendWelcome" asp-route-id="@t.Id" asp-route-userId="@u.Id">
+                                    <button class="icon-btn" type="submit" title="Send the welcome email again" aria-label="Send the welcome email to @u.DisplayName again"><icon name="send" /></button>
+                                </form>
+                            }
+                        </li>
+                    }
+                </ul>
+            }
+            @if (canManage && !t.IsPlatform)
+            {
+                <div class="panel-footer d-flex flex-wrap align-items-center gap-2">
+                    <button class="btn btn-secondary btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#admin-dialog"><icon name="user-plus" class="icon-sm" /> Invite an administrator</button>
+                    <span class="text-muted small">They invite the rest of their team themselves.</span>
+                </div>
+            }
+        </section>
+
         <section class="panel" aria-labelledby="domains-title">
             <div class="panel-header"><h2 class="panel-title" id="domains-title">Domains</h2><span class="text-muted small">@Model.Details.Domains.Count</span></div>
             @if (Model.Details.Domains.Count == 0)
@@ -216,6 +320,23 @@
         </section>
     </div>
 </div>
+
+@if (canManage && !t.IsPlatform)
+{
+    <div class="modal fade" id="admin-dialog" tabindex="-1" aria-labelledby="admin-title" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <form class="modal-content" method="post" asp-action="InviteAdministrator" asp-route-id="@t.Id">
+                <div class="modal-header"><h2 class="modal-title" id="admin-title">Invite an administrator to @t.Name</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body stack">
+                    <p class="text-muted mb-0">They get the welcome email: a link to set their password, where to sign in, and what to do first.</p>
+                    <div><label class="form-label" for="admin-name">Full name</label><input class="form-control" id="admin-name" name="name" maxlength="100" required autocomplete="off" /></div>
+                    <div><label class="form-label" for="admin-email">Email</label><input class="form-control" id="admin-email" name="email" type="email" maxlength="256" required autocomplete="off" /></div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" type="submit"><icon name="send" class="icon-sm" /> Send invitation</button></div>
+            </form>
+        </div>
+    </div>
+}
 
 @if (canManage)
 {

@@ -1,0 +1,16 @@
+@model Base.Application.Common.Records.ResolvedRecord
+@{
+    var href = RecordLinks.Url(Url, Model);
+}
+@if (Model.Label is null)
+{
+    <span class="record-link is-unavailable" title="This @Model.TypeName.ToLowerInvariant() is not available to you"><icon name="@RecordLinks.Icon(Model.Ref.EntityType)" class="icon-sm" /> @Model.TypeName</span>
+}
+else if (href is null)
+{
+    <span class="record-link" title="@Model.TypeName"><icon name="@RecordLinks.Icon(Model.Ref.EntityType)" class="icon-sm" /> <span class="record-link-text">@Model.Label.Title</span></span>
+}
+else
+{
+    <a class="record-link" href="@href" title="@Model.TypeName: @Model.Label.Title"><icon name="@RecordLinks.Icon(Model.Ref.EntityType)" class="icon-sm" /> <span class="record-link-text">@Model.Label.Title</span></a>
+}

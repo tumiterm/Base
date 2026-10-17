@@ -1,19 +1,23 @@
+using Base.Application.Common.Records;
 using Base.Application.Common.Results;
 using Base.Application.Documents;
 using Base.Application.Documents.Generation;
+using Base.Application.Settings;
 using Base.Application.Subscriptions;
 using Base.Web.Controllers.Api;
+using Base.Web.Http;
 using Base.Web.Results;
 using Base.Web.Subscriptions;
 using Base.Web.ViewModels;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Net.Http.Headers;
 
 namespace Base.Web.Controllers;
 
 /// <summary>Document pages. What each user may do is decided per document by <see cref="IDocumentAccessPolicy"/>.</summary>
 [RequiresFeature(FeatureCodes.Documents)]
 [Route("documents")]
-public sealed class DocumentsController(IDocumentService documents, IDocumentGenerator generator, IDocumentAccessPolicy policy) : Controller
+public sealed class DocumentsController(IDocumentService documents, IDocumentGenerator generator, IDocumentAccessPolicy policy, IRecordLabels records, IApplicationSettingService settings) : Controller
 {
     private const long TransportLimitBytes = 500L * 1024 * 1024;
 
@@ -21,7 +25,9 @@ public sealed class DocumentsController(IDocumentService documents, IDocumentGen
     public async Task<IActionResult> Index([FromQuery] DocumentFilterViewModel filter, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(filter);
-        return View(new DocumentListViewModel(await documents.SearchAsync(filter.ToQuery(), cancellationToken), filter, policy.CanCreate));
+        var found = await documents.SearchAsync(filter.ToQuery(), cancellationToken);
+        var links = await records.ResolveAsync(found.Items.Select(d => d.LinkedTo).OfType<RecordRef>(), cancellationToken);
+        return View(new DocumentListViewModel(found, filter, policy.CanCreate, links, await settings.GetBoolAsync(SettingCodes.Documents.PreviewEnabled, cancellationToken)));
     }
 
     [HttpPost("")]
@@ -49,10 +55,23 @@ public sealed class DocumentsController(IDocumentService documents, IDocumentGen
     }
 
     [HttpGet("{id:guid}")]
-    public async Task<IActionResult> Details(Guid id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Details(Guid id, int? version, CancellationToken cancellationToken)
     {
         var result = await documents.GetAsync(id, cancellationToken);
-        return result.IsSuccess ? View(result.Data) : NotFound();
+        if (!result.IsSuccess)
+        {
+            return NotFound();
+        }
+
+        var document = result.Data!;
+        var viewing = document.Versions.FirstOrDefault(v => v.Number == (version ?? document.CurrentVersion)) ?? (document.Versions.Count > 0 ? document.Versions[0] : null);
+        ResolvedRecord? linked = null;
+        if (document.LinkedTo is { } link)
+        {
+            linked = (await records.ResolveAsync([link], cancellationToken))[link];
+        }
+
+        return View(new DocumentPageViewModel(document, linked, viewing, await settings.GetBoolAsync(SettingCodes.Documents.PreviewEnabled, cancellationToken)));
     }
 
     [HttpPost("{id:guid}")]
@@ -115,6 +134,26 @@ public sealed class DocumentsController(IDocumentService documents, IDocumentGen
         return download.RedirectUrl is not null
             ? Redirect(download.RedirectUrl.ToString())
             : File(download.Content!, download.ContentType, download.FileName, enableRangeProcessing: true);
+    }
+
+    /// <summary>
+    /// The version shown inline, for the viewer on the page (PDF, images, text, generated HTML). Same-origin pages
+    /// may frame it; everything except PDFs is sandboxed so nothing in the file can run.
+    /// </summary>
+    [HttpGet("{id:guid}/preview")]
+    public async Task<IActionResult> Preview(Guid id, int? version, CancellationToken cancellationToken)
+    {
+        var result = await documents.PreviewAsync(id, version, cancellationToken);
+        if (!result.IsSuccess)
+        {
+            return NotFound();
+        }
+
+        var preview = result.Data!;
+        Response.AllowFramedPreview(sandboxed: preview.Kind != Application.Files.PreviewKind.Pdf);
+        Response.Headers.ContentDisposition = new ContentDispositionHeaderValue("inline") { FileNameStar = preview.FileName }.ToString();
+        Response.Headers.CacheControl = "private, max-age=300";
+        return File(preview.Content, preview.ContentType, enableRangeProcessing: true);
     }
 
     [HttpGet("generate")]

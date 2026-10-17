@@ -14,6 +14,12 @@
     };
 })();
 
+// Menus position themselves against the viewport, so a row's menu isn't clipped by the table, panel or
+// scrolling container it sits in (tables use overflow: clip for their rounded corners).
+if (window.bootstrap?.Dropdown) {
+    bootstrap.Dropdown.Default.popperConfig = (config) => ({ ...config, strategy: 'fixed' });
+}
+
 // Forms marked .confirm-submit ask before submitting (data-confirm holds the question).
 document.addEventListener('submit', (event) => {
     const form = event.target.closest('form.confirm-submit');
@@ -416,3 +422,47 @@ document.querySelectorAll('.drop-zone').forEach((zone) => {
         Kind.getOrCreateInstance(el).show();
     });
 })();
+
+// File previews in a drawer: <button data-preview="pdf|image|text|html|video|audio" data-preview-src="...">.
+// Text and HTML frames are sandboxed here as well as by the preview response's own CSP.
+(() => {
+    const drawer = document.getElementById('preview-drawer');
+    if (!drawer || !window.bootstrap) return;
+    const stage = drawer.querySelector('[data-preview-stage]');
+    const offcanvas = bootstrap.Offcanvas.getOrCreateInstance(drawer);
+    const make = (kind, src, name) => {
+        if (kind === 'image') { const img = document.createElement('img'); img.src = src; img.alt = name; return img; }
+        if (kind === 'video' || kind === 'audio') { const media = document.createElement(kind); media.src = src; media.controls = true; return media; }
+        const frame = document.createElement('iframe');
+        frame.title = `Preview of ${name}`;
+        if (kind !== 'pdf') frame.setAttribute('sandbox', '');
+        frame.src = src;
+        return frame;
+    };
+    document.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-preview]');
+        if (!button) return;
+        const data = button.dataset;
+        drawer.querySelector('[data-preview-title]').textContent = data.previewName || 'Preview';
+        drawer.querySelector('[data-preview-file]').textContent = data.previewFilename || '';
+        const tile = drawer.querySelector('[data-preview-tile]');
+        tile.className = `file-tile ${data.previewTone || ''}`;
+        const use = tile.querySelector('use');
+        if (use) use.setAttribute('href', `${use.getAttribute('href').split('#')[0]}#${data.previewIcon || 'file'}`);
+        drawer.querySelector('[data-preview-open]').href = data.previewOpenUrl || '#';
+        drawer.querySelector('[data-preview-download]').href = data.previewDownloadUrl || '#';
+        stage.classList.toggle('is-media', data.preview === 'audio');
+        stage.replaceChildren(make(data.preview, data.previewSrc, data.previewName || ''));
+        offcanvas.show();
+    });
+    // Stop media and drop the frame when the drawer closes.
+    drawer.addEventListener('hidden.bs.offcanvas', () => stage.replaceChildren());
+})();
+
+// <input type="file" data-fill-title="#title">: an empty title takes the chosen file's name, without the extension.
+document.querySelectorAll('input[type="file"][data-fill-title]').forEach((input) => input.addEventListener('change', () => {
+    const target = document.querySelector(input.dataset.fillTitle);
+    const file = input.files?.[0];
+    if (!target || !file || target.value.trim()) return;
+    target.value = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
+}));

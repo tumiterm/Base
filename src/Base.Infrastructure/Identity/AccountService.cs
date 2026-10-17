@@ -2,6 +2,7 @@ using Base.Application.Common.Abstractions;
 using Base.Application.Common.Results;
 using Base.Application.Common.Validation;
 using Base.Application.Notifications;
+using Base.Application.Settings;
 using Base.Application.Users;
 using FluentValidation;
 using Microsoft.AspNetCore.Identity;
@@ -12,6 +13,7 @@ internal sealed class AccountService(
     UserManager<ApplicationUser> users,
     INotificationService notifications,
     ICurrentUser currentUser,
+    IApplicationSettingService settings,
     TimeProvider time,
     IValidator<SetPasswordRequest> setPasswordValidator,
     IValidator<ChangePasswordRequest> changePasswordValidator) : IAccountService
@@ -24,6 +26,11 @@ internal sealed class AccountService(
         if (string.IsNullOrWhiteSpace(email))
         {
             return ValidationResponse.Failure(new ValidationError("Email", "Enter your email address."));
+        }
+
+        if (!await settings.GetBoolAsync(SettingCodes.Security.PasswordResetEnabled, cancellationToken))
+        {
+            return ValidationResponse.Forbidden("Password reset by email is switched off. Ask your administrator to reset it.");
         }
 
         var user = await users.FindByEmailAsync(email.Trim());

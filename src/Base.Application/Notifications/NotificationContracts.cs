@@ -60,6 +60,24 @@ public interface INotificationChannels
 
     /// <summary>The provider for the channel, or null if the channel is off or has no usable provider. Not used for in-app.</summary>
     Task<INotificationProvider?> ResolveAsync(NotificationChannel channel, CancellationToken cancellationToken = default);
+
+    /// <summary>Where the channel's messages go right now, for the settings screen.</summary>
+    Task<ChannelRoute> DescribeAsync(NotificationChannel channel, CancellationToken cancellationToken = default);
+
+    /// <summary>Provider instance names a tenant may choose for the channel.</summary>
+    IReadOnlyList<string> ProviderNames(NotificationChannel channel);
+}
+
+/// <summary>How a channel delivers. <see cref="Delivers"/> is false when messages only go to the log (or nowhere).</summary>
+/// <param name="Source">What chose the provider: the tenant's setting, the Email settings, or configuration.</param>
+public sealed record ChannelRoute(bool Enabled, string? ProviderName, bool Delivers, string Description, ChannelRouteSource Source);
+
+public enum ChannelRouteSource
+{
+    Off = 0,
+    Configuration = 1,
+    EmailSettings = 2,
+    TenantChoice = 3,
 }
 
 /// <summary>Fills a recipient's missing addresses and name from their account. Null if the user doesn't exist in this tenant.</summary>

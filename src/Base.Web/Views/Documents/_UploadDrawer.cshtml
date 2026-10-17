@@ -1,0 +1,46 @@
+@model UploadDrawerViewModel
+@using Base.Application.Documents
+@{
+    var id = Model.Id;
+}
+<div class="offcanvas offcanvas-end" tabindex="-1" id="@id" aria-labelledby="@id-title">
+    <div class="offcanvas-header">
+        <h2 class="offcanvas-title" id="@id-title">Upload a document@(Model.LinkedName is null ? "" : " for " + Model.LinkedName)</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <form asp-controller="Documents" asp-action="Create" method="post" enctype="multipart/form-data" class="d-flex flex-column flex-grow-1 overflow-hidden">
+        <input type="hidden" name="LinkType" value="@Model.LinkType" />
+        <input type="hidden" name="LinkId" value="@Model.LinkId" />
+        <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+        <div class="offcanvas-body stack">
+            <label class="drop-zone">
+                <icon name="file-up" class="icon-lg" />
+                <span class="drop-zone-hint"><strong>Choose a file</strong> or drop it here</span>
+                <input class="form-control" type="file" name="File" id="@id-file" data-fill-title="#@id-name" required />
+            </label>
+            <div>
+                <label class="form-label" for="@id-name">Title</label>
+                <input class="form-control" id="@id-name" name="Title" maxlength="200" required placeholder="Taken from the file name" />
+            </div>
+            <div>
+                <label class="form-label" for="@id-type">Type</label>
+                <select class="form-select" id="@id-type" name="Type">
+                    @foreach (var t in DocumentTypeCatalog.All) {<option value="@t.Code">@t.Name</option>}
+                </select>
+            </div>
+            <div>
+                <label class="form-label" for="@id-description">Description <span class="text-muted fw-normal">(optional)</span></label>
+                <textarea class="form-control" id="@id-description" name="Description" rows="2" maxlength="2000"></textarea>
+            </div>
+            <div>
+                <label class="form-label" for="@id-tags">Tags <span class="text-muted fw-normal">(optional)</span></label>
+                <input class="form-control" id="@id-tags" name="Tags" placeholder="contract, 2026" />
+                <div class="form-text">Separate tags with commas. They make documents easy to find.</div>
+            </div>
+        </div>
+        <div class="offcanvas-footer">
+            <button type="button" class="btn btn-ghost" data-bs-dismiss="offcanvas">Cancel</button>
+            <button class="btn btn-primary" type="submit"><icon name="upload" class="icon-sm" /> Upload</button>
+        </div>
+    </form>
+</div>

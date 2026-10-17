@@ -23,3 +23,6 @@ otherwise have to reverse-engineer. Format: context → decision → consequence
 | [0016](0016-tenants-plans-and-subscriptions.md) | Tenants, plans and subscriptions in the base, with no payment gateway |
 | [0017](0017-lookup-lists-and-the-sample-module.md) | Per-tenant lookup lists from a code catalogue, and People as the sample module |
 | [0018](0018-api-keys-idempotency-limits-and-versions.md) | API keys per client, idempotency keys, per-caller limits and header versioning |
+| [0019](0019-versioning-the-base.md) | SemVer for the Base, a changelog, tags, and projects that know their Base version |
+| [0020](0020-secret-settings-and-email-from-settings.md) | A settings screen, encrypted secret settings, email set up from settings |
+| [0021](0021-document-previews-and-record-labels.md) | Sandboxed in-browser previews and named record links |

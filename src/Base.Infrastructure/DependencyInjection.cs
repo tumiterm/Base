@@ -74,6 +74,7 @@ public static class DependencyInjection
         services.AddScoped<ITenantContext, TenantContext>();
         services.AddScoped<ITenantResolver, TenantResolver>();
         services.AddScoped<IPlatformTenant, PlatformTenant>();
+        services.AddSingleton<ISecretProtector, Settings.DataProtectionSecretProtector>();
         services.AddScoped<ITenantUsageReader, TenantUsageReader>();
         services.AddScoped<ITenantAdministration, TenantAdministrationService>();
 

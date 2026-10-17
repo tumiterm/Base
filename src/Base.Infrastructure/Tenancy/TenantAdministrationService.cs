@@ -9,8 +9,10 @@ using Base.Application.Tenancy;
 using Base.Application.Users;
 using Base.Domain.Subscriptions;
 using Base.Domain.Tenancy;
+using Base.Infrastructure.Identity;
 using Base.Infrastructure.Persistence;
 using FluentValidation;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -78,11 +80,21 @@ internal sealed partial class TenantAdministrationService(
             return ValidationResponse.NotFound("Tenant not found.").As<TenantDetails>();
         }
 
+        var people = await AsTenantAsync(tenantId, summary.Code, async services =>
+        {
+            var found = await services.GetRequiredService<IUserAdministration>().SearchAsync(new UserQuery(PageSize: 50), cancellationToken);
+            return found.Items
+                .OrderByDescending(u => u.Roles.Contains(RoleNames.Administrator, StringComparer.Ordinal))
+                .ThenBy(u => u.DisplayName, StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
+        });
+
         return new TenantDetails(
             summary,
             domains,
             await subscriptions.GetAsync(tenantId, cancellationToken),
-            await subscriptions.UsageAsync(tenantId, cancellationToken));
+            await subscriptions.UsageAsync(tenantId, cancellationToken),
+            people);
     }
 
     public async Task<ValidationResponse<Guid>> CreateAsync(CreateTenantRequest request, CancellationToken cancellationToken = default)
@@ -227,6 +239,64 @@ internal sealed partial class TenantAdministrationService(
         return ValidationResponse.Success(active ? $"{target.Name} is active again." : $"{target.Name} is deactivated; nobody can reach it.");
     }
 
+    public async Task<ValidationResponse<Guid>> InviteAdministratorAsync(Guid tenantId, string email, string name, CancellationToken cancellationToken = default)
+    {
+        var target = await FindAsync(tenantId, cancellationToken);
+        if (target is null)
+        {
+            return ValidationResponse.NotFound("Tenant not found.").As<Guid>();
+        }
+
+        var invite = await AsTenantAsync(target.Id, target.Code, services => services.GetRequiredService<IUserAdministration>()
+            .InviteAsync(new InviteUserRequest(email?.Trim() ?? string.Empty, name?.Trim() ?? string.Empty, [RoleNames.Administrator], Welcome: true), cancellationToken));
+        return invite.IsSuccess ? ValidationResponse.Success(invite.Data, $"Invitation on its way to {email!.Trim()}.") : invite;
+    }
+
+    public async Task<ValidationResponse> ResendWelcomeAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken = default)
+    {
+        var target = await FindAsync(tenantId, cancellationToken);
+        if (target is null)
+        {
+            return ValidationResponse.NotFound("Tenant not found.");
+        }
+
+        return await AsTenantAsync(target.Id, target.Code, async services =>
+        {
+            var users = services.GetRequiredService<UserManager<ApplicationUser>>();
+            var user = await users.FindByIdAsync(userId.ToString());
+            if (user is null || user.TenantId != target.Id)
+            {
+                return ValidationResponse.NotFound("User not found.");
+            }
+
+            if (user.HasPassword)
+            {
+                return ValidationResponse.Conflict($"{user.DisplayName} has already accepted and set a password.");
+            }
+
+            // A fresh token is made when the email is sent, so earlier links stop mattering.
+            user.Raise(new UserInvited(user.Id, Welcome: true));
+            var updated = (await users.UpdateAsync(user)).ToValidationResponse();
+            return updated.IsSuccess ? ValidationResponse.Success($"Welcome email sent to {user.Email} again.") : updated;
+        });
+    }
+
+    private async Task<Tenant?> FindAsync(Guid tenantId, CancellationToken cancellationToken)
+    {
+        using (tenant.BeginSystemScope())
+        {
+            return await db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Id == tenantId, cancellationToken);
+        }
+    }
+
+    /// <summary>Runs <paramref name="work"/> in a scope that belongs to <paramref name="tenantId"/>, as the current user.</summary>
+    private async Task<T> AsTenantAsync<T>(Guid tenantId, string code, Func<IServiceProvider, Task<T>> work)
+    {
+        await using var scope = scopes.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId, code);
+        return await work(scope.ServiceProvider);
+    }
+
     private IQueryable<TenantSummary> Project(IQueryable<Tenant> tenants, Guid platformId) =>
         tenants.Select(t => new
         {
@@ -264,7 +334,7 @@ internal sealed partial class TenantAdministrationService(
         }
 
         var invite = await services.GetRequiredService<IUserAdministration>()
-            .InviteAsync(new InviteUserRequest(request.AdminEmail.Trim(), request.AdminName.Trim(), [RoleNames.Administrator]), cancellationToken);
+            .InviteAsync(new InviteUserRequest(request.AdminEmail.Trim(), request.AdminName.Trim(), [RoleNames.Administrator], Welcome: true), cancellationToken);
         if (invite.IsError)
         {
             LogInviteFailed(logger, created.Code, invite.Message);

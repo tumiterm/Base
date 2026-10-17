@@ -1,4 +1,5 @@
 using Base.Application.Common.Persistence;
+using Base.Application.Common.Records;
 using Base.Application.Common.Results;
 using Base.Application.Files;
 using Base.Domain.Documents;
@@ -44,7 +45,14 @@ public sealed record DocumentSummary(
     string? LinkedEntityId,
     DateTimeOffset DateCreated,
     DateTimeOffset DateModified,
-    string? UserCreated);
+    string? UserCreated,
+    string? FileName = null,
+    string? ContentType = null,
+    long SizeBytes = 0)
+{
+    /// <summary>The linked record as a pointer, for <see cref="IRecordLabels"/>.</summary>
+    public RecordRef? LinkedTo => LinkedEntityType is null || LinkedEntityId is null ? null : new RecordRef(LinkedEntityType, LinkedEntityId);
+}
 
 public sealed record DocumentVersionView(
     int Number,
@@ -76,7 +84,10 @@ public sealed record DocumentDetails(
     DateTimeOffset DateCreated,
     string? UserCreated,
     IReadOnlyList<DocumentVersionView> Versions,
-    DocumentAbilities Can);
+    DocumentAbilities Can)
+{
+    public RecordRef? LinkedTo => LinkedEntityType is null || LinkedEntityId is null ? null : new RecordRef(LinkedEntityType, LinkedEntityId);
+}
 
 /// <summary>
 /// Versioned documents on top of <see cref="IFileService"/>: every upload runs the same checks (type, size, content
@@ -107,6 +118,12 @@ public interface IDocumentService
 
     /// <summary>The latest version, or <paramref name="version"/>.</summary>
     Task<ValidationResponse<FileDownload>> DownloadAsync(Guid documentId, int? version = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The latest version, or <paramref name="version"/>, opened for viewing in the browser. Not found when the
+    /// version's type can't be previewed safely (see <see cref="FilePreviews"/>).
+    /// </summary>
+    Task<ValidationResponse<FilePreview>> PreviewAsync(Guid documentId, int? version = null, CancellationToken cancellationToken = default);
 }
 
 public enum DocumentAction

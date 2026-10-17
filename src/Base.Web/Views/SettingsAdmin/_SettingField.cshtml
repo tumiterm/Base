@@ -1,0 +1,141 @@
+@model SettingFieldViewModel
+@using Base.Application.Settings
+@{
+    var s = Model.Setting;
+    var d = s.Definition;
+    var name = "setting:" + d.Code;
+    var id = "s-" + d.Code.Replace('.', '-');
+    var value = Model.Value;
+    var disabled = !Model.CanEdit;
+    var isSwitch = d.DataType == SettingDataType.Boolean;
+    var inheritsPlatform = d.Scope == SettingScope.Tenant && !Model.IsPlatform;
+    var options = Model.Choices ?? d.AllowedValues;
+    var error = ViewData.ModelState[d.Code]?.Errors.FirstOrDefault()?.ErrorMessage;
+    var invalid = error is null ? "" : " input-validation-error";
+}
+<div class="setting-row @(isSwitch ? "is-switch" : "")" id="@id-row">
+    <div class="setting-text">
+        <div class="setting-head">
+            <label class="setting-name" for="@id">@d.Name</label>
+            @if (d.Scope == SettingScope.Platform && Model.ShowScope)
+            {
+                <span class="chip" title="One value for the whole installation"><icon name="globe" /> All tenants</span>
+            }
+            @if (s.IsChanged)
+            {
+                <span class="chip is-active">@(inheritsPlatform ? "Changed for this tenant" : "Changed")</span>
+            }
+        </div>
+        <p class="setting-desc">@d.Description</p>
+        <div class="setting-meta">
+            @if (d.IsSecret)
+            {
+                <span>@(s.HasSecret ? "A value is stored, encrypted." : "Not set.")</span>
+            }
+            else if (inheritsPlatform && !s.IsChanged)
+            {
+                <span>Uses the platform value.</span>
+            }
+            else
+            {
+                <span>Default: @SettingsDisplay.Format(d, d.DefaultValue)</span>
+            }
+            @if (s.IsChanged && Model.CanEdit)
+            {
+                <button class="btn-inline" type="submit" formaction="@Url.Action("Revert", "SettingsAdmin")" formnovalidate name="code" value="@d.Code">
+                    @(inheritsPlatform ? "Use the platform value" : d.IsSecret ? "Remove" : "Reset to default")
+                </button>
+            }
+        </div>
+        @if (error is not null)
+        {
+            <span class="field-validation-error small" id="@id-error">@error</span>
+        }
+    </div>
+    <div class="setting-control">
+        @switch (d.DataType)
+        {
+            case SettingDataType.Boolean:
+                var on = bool.TryParse(value, out var flag) && flag;
+                <input type="hidden" name="@name" value="false" />
+                <div class="form-check form-switch m-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="@id" name="@name" value="true" checked="@on" disabled="@disabled" />
+                    <label class="visually-hidden" for="@id">@d.Name</label>
+                </div>
+                break;
+
+            case SettingDataType.Secret:
+                <input class="form-control@(invalid)" type="password" id="@id" name="@name" autocomplete="new-password" spellcheck="false" maxlength="@SettingDefinition.SecretMaxLength"
+                       placeholder="@(s.HasSecret ? "•••••••• stored — type to replace" : "Not set")" disabled="@disabled" />
+                break;
+
+            case SettingDataType.Integer:
+                <input class="form-control@(invalid) setting-number" type="number" id="@id" name="@name" value="@value" min="@d.Min" max="@d.Max" step="1" inputmode="numeric" required="@d.IsRequired" disabled="@disabled" />
+                break;
+
+            case SettingDataType.Color:
+                <div class="d-flex align-items-center gap-2">
+                    <input class="form-control form-control-color" type="color" id="@id" name="@name" value="@value" disabled="@disabled" />
+                    <span class="font-monospace text-muted small">@value</span>
+                </div>
+                break;
+
+            case SettingDataType.TimeZone:
+                <select class="form-select" id="@id" name="@name" data-combobox data-placeholder="Search time zones" disabled="@disabled">
+                    @foreach (var zone in TimeZones())
+                    {
+                        <option value="@zone" selected="@(string.Equals(zone, value, StringComparison.Ordinal))">@zone.Replace('_', ' ')</option>
+                    }
+                </select>
+                break;
+
+            default:
+                if (options is { Count: > 0 } && options.Count <= 3 && Model.Choices is null)
+                {
+                    <div class="segmented" role="radiogroup" aria-label="@d.Name">
+                        @foreach (var option in options)
+                        {
+                            var optionId = id + "-" + option;
+                            <input type="radio" name="@name" id="@optionId" value="@option" checked="@(string.Equals(option, value, StringComparison.OrdinalIgnoreCase))" disabled="@disabled" />
+                            <label for="@optionId">@Capitalise(option)</label>
+                        }
+                    </div>
+                }
+                else if (options is { Count: > 0 })
+                {
+                    <select class="form-select@(invalid)" id="@id" name="@name" disabled="@disabled">
+                        @if (!d.IsRequired)
+                        {
+                            <option value="">@(Model.Choices is null ? "None" : "Default")</option>
+                        }
+                        @foreach (var option in options)
+                        {
+                            <option value="@option" selected="@(string.Equals(option, value, StringComparison.OrdinalIgnoreCase))">@option</option>
+                        }
+                    </select>
+                }
+                else
+                {
+                    var type = d.DataType switch { SettingDataType.Url => "url", SettingDataType.Email => "email", _ => "text" };
+                    <input class="form-control@(invalid)" type="@type" id="@id" name="@name" value="@value" maxlength="4000" required="@d.IsRequired" disabled="@disabled"
+                           spellcheck="@(d.DataType == SettingDataType.String ? "true" : "false")" autocapitalize="off" />
+                    @if (d.DataType == SettingDataType.StringList)
+                    {
+                        <div class="form-text">Separate entries with commas.</div>
+                    }
+                }
+                break;
+        }
+    </div>
+</div>
+@functions {
+    private static IEnumerable<string> TimeZones() =>
+        TimeZoneInfo.GetSystemTimeZones()
+            .Select(z => z.HasIanaId ? z.Id : TimeZoneInfo.TryConvertWindowsIdToIanaId(z.Id, out var iana) ? iana : null)
+            .OfType<string>()
+            .Where(z => z.Contains('/', StringComparison.Ordinal))
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal);
+
+    private static string Capitalise(string text) => text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text[1..];
+}

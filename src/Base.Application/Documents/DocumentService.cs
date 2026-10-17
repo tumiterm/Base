@@ -2,6 +2,7 @@ using Base.Application.Common.Abstractions;
 using Base.Application.Common.Persistence;
 using Base.Application.Common.Results;
 using Base.Application.Files;
+using Base.Application.Settings;
 using Base.Domain.Documents;
 using Base.Domain.Files;
 
@@ -12,6 +13,7 @@ internal sealed class DocumentService(
     FileService files,
     IDocumentAccessPolicy policy,
     ICurrentUser currentUser,
+    IApplicationSettingService settings,
     TimeProvider time) : IDocumentService
 {
     private const string NotFoundMessage = "Document not found.";
@@ -200,7 +202,11 @@ internal sealed class DocumentService(
         // The Tenant and SoftDelete filters apply on top of this.
         return unitOfWork.Repository<Document>().GetPagedAsync(
             new PageRequest(query.Page, query.PageSize),
-            d => new DocumentSummary(d.Id, d.Title, d.DocumentType, d.Status, d.CurrentVersion, d.Tags, d.LinkedEntityType, d.LinkedEntityId, d.DateCreated, d.DateModified, d.UserCreated),
+            d => new DocumentSummary(
+                d.Id, d.Title, d.DocumentType, d.Status, d.CurrentVersion, d.Tags, d.LinkedEntityType, d.LinkedEntityId, d.DateCreated, d.DateModified, d.UserCreated,
+                d.Versions.Where(v => v.Number == d.CurrentVersion).Select(v => v.FileName).FirstOrDefault(),
+                d.Versions.Where(v => v.Number == d.CurrentVersion).Select(v => v.ContentType).FirstOrDefault(),
+                d.Versions.Where(v => v.Number == d.CurrentVersion).Select(v => v.SizeBytes).FirstOrDefault()),
             q => q.OrderByDescending(d => d.DateModified).ThenByDescending(d => d.Id),
             d => (onlyCreatedBy == null || d.CreatedByUserId == onlyCreatedBy)
                 && (search == null || d.Title.Contains(search))
@@ -228,6 +234,27 @@ internal sealed class DocumentService(
         }
 
         return await files.OpenAsync(file, wanted.FileName, cancellationToken);
+    }
+
+    public async Task<ValidationResponse<FilePreview>> PreviewAsync(Guid documentId, int? version = null, CancellationToken cancellationToken = default)
+    {
+        var document = await LoadAsync(documentId, DocumentAction.Read, includeVersions: true, cancellationToken, asNoTracking: true);
+        var wanted = document?.Versions.FirstOrDefault(v => v.Number == (version ?? document.CurrentVersion));
+        var kind = FilePreviews.KindOf(wanted?.ContentType);
+        if (wanted is null || kind == PreviewKind.None || !await settings.GetBoolAsync(SettingCodes.Documents.PreviewEnabled, cancellationToken))
+        {
+            return ValidationResponse.NotFound(NotFoundMessage).As<FilePreview>();
+        }
+
+        var file = await unitOfWork.Repository<StoredFile>().GetAsync(f => f.Id == wanted.FileId, asNoTracking: true, cancellationToken: cancellationToken);
+        if (file is null)
+        {
+            return ValidationResponse.NotFound(NotFoundMessage).As<FilePreview>();
+        }
+
+        // Streamed rather than redirected: a pre-signed object-storage link is another origin and forces a download.
+        var content = await files.OpenReadAsync(file, cancellationToken);
+        return new FilePreview(wanted.FileName, FilePreviews.ServedAs(kind, wanted.ContentType), kind, content);
     }
 
     private async Task<ValidationResponse> ChangeStatusAsync(

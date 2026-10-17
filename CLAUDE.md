@@ -8,6 +8,7 @@ cross-cutting feature or adding a package:
 - [docs/ui-design-direction.md](docs/ui-design-direction.md): the minimum bar for every screen (read before any UI work)
 - [docs/vertical-slice.md](docs/vertical-slice.md): a new module copies the People sample, file by file
 - [docs/api.md](docs/api.md): API keys, idempotency, limits, versions and CORS
+- [docs/changelog.md](docs/changelog.md): what changed in each Base version (add to Unreleased with every change)
 
 ## Commands
 
@@ -40,7 +41,11 @@ cross-cutting feature or adding a package:
   and enforcement (`[RequiresFeature]` + `asp-feature`, or `ITenantEntitlements.EnsureWithinLimitAsync` before the
   action). Never check plan codes or prices in code. Tenants are created through `ITenantAdministration`,
   subscriptions changed through `ISubscriptionService` (payments come from outside; no gateway in the base).
-- New setting = constant in `SettingCodes` + `SettingCatalog` entry (no migration). Secrets are never settings.
+- New setting = constant in `SettingCodes` + `SettingCatalog` entry (no migration); it appears on Administration →
+  Settings by itself. A switch is a `Boolean` setting read with `GetBoolAsync` in the service that does the work.
+  Platform-scope settings change only from the platform tenant. Deployment secrets (connection strings, signing and
+  provider keys) are never settings; only operator-entered credentials may be `Secret` settings (encrypted,
+  write-only, platform scope).
 - API controllers are `[ApiController]` under `api/...`, gated by `[HasPermission]` (API clients carry permissions
   too), return problem details through `ToActionResult`, and are version 1.0 unless marked `[ApiVersion]`. Never read a
   key or token from the query string, never add per-endpoint auth: callers are a person (cookie) or an `ApiClient`
@@ -51,6 +56,9 @@ cross-cutting feature or adding a package:
 - Files only through `IFileService`: bytes go to object storage. The `Database` provider is only for small files in chosen
   categories (`Files.CategoryProviders`), capped by the `Files.Database.*` settings; it can't be the default. Extra
   upload checks (virus scanning, ...) implement `IFileUploadCheck`.
+- A record other records can point at (documents' "linked to", ...) registers an `IRecordLabelProvider` (names only
+  what the user may see) and a row in `RecordLinks`, so screens show names, never ids. Previews go through
+  `FilePreviews` and the framed-preview headers; never serve a stored file inline any other way.
 - Documents (titled, versioned, linked to any record) go through `IDocumentService`. New document type = constant in
   `DocumentTypes` + `DocumentTypeCatalog` entry; new generated document = constant in `DocumentTemplates` + catalogue
   entry + `Documents/Templates/{Code}.html`. Output formats are `IDocumentRenderer`s; no licensed engine in the base.
@@ -63,7 +71,8 @@ cross-cutting feature or adding a package:
 - Notify people only through `INotificationService` (template code + recipient + data). New template = constant in
   `NotificationTemplates` + `NotificationCatalog` entry + `Notifications/Templates/{Code}.txt` (tests check they match).
   Templates containing secrets are `IsSensitive` (sent at once, stored without content). Providers are configured
-  under `Notifications:Providers`; nothing is sent on a channel until it is switched on. `IEmailSender` is only for
+  under `Notifications:Providers` (or, for email, the SMTP server under Settings → Email); nothing is sent on a channel
+  until it is switched on. `IEmailSender` is only for
   untemplated operator email.
 - User and role changes go through `IUserAdministration`/`IRoleAdministration` (never `UserManager` from Web), which
   enforce `PermissionGuard`: nobody grants or manages access they don't hold. Emails with links are sent from outbox
@@ -73,6 +82,8 @@ cross-cutting feature or adding a package:
 - Side effects after a commit go through domain events + `IDomainEventHandler<T>` (outbox; handlers idempotent).
 - Every schema change ships a generated migration. Never hand-write migrations or edit the snapshot.
 - Package versions live only in `Directory.Packages.props`. No pre-release packages.
+- Versions: `BaseVersion` in `Directory.Build.props` (SemVer, ADR 0019). Every change people would notice adds a line
+  under Unreleased in `docs/changelog.md` in the same commit; a release bumps the version and tags `vX.Y.Z`.
 - UI is built from the design system (`design-system.css` tokens, `<icon>`, the shell in `_Layout`) and must meet
   `docs/ui-design-direction.md`: no stock Bootstrap look, no inline scripts or styles (strict CSP), light and dark,
   phone layouts. Brand colours come from `var(--accent*)` (per-tenant `Branding.*` settings), never hard-coded.

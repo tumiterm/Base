@@ -16,7 +16,15 @@ cd ../Acme.Payroll && git init && dotnet tool restore && dotnet build && dotnet 
 ```
 
 The script copies the repository, renames `Base.*` projects, namespaces and the solution to `Acme.Payroll.*`
-(leaving `EntityBase`, `ControllerBase`, `Database`… alone), and generates a fresh user-secrets id.
+(leaving `EntityBase`, `ControllerBase`, `Database`… alone), and generates a fresh user-secrets id. The new project
+records the Base version it came from (`BaseVersion`) and starts its own at 0.1.0.
+
+## Versions
+
+The Base follows SemVer. The current version is `BaseVersion` in `Directory.Build.props`; what changed in each one is
+in [`docs/changelog.md`](docs/changelog.md); releases are tags `vX.Y.Z`. How a project takes a later Base release is
+in [ADR 0019](docs/adr/0019-versioning-the-base.md). The running build shows its version on the System page, in the
+account menu and at `GET api/system/version`.
 
 ## Run it locally
 
@@ -96,6 +104,13 @@ scripts/new-project.cs  Creates a renamed copy for a new project.
   - **Rate limits** per client or person (429 with `Retry-After`).
   - **Versioning:** `api-version`, with unversioned calls treated as 1.0.
   - **OpenAPI and a reference page,** switched on by configuration; CORS is closed by default.
+- **Settings screen** (Administration → Settings): every setting by category with defaults, switches and reset,
+  including email delivery (SMTP server, sender, an encrypted password) with a test email
+  ([ADR 0020](docs/adr/0020-secret-settings-and-email-from-settings.md)).
+- **Documents in the browser:** PDFs, images and text open on the page or in a drawer, sandboxed; linked records show
+  by name ([ADR 0021](docs/adr/0021-document-previews-and-record-labels.md)).
+- **Tenant onboarding:** each tenant's users and their status, a getting-started checklist, and a welcome email for
+  its first administrator with the sign-in address and first steps.
 - **Sample module: People.** A complete, documented vertical slice to copy ([docs/vertical-slice.md](docs/vertical-slice.md)):
   - a directory with filters, sorting, a drawer to add people, and a profile that is edited in place
   - photos, linked documents, and history from the audit trail

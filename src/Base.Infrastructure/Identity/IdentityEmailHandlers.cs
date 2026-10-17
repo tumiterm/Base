@@ -1,8 +1,14 @@
+using System.Globalization;
+using Base.Application.Common.Abstractions;
 using Base.Application.Messaging;
 using Base.Application.Notifications;
 using Base.Application.Settings;
+using Base.Application.Subscriptions;
 using Base.Application.Users;
+using Base.Domain.Subscriptions;
+using Base.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 
 namespace Base.Infrastructure.Identity;
 
@@ -15,7 +21,10 @@ namespace Base.Infrastructure.Identity;
 internal sealed class IdentityEmailHandlers(
     UserManager<ApplicationUser> users,
     INotificationService notifications,
-    IApplicationSettingService settings) : IDomainEventHandler<UserInvited>, IDomainEventHandler<PasswordResetRequested>
+    IApplicationSettingService settings,
+    AppDbContext db,
+    ITenantContext tenant,
+    ISubscriptionService subscriptions) : IDomainEventHandler<UserInvited>, IDomainEventHandler<PasswordResetRequested>
 {
     public async Task HandleAsync(UserInvited domainEvent, CancellationToken cancellationToken)
     {
@@ -27,6 +36,12 @@ internal sealed class IdentityEmailHandlers(
         }
 
         var token = await users.GenerateUserTokenAsync(user, InviteTokenProvider.ProviderName, InviteTokenProvider.Purpose);
+        if (domainEvent.Welcome)
+        {
+            await SendWelcomeAsync(user, token, cancellationToken);
+            return;
+        }
+
         await SendAsync(NotificationTemplates.Identity.UserInvited, user, token, PasswordTokenKind.Invite, cancellationToken);
     }
 
@@ -43,10 +58,42 @@ internal sealed class IdentityEmailHandlers(
         await SendAsync(NotificationTemplates.Identity.PasswordReset, user, token, PasswordTokenKind.Reset, cancellationToken);
     }
 
+    /// <summary>The first administrator of a new organisation: the invitation, where to sign in, and the first steps.</summary>
+    private async Task SendWelcomeAsync(ApplicationUser user, string token, CancellationToken cancellationToken)
+    {
+        string organisation;
+        using (tenant.BeginSystemScope())
+        {
+            organisation = await db.Tenants.AsNoTracking().Where(t => t.Id == tenant.TenantId).Select(t => t.Name).FirstOrDefaultAsync(cancellationToken) ?? "Your organisation";
+        }
+
+        var subscription = await subscriptions.GetAsync(tenant.TenantId, cancellationToken);
+        var planLine = subscription switch
+        {
+            { Status: SubscriptionStatus.Trialing, TrialEndsAt: { } ends } =>
+                $"You're on a free trial of the {subscription.PlanName} plan until {ends.ToString("d MMMM yyyy", CultureInfo.InvariantCulture)}.",
+            not null => $"You're on the {subscription.PlanName} plan.",
+            _ => string.Empty,
+        };
+
+        var baseUrl = await BaseUrlAsync(cancellationToken);
+        await notifications.SendAsync(
+            new Notification(
+                NotificationTemplates.Tenancy.Welcome,
+                new NotificationRecipient(user.Id, user.Email, null, user.DisplayName),
+                new { Link = Link(baseUrl, user, token, PasswordTokenKind.Invite), OrganisationName = organisation, SignInUrl = $"{baseUrl}/account/login", PlanLine = planLine }),
+            cancellationToken);
+    }
+
+    private async Task<string> BaseUrlAsync(CancellationToken cancellationToken) =>
+        (await settings.GetAsync(SettingCodes.General.PublicBaseUrl, cancellationToken))!.TrimEnd('/');
+
+    private static string Link(string baseUrl, ApplicationUser user, string token, PasswordTokenKind kind) =>
+        $"{baseUrl}/account/set-password?kind={kind.ToString().ToLowerInvariant()}&userId={user.Id}&token={Uri.EscapeDataString(token)}";
+
     private async Task SendAsync(string template, ApplicationUser user, string token, PasswordTokenKind kind, CancellationToken cancellationToken)
     {
-        var baseUrl = (await settings.GetAsync(SettingCodes.General.PublicBaseUrl, cancellationToken))!.TrimEnd('/');
-        var link = $"{baseUrl}/account/set-password?kind={kind.ToString().ToLowerInvariant()}&userId={user.Id}&token={Uri.EscapeDataString(token)}";
+        var link = Link(await BaseUrlAsync(cancellationToken), user, token, kind);
 
         // Explicit address: an invited user's email isn't confirmed yet, and that's the point of the link.
         await notifications.SendAsync(

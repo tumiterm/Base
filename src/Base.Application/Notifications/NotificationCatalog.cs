@@ -25,6 +25,12 @@ public static class NotificationTemplates
         public const string StatusChanged = "Subscriptions.StatusChanged";
     }
 
+    public static class Tenancy
+    {
+        /// <summary>A new organisation's first administrator: the invitation plus what to do next.</summary>
+        public const string Welcome = "Tenancy.Welcome";
+    }
+
     public static class Integrations
     {
         public const string ApiKeyExpiring = "Integrations.ApiKeyExpiring";
@@ -85,6 +91,9 @@ public static class NotificationCatalog
         new(NotificationTemplates.Identity.UserInvited, "Invitation", NotificationCategories.Security,
             "Sent when an administrator invites someone. Contains a single-use link to set a password.",
             [NotificationChannel.Email], ["Link"], IsMandatory: true, IsSensitive: true),
+        new(NotificationTemplates.Tenancy.Welcome, "Welcome to a new organisation", NotificationCategories.Security,
+            "Sent to a new organisation's first administrator: a single-use link to set a password, where to sign in, and the first steps.",
+            [NotificationChannel.Email], ["Link", "OrganisationName", "SignInUrl", "PlanLine"], IsMandatory: true, IsSensitive: true),
         new(NotificationTemplates.Identity.PasswordReset, "Password reset", NotificationCategories.Security,
             "Sent when a password reset is requested. Contains a single-use link.",
             [NotificationChannel.Email], ["Link"], IsMandatory: true, IsSensitive: true),

@@ -12,6 +12,39 @@ public static class SettingCodes
 
         /// <summary>Absolute URL used in emailed links. Never derived from the request's Host header (link hijacking).</summary>
         public const string PublicBaseUrl = "General.PublicBaseUrl";
+
+        /// <summary>A message across the top of every page (planned maintenance, ...); empty shows nothing.</summary>
+        public const string Announcement = "General.Announcement";
+    }
+
+    public static class Security
+    {
+        /// <summary>Switch: whether "Forgot your password?" is offered on the sign-in page.</summary>
+        public const string PasswordResetEnabled = "Security.PasswordResetEnabled";
+    }
+
+    public static class Documents
+    {
+        /// <summary>Switch: whether documents open in the browser (PDF, images, text) or only download.</summary>
+        public const string PreviewEnabled = "Documents.PreviewEnabled";
+    }
+
+    /// <summary>
+    /// Email delivery set up on the settings screen instead of in configuration. When <see cref="SmtpEnabled"/> is on
+    /// (and a tenant hasn't picked another provider), email goes through this SMTP server.
+    /// </summary>
+    public static class Email
+    {
+        public const string SmtpEnabled = "Email.Smtp.Enabled";
+        public const string SmtpHost = "Email.Smtp.Host";
+        public const string SmtpPort = "Email.Smtp.Port";
+        public const string SmtpUseStartTls = "Email.Smtp.UseStartTls";
+        public const string SmtpUserName = "Email.Smtp.UserName";
+
+        /// <summary>A <see cref="SettingDataType.Secret"/>: stored encrypted, never shown again.</summary>
+        public const string SmtpPassword = "Email.Smtp.Password";
+        public const string FromAddress = "Email.FromAddress";
+        public const string FromName = "Email.FromName";
     }
 
     public static class Branding

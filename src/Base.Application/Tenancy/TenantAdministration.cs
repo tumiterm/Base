@@ -1,6 +1,7 @@
 using Base.Application.Common.Persistence;
 using Base.Application.Common.Results;
 using Base.Application.Subscriptions;
+using Base.Application.Users;
 using Base.Domain.Subscriptions;
 
 namespace Base.Application.Tenancy;
@@ -32,6 +33,12 @@ public interface ITenantAdministration
 
     /// <summary>A deactivated tenant gets 403 on every request, whatever its subscription. The platform tenant can't be.</summary>
     Task<ValidationResponse> SetActiveAsync(Guid tenantId, bool active, CancellationToken cancellationToken = default);
+
+    /// <summary>Invites another administrator into the tenant, with the new-organisation welcome email.</summary>
+    Task<ValidationResponse<Guid>> InviteAdministratorAsync(Guid tenantId, string email, string name, CancellationToken cancellationToken = default);
+
+    /// <summary>Sends the welcome (with a fresh set-password link) again to a user who hasn't accepted it yet.</summary>
+    Task<ValidationResponse> ResendWelcomeAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken = default);
 }
 
 public sealed record TenantQuery(string? Search = null, SubscriptionStatus? Status = null, int Page = 1, int PageSize = 25);
@@ -52,11 +59,13 @@ public sealed record TenantSummary(
 
 public sealed record TenantDomainView(Guid Id, string Host, bool IsVerified);
 
+/// <param name="Users">The tenant's first users (administrators first), to see who is in and who hasn't accepted yet.</param>
 public sealed record TenantDetails(
     TenantSummary Tenant,
     IReadOnlyList<TenantDomainView> Domains,
     SubscriptionView? Subscription,
-    IReadOnlyList<UsageView> Usage);
+    IReadOnlyList<UsageView> Usage,
+    IReadOnlyList<UserSummary> Users);
 
 /// <param name="Host">Optional host name the tenant is reached at, e.g. acme.example.com (added as verified).</param>
 /// <param name="PlanId">Null leaves the tenant without a subscription: unrestricted, like the platform tenant.</param>

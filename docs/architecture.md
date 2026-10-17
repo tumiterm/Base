@@ -199,6 +199,11 @@ whose `IDocumentAccessPolicy` decides: `Documents.View` reads everything, `Docum
 `SaveAsync`; if it fails, the stored object is deleted. Final documents take no new versions until reopened. A daily
 job applies each `DocumentTypeCatalog` type's `ArchiveAfterDays` and `DeleteAfterDays` across tenants.
 
+Versions are previewed in the browser through `documents/{id}/preview` (ADR 0021): streamed through the application,
+served with a framing CSP of its own (same-origin frames only; sandboxed, except PDFs), and limited to the types in
+`FilePreviews` (never SVG; text served as plain text). A record link is shown by name through `IRecordLabels`, which
+asks each entity type's `IRecordLabelProvider`; `RecordLinks` in Web maps types to pages.
+
 `IDocumentGenerator` fills an HTML template from `Documents/Templates/{Code}.html` (values HTML-encoded, plus
 `AppName` and `Today`) and hands it to the `IDocumentRenderer` for the requested format. `html` is built in; `pdf` is
 `GotenbergPdfRenderer` when `Documents:Pdf:Gotenberg:BaseUrl` is set. The output is stored like an upload (size limit
@@ -254,6 +259,21 @@ streaming).
   (`Observability:TraceUrlTemplate`, `LogSearchUrlTemplate`).
 - Commands slower than `Database:SlowQueryThresholdMs` are logged with their SQL and trace id and counted as
   `base.db.slow_commands`. EF Core's meter is exported too.
+
+## Settings
+
+`SettingCatalog` defines every setting; `IApplicationSettingService` resolves tenant value → platform value → default,
+cached per tenant. Administration → Settings edits them by category (all or nothing per form, unchanged values left
+alone). Platform-scope settings are visible to and changeable by the platform tenant only. `Secret` settings are
+encrypted with Data Protection into `ProtectedValue` and never read back to screens. Email goes through the tenant's
+chosen provider, else the SMTP server from `Email.*` settings when switched on, else the configured channel default;
+`IEmailDeliveryTest` sends one message straight through that route (ADR 0020).
+
+## Versions
+
+`BaseVersion` in `Directory.Build.props` is the Base's SemVer version; projects made from it keep it and version
+themselves with `VersionPrefix`. `AppVersion` exposes both at run time (System page, account menu,
+`api/system/version`). `docs/changelog.md` records every change; tags `vX.Y.Z` publish releases (ADR 0019).
 
 ## UI and branding
 

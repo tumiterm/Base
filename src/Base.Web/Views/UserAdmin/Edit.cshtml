@@ -1,58 +1,111 @@
 @model EditUserViewModel
+@inject ICurrentUser CurrentUser
 @{
     ViewData["Title"] = Model.DisplayName;
+    var canManage = CurrentUser.HasPermission(PermissionCodes.Users.Manage);
+    var status = UserDisplay.Status(Model.IsLockedOut, Model.HasPassword, Model.LastSignInAt);
 }
+<nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-action="Index">Users</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">@Model.DisplayName</span></nav>
 <div class="page-header">
-    <h1 class="page-title">@Model.DisplayName</h1>
-</div>
-<p class="text-muted">
-    @Model.Email ·
-    @if (Model.IsLockedOut) { <span class="badge text-bg-danger">Locked</span> }
-    else if (!Model.HasPassword) { <span class="badge text-bg-warning">Invitation pending</span> }
-    else { <span class="badge text-bg-success">Active</span> }
-    · Last sign-in: @if (Model.LastSignInAt is { } at) { <local-time value="@at" /> } else { <span>never</span> }
-    <span asp-permission="@PermissionCodes.Audit.View">
-        · <a asp-controller="AuditAdmin" asp-action="Index" asp-route-EntityId="@Model.Id">History</a>
-        · <a asp-controller="AuditAdmin" asp-action="Index" asp-route-UserId="@Model.Id">Changes made by this user</a>
-    </span>
-</p>
-
-<div class="row g-4">
-    <form asp-action="Edit" asp-route-id="@Model.Id" method="post" class="col-md-6">
-        <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
-        <input type="hidden" asp-for="Email" />
-        <div class="mb-3">
-            <label asp-for="DisplayName" class="form-label"></label>
-            <input asp-for="DisplayName" class="form-control" />
-            <span asp-validation-for="DisplayName" class="text-danger"></span>
+    <div class="entity">
+        <span class="avatar avatar-xl" aria-hidden="true">@Display.Initials(Model.DisplayName)</span>
+        <div class="entity-text">
+            <h1 class="page-title">@Model.DisplayName</h1>
+            <p class="page-subtitle d-flex flex-wrap align-items-center gap-2"><span class="badge text-bg-@status.Tone">@status.Label</span> <span>@Model.Email</span></p>
         </div>
-        <partial name="_RolePicker" model="(Model.AvailableRoles, Model.Roles)" />
-        <div asp-permission="@PermissionCodes.Users.Manage">
-            <button type="submit" class="btn btn-primary">Save</button>
-        </div>
-        <a asp-action="Index" class="btn btn-link px-0">Back to users</a>
-    </form>
-
-    <div class="col-md-6" asp-permission="@PermissionCodes.Users.Manage">
-        <h2 class="h5">Access</h2>
-        <form asp-action="SendPasswordReset" asp-route-id="@Model.Id" method="post" class="mb-2">
-            <button type="submit" class="btn btn-outline-secondary">@(Model.HasPassword ? "Email a password reset link" : "Resend invitation")</button>
-        </form>
-        @if (Model.IsLockedOut)
-        {
-            <form asp-action="Unlock" asp-route-id="@Model.Id" method="post">
-                <button type="submit" class="btn btn-outline-success">Unlock account</button>
-            </form>
-        }
-        else
-        {
-            <form asp-action="Lock" asp-route-id="@Model.Id" method="post">
-                <button type="submit" class="btn btn-outline-danger">Lock account</button>
-                <div class="form-text">Locking signs the user out everywhere within a minute.</div>
-            </form>
-        }
+    </div>
+    <div class="page-actions">
+        <a class="btn btn-secondary" asp-controller="AuditAdmin" asp-action="Index" asp-route-EntityId="@Model.Id" asp-permission="@PermissionCodes.Audit.View"><icon name="history" class="icon-sm" /> History</a>
     </div>
 </div>
+
+<div class="detail-grid">
+    <form asp-action="Edit" asp-route-id="@Model.Id" method="post" class="panel" novalidate>
+        <input type="hidden" asp-for="Email" />
+        <div class="panel-header"><h2 class="panel-title">Profile and roles</h2></div>
+        <fieldset class="panel-body" disabled="@(!canManage)">
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+            <section class="form-section">
+                <div>
+                    <h2 class="form-section-title">Name</h2>
+                    <p class="form-section-desc">How they appear across the application and in the audit trail.</p>
+                </div>
+                <div>
+                    <label asp-for="DisplayName" class="form-label">Full name</label>
+                    <input asp-for="DisplayName" class="form-control" autocomplete="off" />
+                    <span asp-validation-for="DisplayName" class="text-danger"></span>
+                </div>
+            </section>
+            <section class="form-section">
+                <div>
+                    <h2 class="form-section-title">Roles</h2>
+                    <p class="form-section-desc">Changes apply within a minute, even if they're signed in.</p>
+                </div>
+                <partial name="_RolePicker" model="(Model.AvailableRoles, Model.Roles)" />
+            </section>
+        </fieldset>
+        @if (canManage)
+        {
+            <div class="panel-footer d-flex justify-content-end gap-2">
+                <a class="btn btn-ghost" asp-action="Index">Cancel</a>
+                <button type="submit" class="btn btn-primary"><icon name="check" class="icon-sm" /> Save changes</button>
+            </div>
+        }
+    </form>
+
+    <aside class="stack">
+        <section class="panel" aria-labelledby="account-title">
+            <div class="panel-header"><h2 class="panel-title" id="account-title">Account</h2></div>
+            <div class="panel-body">
+                <dl class="kv">
+                    <dt>Status</dt><dd><span class="badge text-bg-@status.Tone">@status.Label</span></dd>
+                    <dt>Signs in with</dt><dd>@Model.Email</dd>
+                    <dt>Password</dt><dd>@(Model.HasPassword ? "Set by them" : "Not set yet: invitation pending")</dd>
+                    <dt>Last signed in</dt><dd>@if (Model.LastSignInAt is { } at) {<local-time value="at" format="d MMM yyyy, HH:mm" />} else {<text>Never</text>}</dd>
+                </dl>
+            </div>
+            <div class="panel-footer small" asp-permission="@PermissionCodes.Audit.View">
+                <a asp-controller="AuditAdmin" asp-action="Index" asp-route-UserId="@Model.Id">See the changes they've made <icon name="chevron-right" class="icon-sm" /></a>
+            </div>
+        </section>
+
+        @if (canManage)
+        {
+            <section class="panel" aria-labelledby="access-title">
+                <div class="panel-header"><h2 class="panel-title" id="access-title">Access</h2></div>
+                <div class="panel-body stack">
+                    <form asp-action="SendPasswordReset" asp-route-id="@Model.Id" method="post">
+                        <button type="submit" class="btn btn-secondary w-100"><icon name="send" class="icon-sm" /> @(Model.HasPassword ? "Email a password reset link" : "Resend the invitation")</button>
+                        <div class="form-text">@(Model.HasPassword ? "They choose a new password from the link. Their current one keeps working until then." : "Sends a fresh link; earlier ones stop working.")</div>
+                    </form>
+                    @if (Model.IsLockedOut)
+                    {
+                        <form asp-action="Unlock" asp-route-id="@Model.Id" method="post">
+                            <button type="submit" class="btn btn-secondary w-100"><icon name="circle-play" class="icon-sm" /> Unlock the account</button>
+                        </form>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-outline-danger w-100" data-bs-toggle="modal" data-bs-target="#lock-dialog"><icon name="ban" class="icon-sm" /> Lock the account…</button>
+                    }
+                </div>
+            </section>
+        }
+    </aside>
+</div>
+
+@if (canManage && !Model.IsLockedOut)
+{
+    <div class="modal fade" id="lock-dialog" tabindex="-1" aria-labelledby="lock-title" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <form class="modal-content" method="post" asp-action="Lock" asp-route-id="@Model.Id">
+                <div class="modal-header"><h2 class="modal-title" id="lock-title">Lock @Model.DisplayName's account?</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body"><p class="mb-0 text-muted">They're signed out everywhere within a minute and can't sign in until someone unlocks the account. Nothing they made is removed.</p></div>
+                <div class="modal-footer"><button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button><button class="btn btn-danger" type="submit">Lock account</button></div>
+            </form>
+        </div>
+    </div>
+}
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
 }

@@ -9,12 +9,12 @@ public sealed record UserListViewModel(PagedResult<UserSummary> Users, string? S
 
 public sealed class InviteUserViewModel
 {
-    [Required]
-    [EmailAddress]
+    [Required(ErrorMessage = "Enter the email address the invitation goes to.")]
+    [EmailAddress(ErrorMessage = "Enter an email address like name@example.com.")]
     public string Email { get; set; } = string.Empty;
 
-    [Required]
-    [Display(Name = "Display name")]
+    [Required(ErrorMessage = "Enter their full name.")]
+    [Display(Name = "Full name")]
     public string DisplayName { get; set; } = string.Empty;
 
     public IList<string> Roles { get; set; } = [];
@@ -28,8 +28,8 @@ public sealed class EditUserViewModel
 
     public string Email { get; set; } = string.Empty;
 
-    [Required]
-    [Display(Name = "Display name")]
+    [Required(ErrorMessage = "Enter their full name.")]
+    [Display(Name = "Full name")]
     public string DisplayName { get; set; } = string.Empty;
 
     public IList<string> Roles { get; set; } = [];

@@ -101,7 +101,7 @@ internal sealed class UserAdministrationService(
                 Email = email,
                 DisplayName = request.DisplayName.Trim(),
             };
-            user.Raise(new UserInvited(user.Id));
+            user.Raise(new UserInvited(user.Id, request.Welcome));
 
             IdentityOperationException.ThrowIfFailed(await users.CreateAsync(user));
             if (request.Roles.Count > 0)

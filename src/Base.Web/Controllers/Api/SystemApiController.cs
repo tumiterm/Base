@@ -12,6 +12,10 @@ namespace Base.Web.Controllers.Api;
 [HasPermission(PermissionCodes.System.HealthView)]
 public sealed class SystemApiController(ISystemStatus status, IJobScheduler jobs, IErrorLog errors) : ControllerBase
 {
+    /// <summary>The running build: product version, commit and the Base version it is built on.</summary>
+    [HttpGet("version")]
+    public VersionView Version() => new(AppVersion.Version, AppVersion.Commit, AppVersion.BaseVersion, AppVersion.Informational);
+
     /// <summary>Every health check with its data (the anonymous <c>/health/*</c> probes only say up or down).</summary>
     [HttpGet("health")]
     public Task<HealthReportView> Health(CancellationToken cancellationToken) => status.HealthAsync(cancellationToken);
@@ -31,3 +35,5 @@ public sealed class SystemApiController(ISystemStatus status, IJobScheduler jobs
     public async Task<IActionResult> Error(string ticket, CancellationToken cancellationToken) =>
         await errors.GetAsync(ticket, cancellationToken) is { } error ? Ok(error) : NotFound();
 }
+
+public sealed record VersionView(string Version, string? Commit, string BaseVersion, string Informational);

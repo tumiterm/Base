@@ -1,27 +1,89 @@
 @model InviteUserViewModel
+@inject Base.Application.Notifications.INotificationChannels Channels
+@inject Base.Application.Settings.IApplicationSettingService Settings
+@inject ICurrentUser CurrentUser
 @{
-    ViewData["Title"] = "Invite user";
+    ViewData["Title"] = "Invite someone";
+    var email = await Channels.DescribeAsync(Base.Domain.Notifications.NotificationChannel.Email);
+    var address = await Settings.GetAsync(Base.Application.Settings.SettingCodes.General.PublicBaseUrl);
 }
+<nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-action="Index">Users</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">Invite someone</span></nav>
 <div class="page-header">
-    <h1 class="page-title">Invite user</h1>
+    <div>
+        <h1 class="page-title">Invite someone</h1>
+        <p class="page-subtitle">They get an email to choose their own password. Nobody else ever sees or sets it.</p>
+    </div>
 </div>
-<p class="text-muted">They'll get an email with a link to choose their own password. The link is valid for 3 days.</p>
-<form asp-action="Invite" method="post" class="col-md-6">
-    <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
-    <div class="mb-3">
-        <label asp-for="Email" class="form-label"></label>
-        <input asp-for="Email" class="form-control" autofocus />
-        <span asp-validation-for="Email" class="text-danger"></span>
-    </div>
-    <div class="mb-3">
-        <label asp-for="DisplayName" class="form-label"></label>
-        <input asp-for="DisplayName" class="form-control" />
-        <span asp-validation-for="DisplayName" class="text-danger"></span>
-    </div>
-    <partial name="_RolePicker" model="(Model.AvailableRoles, Model.Roles)" />
-    <button type="submit" class="btn btn-primary">Send invitation</button>
-    <a asp-action="Index" class="btn btn-link">Cancel</a>
-</form>
+
+<div class="detail-grid">
+    <form asp-action="Invite" method="post" class="panel" novalidate>
+        <div class="panel-body">
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+            <section class="form-section">
+                <div>
+                    <h2 class="form-section-title">Who</h2>
+                    <p class="form-section-desc">Their name as colleagues know it, and the address the invitation goes to. They sign in with it.</p>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label asp-for="DisplayName" class="form-label">Full name</label>
+                        <input asp-for="DisplayName" class="form-control" autocomplete="off" placeholder="Thandi Nkosi" autofocus />
+                        <span asp-validation-for="DisplayName" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-6">
+                        <label asp-for="Email" class="form-label">Email</label>
+                        <input asp-for="Email" class="form-control" type="email" autocomplete="off" spellcheck="false" autocapitalize="off" placeholder="thandi@example.com" />
+                        <span asp-validation-for="Email" class="text-danger"></span>
+                    </div>
+                </div>
+            </section>
+            <section class="form-section">
+                <div>
+                    <h2 class="form-section-title">What they can do</h2>
+                    <p class="form-section-desc">Roles bundle permissions. Most people need just one.</p>
+                </div>
+                <partial name="_RolePicker" model="(Model.AvailableRoles, Model.Roles)" />
+            </section>
+        </div>
+        <div class="panel-footer d-flex justify-content-end gap-2">
+            <a class="btn btn-ghost" asp-action="Index">Cancel</a>
+            <button type="submit" class="btn btn-primary"><icon name="send" class="icon-sm" /> Send invitation</button>
+        </div>
+    </form>
+
+    <aside class="stack">
+        @if (!email.Delivers)
+        {
+            <div class="status-callout is-warning" role="status">
+                <icon name="triangle-alert" />
+                <div>
+                    <div class="status-callout-title">Email isn't being delivered</div>
+                    <div class="small">@email.Description The invitation will be created, but they won't receive it until email is set up.</div>
+                    @if (CurrentUser.HasPermission(PermissionCodes.Settings.Edit))
+                    {
+                        <a class="btn btn-secondary btn-sm mt-2" asp-controller="SettingsAdmin" asp-action="Index" asp-route-category="Email"><icon name="mail" class="icon-sm" /> Set up email</a>
+                    }
+                </div>
+            </div>
+        }
+        <section class="panel" aria-labelledby="next-title">
+            <div class="panel-header"><h2 class="panel-title" id="next-title">What happens next</h2></div>
+            <div class="panel-body">
+                <ol class="steps">
+                    <li><div class="steps-title">They get an email</div><div class="steps-desc">With a link to set a password. It works once and expires in 3 days.</div></li>
+                    <li><div class="steps-title">They choose a password</div><div class="steps-desc">At least 12 characters. A passphrase is fine.</div></li>
+                    <li><div class="steps-title">They sign in</div><div class="steps-desc">At <span class="text-nowrap">@address</span> with this email address.</div></li>
+                    <li><div class="steps-title">You stay in charge</div><div class="steps-desc">Change their roles, resend the invitation or lock the account from their page.</div></li>
+                </ol>
+            </div>
+        </section>
+        <a class="panel panel-link" asp-controller="Imports" asp-action="Index" asp-permission="@PermissionCodes.Users.Manage" asp-feature="@FeatureCodes.DataExchange">
+            <span class="file-tile is-sheet" aria-hidden="true"><icon name="file-spreadsheet" /></span>
+            <span><span class="d-block fw-semibold">Inviting a whole team?</span><span class="text-muted small">Import a spreadsheet of names, emails and roles.</span></span>
+            <icon name="chevron-right" class="icon-sm text-muted ms-auto" />
+        </a>
+    </aside>
+</div>
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
 }

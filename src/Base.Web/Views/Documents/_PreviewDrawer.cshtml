@@ -1,0 +1,20 @@
+@* One drawer per page, filled by [data-preview] buttons (site.js). *@
+<div class="offcanvas offcanvas-end offcanvas-wide" tabindex="-1" id="preview-drawer" aria-labelledby="preview-title">
+    <div class="offcanvas-header">
+        <div class="entity">
+            <span class="file-tile" data-preview-tile aria-hidden="true"><icon name="file" /></span>
+            <div class="entity-text">
+                <h2 class="offcanvas-title entity-name" id="preview-title" data-preview-title>Preview</h2>
+                <span class="entity-sub" data-preview-file></span>
+            </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body p-0">
+        <div class="viewer-stage" data-preview-stage></div>
+    </div>
+    <div class="offcanvas-footer">
+        <a class="btn btn-ghost me-auto" href="#" data-preview-open><icon name="external-link" class="icon-sm" /> Open document</a>
+        <a class="btn btn-primary" href="#" data-preview-download><icon name="download" class="icon-sm" /> Download</a>
+    </div>
+</div>
