@@ -6,13 +6,18 @@ namespace Base.Application.Security;
 /// <param name="Key">The <see cref="PermissionCodes"/> constant.</param>
 /// <param name="GrantedByDefaultTo">Roles that receive it when roles are first seeded.</param>
 /// <param name="Implies">Permissions this one includes (e.g. Edit implies View).</param>
+/// <param name="IsPlatform">
+/// Acts across tenants (or on data all tenants share, like roles), so it only takes effect for users of the platform
+/// (default) tenant. A tenant's own administrators never receive it, whatever their roles say.
+/// </param>
 public sealed record PermissionDefinition(
     string Key,
     string Label,
     string Module,
     string Description,
     IReadOnlyList<string> GrantedByDefaultTo,
-    IReadOnlyList<string> Implies);
+    IReadOnlyList<string> Implies,
+    bool IsPlatform = false);
 
 /// <summary>
 /// The single source of truth for permissions. Declare a permission only when code enforces it.
@@ -35,7 +40,8 @@ public static class PermissionCatalog
         new(PermissionCodes.Settings.Edit, "Edit settings", "Settings", "Change application settings.", AdminOnly, [PermissionCodes.Settings.View]),
         new(PermissionCodes.Users.View, "View users", "Users", "See user accounts.", AdminOnly, []),
         new(PermissionCodes.Users.Manage, "Manage users", "Users", "Create, lock and edit user accounts.", AdminOnly, [PermissionCodes.Users.View]),
-        new(PermissionCodes.Roles.Manage, "Manage roles", "Users", "Create roles and grant permissions.", AdminOnly, [PermissionCodes.Users.View]),
+        new(PermissionCodes.Roles.Manage, "Manage roles", "Users", "Create roles and grant permissions. Roles are shared by every tenant.", AdminOnly,
+            [PermissionCodes.Users.View], IsPlatform: true),
         new(PermissionCodes.Files.Upload, "Upload files", "Files", "Upload files; users can always read their own uploads.", Everyone, []),
         new(PermissionCodes.Files.ReadAll, "Read all files", "Files", "Download any file in the tenant, not just your own.", AdminOnly, []),
         new(PermissionCodes.Files.DeleteAll, "Delete any file", "Files", "Delete any file in the tenant.", AdminOnly, [PermissionCodes.Files.ReadAll]),
@@ -46,6 +52,12 @@ public static class PermissionCatalog
         new(PermissionCodes.Notifications.View, "View notification log", "Notifications", "See every email, SMS, WhatsApp and in-app message sent, skipped or failed.", AdminOnly, []),
         new(PermissionCodes.Notifications.Manage, "Manage notifications", "Notifications", "Resend messages and edit this tenant's notification wording.", AdminOnly, [PermissionCodes.Notifications.View]),
         new(PermissionCodes.Audit.View, "View audit trail", "System", "See who changed what, when, with before and after values.", AdminOnly, []),
+        new(PermissionCodes.Subscription.View, "View subscription", "Subscription", "See this organisation's plan, usage and billing status.", AdminOnly, []),
+        new(PermissionCodes.Platform.TenantsView, "View tenants", "Platform", "See every tenant, its subscription and usage.", AdminOnly, [], IsPlatform: true),
+        new(PermissionCodes.Platform.TenantsManage, "Manage tenants", "Platform", "Create tenants, manage their domains and subscriptions, suspend and reinstate them.",
+            AdminOnly, [PermissionCodes.Platform.TenantsView], IsPlatform: true),
+        new(PermissionCodes.Platform.PlansManage, "Manage plans", "Platform", "Create plans and set their prices, trials, features and limits.", AdminOnly,
+            [PermissionCodes.Platform.TenantsView], IsPlatform: true),
         new(PermissionCodes.System.HealthView, "View system health", "System", "See health checks, errors and storage usage.", AdminOnly, []),
         new(PermissionCodes.System.JobsManage, "Manage background jobs", "System", "Open the job dashboard and retry or delete jobs.", AdminOnly, [PermissionCodes.System.HealthView]),
     ];
@@ -56,6 +68,12 @@ public static class PermissionCatalog
     public static bool Exists(string key) => ByKey.ContainsKey(key);
 
     public static PermissionDefinition? Find(string key) => ByKey.GetValueOrDefault(key);
+
+    public static bool IsPlatform(string key) => ByKey.TryGetValue(key, out var definition) && definition.IsPlatform;
+
+    /// <summary>The permissions that take effect in a tenant: platform ones only in the platform tenant.</summary>
+    public static IEnumerable<string> EffectiveIn(IEnumerable<string> permissions, bool platformTenant) =>
+        platformTenant ? permissions : permissions.Where(p => !IsPlatform(p));
 
     /// <summary>Permissions granted to a role on first seed.</summary>
     public static IEnumerable<string> DefaultsFor(string role) =>

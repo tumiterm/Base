@@ -3,6 +3,7 @@ using Base.Application.Common.Persistence;
 using Base.Application.Common.Results;
 using Base.Application.Common.Validation;
 using Base.Application.Security;
+using Base.Application.Subscriptions;
 using Base.Application.Users;
 using Base.Domain.Common;
 using Base.Infrastructure.Persistence;
@@ -19,6 +20,8 @@ internal sealed class UserAdministrationService(
     IUnitOfWork unitOfWork,
     IdentityQueries queries,
     ICurrentUser actor,
+    IPlatformTenant platform,
+    ITenantEntitlements entitlements,
     TimeProvider time,
     IValidator<InviteUserRequest> inviteValidator,
     IValidator<UpdateUserRequest> updateValidator) : IUserAdministration
@@ -80,6 +83,12 @@ internal sealed class UserAdministrationService(
         if (roleCheck.IsError)
         {
             return roleCheck.As<Guid>();
+        }
+
+        var limit = await entitlements.EnsureWithinLimitAsync(LimitCodes.Users, 1, cancellationToken);
+        if (limit.IsError)
+        {
+            return limit.As<Guid>();
         }
 
         return await RunAsync(async ct =>
@@ -245,7 +254,14 @@ internal sealed class UserAdministrationService(
 
     /// <summary>You can only manage users whose access you hold yourself.</summary>
     private async Task<ValidationResponse> CheckCanManageAsync(ApplicationUser user, string action, CancellationToken cancellationToken) =>
-        PermissionGuard.EnsureHoldsAll(actor, await queries.PermissionsOfUserAsync(user.Id, cancellationToken), action);
+        PermissionGuard.EnsureHoldsAll(actor, await EffectiveAsync(await queries.PermissionsOfUserAsync(user.Id, cancellationToken), cancellationToken), action);
+
+    /// <summary>
+    /// Roles are shared by all tenants, so a role can carry platform permissions that do nothing outside the platform
+    /// tenant. They are left out of the escalation check there; otherwise no tenant could manage its own administrators.
+    /// </summary>
+    private async Task<IEnumerable<string>> EffectiveAsync(IEnumerable<string> permissions, CancellationToken cancellationToken) =>
+        PermissionCatalog.EffectiveIn(permissions, await platform.IsCurrentAsync(cancellationToken));
 
     /// <summary>Roles must exist, and you can only assign roles whose permissions you hold.</summary>
     private async Task<ValidationResponse> CheckAssignableRolesAsync(IReadOnlyList<string> roleNames, CancellationToken cancellationToken)
@@ -258,7 +274,7 @@ internal sealed class UserAdministrationService(
             }
         }
 
-        return PermissionGuard.EnsureHoldsAll(actor, await queries.PermissionsOfRolesAsync(roleNames, cancellationToken), "assign these roles");
+        return PermissionGuard.EnsureHoldsAll(actor, await EffectiveAsync(await queries.PermissionsOfRolesAsync(roleNames, cancellationToken), cancellationToken), "assign these roles");
     }
 
     private async Task<ValidationResponse<T>> RunAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken)

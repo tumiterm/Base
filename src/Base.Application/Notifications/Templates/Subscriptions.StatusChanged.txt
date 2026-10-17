@@ -1,0 +1,12 @@
+--- email.subject
+Your {{AppName}} subscription is now {{Status}}
+--- email.html
+<p>Hello,</p>
+<p>Your organisation's {{PlanName}} subscription is now <strong>{{Status}}</strong>: {{Reason}}.</p>
+<p>See the details at <a href="{{PublicBaseUrl}}/subscription">{{PublicBaseUrl}}/subscription</a>, or reply to this email if you think this is a mistake.</p>
+--- email.text
+Hello,
+
+Your organisation's {{PlanName}} subscription is now {{Status}}: {{Reason}}.
+
+Details: {{PublicBaseUrl}}/subscription

@@ -1,12 +1,15 @@
 using Base.Application.Common.Persistence;
 using Base.Application.Common.Results;
 using Base.Application.DataExchange;
+using Base.Application.Subscriptions;
 using Base.Domain.DataExchange;
+using Base.Web.Subscriptions;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Base.Web.Controllers;
 
 /// <summary>Export history and downloads. Exports start from the buttons on each list (<c>/exports/{code}?format=...</c>).</summary>
+[RequiresFeature(FeatureCodes.DataExchange)]
 [Route("exports")]
 public sealed class ExportsController(IExportService exports) : Controller
 {
@@ -55,6 +58,7 @@ public sealed class ExportsController(IExportService exports) : Controller
 }
 
 /// <summary>Upload, preview, confirm and follow imports.</summary>
+[RequiresFeature(FeatureCodes.DataExchange)]
 [Route("imports")]
 public sealed class ImportsController(IImportService imports) : Controller
 {

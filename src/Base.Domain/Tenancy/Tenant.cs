@@ -9,6 +9,7 @@ public sealed record TenantCreated(Guid TenantId, string Code) : IDomainEvent;
 public sealed class Tenant : EntityBase, INamedEntity
 {
     public const string DefaultCode = "default";
+    public const int ContactEmailMaxLength = 256;
 
     private readonly List<TenantDomain> _domains = [];
 
@@ -33,6 +34,9 @@ public sealed class Tenant : EntityBase, INamedEntity
 
     public bool IsActive { get; private set; }
 
+    /// <summary>Who receives subscription and billing notices.</summary>
+    public string? ContactEmail { get; private set; }
+
     public IReadOnlyCollection<TenantDomain> Domains => _domains.AsReadOnly();
 
     public void Rename(string name)
@@ -41,9 +45,13 @@ public sealed class Tenant : EntityBase, INamedEntity
         Name = name.Trim();
     }
 
+    public void ChangeContact(string? email) => ContactEmail = string.IsNullOrWhiteSpace(email) ? null : email.Trim();
+
     public void Activate() => IsActive = true;
 
     public void Deactivate() => IsActive = false;
+
+    public TenantDomain? FindDomain(Guid domainId) => _domains.FirstOrDefault(d => d.Id == domainId);
 
     public TenantDomain AddDomain(string host)
     {

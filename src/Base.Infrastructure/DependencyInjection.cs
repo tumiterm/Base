@@ -9,6 +9,8 @@ using Base.Application.Files;
 using Base.Application.Messaging;
 using Base.Application.Notifications;
 using Base.Application.Operations;
+using Base.Application.Subscriptions;
+using Base.Application.Tenancy;
 using Base.Application.Users;
 using Base.Infrastructure.Auditing;
 using Base.Infrastructure.DataExchange;
@@ -69,6 +71,9 @@ public static class DependencyInjection
 
         services.AddScoped<ITenantContext, TenantContext>();
         services.AddScoped<ITenantResolver, TenantResolver>();
+        services.AddScoped<IPlatformTenant, PlatformTenant>();
+        services.AddScoped<ITenantUsageReader, TenantUsageReader>();
+        services.AddScoped<ITenantAdministration, TenantAdministrationService>();
 
         services.AddScoped<DomainEventDispatcher>();
         if (configuration.GetValue(OutboxOptions.SectionName + ":" + nameof(OutboxOptions.Enabled), true))
@@ -82,6 +87,7 @@ public static class DependencyInjection
         services.AddScoped<IStartupTask, DefaultTenantSeedTask>();
         services.AddScoped<IStartupTask, SettingsSeedTask>();
         services.AddScoped<IStartupTask, IdentitySeedTask>();
+        services.AddScoped<IStartupTask, SamplePlansSeedTask>();
 
         AddHealthChecks(services, configuration);
 

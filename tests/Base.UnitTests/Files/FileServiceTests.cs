@@ -5,6 +5,7 @@ using Base.Application.Common.Persistence;
 using Base.Application.Common.Results;
 using Base.Application.Files;
 using Base.Application.Settings;
+using Base.Application.Subscriptions;
 using Base.Domain.Files;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
@@ -22,6 +23,7 @@ public sealed class FileServiceTests
     private readonly IFileStorageProvider _provider = Substitute.For<IFileStorageProvider>();
     private readonly IApplicationSettingService _settings = Substitute.For<IApplicationSettingService>();
     private readonly ICurrentUser _user = Substitute.For<ICurrentUser>();
+    private readonly ITenantEntitlements _entitlements = Substitute.For<ITenantEntitlements>();
     private readonly FileService _service;
 
     public FileServiceTests()
@@ -48,10 +50,24 @@ public sealed class FileServiceTests
         tenant.TenantId.Returns(TenantId);
         _user.UserId.Returns(UserId);
         _user.IsAuthenticated.Returns(true);
+        _entitlements.EnsureWithinLimitAsync(Arg.Any<string>(), Arg.Any<long>(), Arg.Any<CancellationToken>()).Returns(ValidationResponse.Success());
 
         _service = new FileService(
-            _unitOfWork, resolver, new DefaultStoredFileAccessPolicy(_user), _settings, [], tenant, _user,
+            _unitOfWork, resolver, new DefaultStoredFileAccessPolicy(_user), _settings, [], tenant, _entitlements, _user,
             new FakeTimeProvider(new DateTimeOffset(2026, 10, 16, 12, 0, 0, TimeSpan.Zero)), NullLogger<FileService>.Instance);
+    }
+
+    [Fact]
+    public async Task Upload_over_the_plan_storage_limit_is_refused_before_anything_is_stored()
+    {
+        _entitlements.EnsureWithinLimitAsync(LimitCodes.StorageMb, 14, Arg.Any<CancellationToken>())
+            .Returns(ValidationResponse.Failure("Your Starter plan allows 1 MB of file storage."));
+
+        var result = await _service.UploadAsync(new FileUploadRequest(new MemoryStream("%PDF-1.7 hello"u8.ToArray()), "report.pdf", null, "invoice"), TestContext.Current.CancellationToken);
+
+        result.IsSuccess.ShouldBeFalse();
+        result.Message!.ShouldContain("Starter plan");
+        await _provider.DidNotReceiveWithAnyArgs().UploadAsync(default!, default!, default!, default);
     }
 
     [Fact]

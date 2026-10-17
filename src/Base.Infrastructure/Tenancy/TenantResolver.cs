@@ -15,12 +15,17 @@ public interface ITenantResolver
     Task<ResolvedTenant?> ResolveByHostAsync(string host, CancellationToken cancellationToken = default);
 
     Task<ResolvedTenant?> GetDefaultAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Forgets cached lookups after a tenant or domain changes (deactivated, domain added or removed).</summary>
+    Task InvalidateAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>Looks tenants up by verified host name or code. Results are cached briefly.</summary>
 internal sealed class TenantResolver(AppDbContext db, HybridCache cache, IOptions<TenancyOptions> options) : ITenantResolver
 {
+    private const string CacheTag = "tenants";
     private static readonly HybridCacheEntryOptions CacheOptions = new() { Expiration = TimeSpan.FromMinutes(5) };
+    private static readonly string[] CacheTags = [CacheTag];
 
     public Task<ResolvedTenant?> ResolveByHostAsync(string host, CancellationToken cancellationToken = default)
     {
@@ -33,7 +38,8 @@ internal sealed class TenantResolver(AppDbContext db, HybridCache cache, IOption
                 .Join(state.db.Tenants, d => d.TenantId, t => t.Id, (_, t) => new ResolvedTenant(t.Id, t.Code, t.IsActive))
                 .FirstOrDefaultAsync(ct),
             CacheOptions,
-            cancellationToken: cancellationToken).AsTask();
+            CacheTags,
+            cancellationToken).AsTask();
     }
 
     public Task<ResolvedTenant?> GetDefaultAsync(CancellationToken cancellationToken = default)
@@ -47,6 +53,9 @@ internal sealed class TenantResolver(AppDbContext db, HybridCache cache, IOption
                 .Select(t => new ResolvedTenant(t.Id, t.Code, t.IsActive))
                 .FirstOrDefaultAsync(ct),
             CacheOptions,
-            cancellationToken: cancellationToken).AsTask();
+            CacheTags,
+            cancellationToken).AsTask();
     }
+
+    public Task InvalidateAsync(CancellationToken cancellationToken = default) => cache.RemoveByTagAsync(CacheTag, cancellationToken).AsTask();
 }

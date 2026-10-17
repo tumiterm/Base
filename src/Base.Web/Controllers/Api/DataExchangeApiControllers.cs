@@ -1,13 +1,16 @@
 using Base.Application.Common.Persistence;
 using Base.Application.DataExchange;
+using Base.Application.Subscriptions;
 using Base.Domain.DataExchange;
 using Base.Web.Results;
+using Base.Web.Subscriptions;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Base.Web.Controllers.Api;
 
 /// <summary>Exports over the API. Named apart from the page controllers so tag helpers never link pages here.</summary>
 [ApiController]
+[RequiresFeature(FeatureCodes.DataExchange)]
 [Route("api/exports")]
 public sealed class ExportsApiController(IExportService exports) : ControllerBase
 {
@@ -48,6 +51,7 @@ public sealed class ExportsApiController(IExportService exports) : ControllerBas
 }
 
 [ApiController]
+[RequiresFeature(FeatureCodes.DataExchange)]
 [Route("api/imports")]
 public sealed class ImportsApiController(IImportService imports) : ControllerBase
 {

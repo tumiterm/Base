@@ -1,0 +1,146 @@
+@model PlanEditViewModel
+@{
+    var isNew = Model.Id is null;
+    ViewData["Title"] = isNew ? "New plan" : Model.Name;
+}
+<nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-action="Index">Plans</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">@(isNew ? "New plan" : Model.Name)</span></nav>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">@(isNew ? "New plan" : Model.Name) @if (!isNew && !Model.IsActive) {<span class="badge text-bg-secondary">Retired</span>}</h1>
+        <p class="page-subtitle">@(isNew ? "Prices, trial, and what the plan includes." : $"{Model.SubscriberCount} subscriber(s). Changes apply to them immediately.")</p>
+    </div>
+    @if (!isNew)
+    {
+        <div class="page-actions">
+            <form method="post" asp-action="SetOffered" asp-route-id="@Model.Id">
+                <input type="hidden" name="offered" value="@(Model.IsActive ? "false" : "true")" />
+                <button class="btn btn-secondary" type="submit">@(Model.IsActive ? "Stop offering" : "Offer again")</button>
+            </form>
+        </div>
+    }
+</div>
+
+<form method="post" class="panel" asp-action="@(isNew ? "New" : "Edit")" asp-route-id="@Model.Id" novalidate>
+    <div class="panel-body">
+        <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+
+        <section class="form-section">
+            <div>
+                <h2 class="form-section-title">Plan</h2>
+                <p class="form-section-desc">The code identifies the plan to billing systems and can't change.</p>
+            </div>
+            <div class="row g-3">
+                <div class="col-md-7">
+                    <label asp-for="Name" class="form-label">Name</label>
+                    <input asp-for="Name" class="form-control" required autofocus="@isNew" />
+                    <span asp-validation-for="Name" class="text-danger"></span>
+                </div>
+                <div class="col-md-5">
+                    <label asp-for="Code" class="form-label">Code</label>
+                    @if (isNew)
+                    {
+                        <input asp-for="Code" class="form-control font-monospace" data-slug-from="#Name" spellcheck="false" autocapitalize="off" required />
+                    }
+                    else
+                    {
+                        <input asp-for="Code" class="form-control font-monospace" readonly />
+                    }
+                    <span asp-validation-for="Code" class="text-danger"></span>
+                </div>
+                <div class="col-12">
+                    <label asp-for="Description" class="form-label">Description <span class="text-muted fw-normal">(optional)</span></label>
+                    <input asp-for="Description" class="form-control" maxlength="500" placeholder="One line on who it's for" />
+                    <span asp-validation-for="Description" class="text-danger"></span>
+                </div>
+            </div>
+        </section>
+
+        <section class="form-section">
+            <div>
+                <h2 class="form-section-title">Pricing</h2>
+                <p class="form-section-desc">What a payment covers for each billing cycle. Use 0 for a free plan.</p>
+            </div>
+            <div class="row g-3 align-items-end">
+                <div class="col-sm-3">
+                    <label asp-for="Currency" class="form-label">Currency</label>
+                    <input asp-for="Currency" class="form-control text-uppercase font-monospace" maxlength="3" required />
+                    <span asp-validation-for="Currency" class="text-danger"></span>
+                </div>
+                <div class="col-sm-4 col-6">
+                    <label asp-for="MonthlyPrice" class="form-label">Monthly</label>
+                    <input asp-for="MonthlyPrice" asp-format="{0:0.##}" class="form-control text-end tabular" type="number" min="0" step="0.01" inputmode="decimal" />
+                    <span asp-validation-for="MonthlyPrice" class="text-danger"></span>
+                </div>
+                <div class="col-sm-4 col-6">
+                    <label asp-for="AnnualPrice" class="form-label">Annual</label>
+                    <input asp-for="AnnualPrice" asp-format="{0:0.##}" class="form-control text-end tabular" type="number" min="0" step="0.01" inputmode="decimal" />
+                    <span asp-validation-for="AnnualPrice" class="text-danger"></span>
+                </div>
+                <div class="col-12">
+                    <label class="form-label" for="TrialDays">Free trial</label>
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="stepper" data-stepper>
+                            <button type="button" data-step="-1" aria-label="One day fewer"><icon name="chevron-left" class="icon-sm" /></button>
+                            <input asp-for="TrialDays" type="number" min="0" max="365" />
+                            <button type="button" data-step="1" aria-label="One day more"><icon name="chevron-right" class="icon-sm" /></button>
+                        </div>
+                        <span class="text-muted">days; 0 starts new subscriptions active</span>
+                    </div>
+                    <span asp-validation-for="TrialDays" class="text-danger"></span>
+                </div>
+            </div>
+        </section>
+
+        <section class="form-section">
+            <div>
+                <h2 class="form-section-title">Features</h2>
+                <p class="form-section-desc">Modules a subscriber can use. Switched-off modules disappear from their navigation.</p>
+            </div>
+            <div class="stack">
+                @foreach (var feature in EntitlementCatalog.Features)
+                {
+                    var id = "f-" + feature.Code.Replace('.', '-');
+                    <div class="form-check form-switch m-0">
+                        <input class="form-check-input" type="checkbox" role="switch" id="@id" name="Features" value="@feature.Code" checked="@Model.Features.Contains(feature.Code)" />
+                        <label class="form-check-label" for="@id"><span class="fw-medium">@feature.Name</span> <span class="d-block text-muted small">@feature.Description</span></label>
+                    </div>
+                }
+            </div>
+        </section>
+
+        <section class="form-section">
+            <div>
+                <h2 class="form-section-title">Limits</h2>
+                <p class="form-section-desc">Checked when people are invited and files are uploaded. Existing data over a new limit stays.</p>
+            </div>
+            <div class="row g-3">
+                @foreach (var limit in EntitlementCatalog.Limits)
+                {
+                    var id = "l-" + limit.Code.Replace('.', '-');
+                    var unlimited = Model.Unlimited.Contains(limit.Code);
+                    <div class="col-md-6">
+                        <label class="form-label" for="@id">@limit.Name @if (limit.Unit is not null) {<span class="text-muted fw-normal">(@limit.Unit)</span>}</label>
+                        <input class="form-control tabular" type="number" min="0" id="@id" name="Limits[@limit.Code]" value="@(Model.Limits.TryGetValue(limit.Code, out var v) ? v : null)" />
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="@id-u" name="Unlimited" value="@limit.Code" checked="@unlimited" data-unlimited-for="#@id" />
+                            <label class="form-check-label small" for="@id-u">Unlimited</label>
+                        </div>
+                        <div class="form-text">@limit.Description</div>
+                    </div>
+                }
+            </div>
+        </section>
+
+        <section class="form-section">
+            <div>
+                <h2 class="form-section-title">Order</h2>
+                <p class="form-section-desc">Where it appears when plans are compared; lower comes first.</p>
+            </div>
+            <div><input asp-for="SortOrder" class="form-control w-auto tabular" type="number" /></div>
+        </section>
+    </div>
+    <div class="panel-footer d-flex justify-content-end gap-2">
+        <a class="btn btn-ghost" asp-action="Index">Cancel</a>
+        <button class="btn btn-primary" type="submit"><icon name="check" class="icon-sm" /> @(isNew ? "Create plan" : "Save plan")</button>
+    </div>
+</form>

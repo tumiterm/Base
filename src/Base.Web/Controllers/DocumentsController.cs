@@ -1,14 +1,17 @@
 using Base.Application.Common.Results;
 using Base.Application.Documents;
 using Base.Application.Documents.Generation;
+using Base.Application.Subscriptions;
 using Base.Web.Controllers.Api;
 using Base.Web.Results;
+using Base.Web.Subscriptions;
 using Base.Web.ViewModels;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Base.Web.Controllers;
 
 /// <summary>Document pages. What each user may do is decided per document by <see cref="IDocumentAccessPolicy"/>.</summary>
+[RequiresFeature(FeatureCodes.Documents)]
 [Route("documents")]
 public sealed class DocumentsController(IDocumentService documents, IDocumentGenerator generator, IDocumentAccessPolicy policy) : Controller
 {

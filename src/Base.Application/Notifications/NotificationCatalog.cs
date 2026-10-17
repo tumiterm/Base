@@ -19,6 +19,12 @@ public static class NotificationTemplates
         public const string Reminder = "General.Reminder";
     }
 
+    public static class Subscriptions
+    {
+        public const string TrialEnding = "Subscriptions.TrialEnding";
+        public const string StatusChanged = "Subscriptions.StatusChanged";
+    }
+
     public static class DataExchange
     {
         public const string ExportReady = "DataExchange.ExportReady";
@@ -34,6 +40,9 @@ public static class NotificationCategories
 
     /// <summary>Results of work the user started (exports, imports).</summary>
     public const string Activity = "Activity";
+
+    /// <summary>The organisation's plan and billing; sent to its contact address.</summary>
+    public const string Billing = "Billing";
 }
 
 /// <summary>A WhatsApp template approved by Meta: its name, language, and the variables that fill {{1}}, {{2}}, ...</summary>
@@ -86,6 +95,11 @@ public static class NotificationCatalog
             "A large export finished in the background (or failed).", [NotificationChannel.InApp], ["Export", "Outcome"]),
         new(NotificationTemplates.DataExchange.ImportFinished, "Import finished", NotificationCategories.Activity,
             "An import finished applying, with how many rows went in.", [NotificationChannel.InApp], ["Import", "Outcome"]),
+        new(NotificationTemplates.Subscriptions.TrialEnding, "Trial ending", NotificationCategories.Billing,
+            "Tells the organisation's contact that the trial ends soon.", [NotificationChannel.Email], ["PlanName", "EndsOn"], IsMandatory: true),
+        new(NotificationTemplates.Subscriptions.StatusChanged, "Subscription status changed", NotificationCategories.Billing,
+            "Tells the organisation's contact that the subscription is past due, suspended, cancelled, expired or active again.",
+            [NotificationChannel.Email], ["PlanName", "Status", "Reason"], IsMandatory: true),
     ];
 
     private static readonly FrozenDictionary<string, NotificationTemplateDefinition> ByCode =

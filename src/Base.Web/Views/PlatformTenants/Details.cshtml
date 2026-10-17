@@ -1,0 +1,301 @@
+@model TenantDetailsViewModel
+@inject ICurrentUser CurrentUser
+@inject TimeProvider Time
+@{
+    var t = Model.Details.Tenant;
+    var s = Model.Details.Subscription;
+    ViewData["Title"] = t.Name;
+    var canManage = CurrentUser.HasPermission(PermissionCodes.Platform.TenantsManage);
+    var now = Time.GetUtcNow();
+}
+<nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-action="Index">Tenants</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">@t.Name</span></nav>
+<div class="page-header">
+    <div class="entity">
+        <span class="avatar avatar-lg avatar-square" aria-hidden="true">@Display.Initials(t.Name)</span>
+        <div class="entity-text">
+            <h1 class="page-title">@t.Name</h1>
+            <p class="page-subtitle">
+                <span class="font-monospace">@t.Code</span>
+                @if (t.PrimaryHost is not null) {<text> · </text><a href="https://@t.PrimaryHost" rel="noopener" target="_blank">@t.PrimaryHost <icon name="external-link" class="icon-sm" /></a>}
+                · @t.UserCount user(s)
+            </p>
+        </div>
+    </div>
+    <div class="page-actions">
+        @if (t.IsPlatform) {<span class="badge text-bg-light">Platform tenant</span>}
+        else if (!t.IsActive) {<span class="badge text-bg-secondary">Deactivated</span>}
+        @if (canManage && !t.IsPlatform)
+        {
+            <div class="dropdown">
+                <button class="btn btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false"><icon name="ellipsis" class="icon-sm" /> More</button>
+                <div class="dropdown-menu dropdown-menu-end">
+                    <form method="post" asp-action="SetActive" asp-route-id="@t.Id">
+                        <input type="hidden" name="active" value="@(t.IsActive ? "false" : "true")" />
+                        @if (t.IsActive)
+                        {
+                            <button class="dropdown-item text-danger" type="submit"><icon name="ban" class="icon-sm" /> Deactivate tenant</button>
+                        }
+                        else
+                        {
+                            <button class="dropdown-item" type="submit"><icon name="circle-play" class="icon-sm" /> Activate tenant</button>
+                        }
+                    </form>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<div class="detail-grid">
+    <div class="stack">
+        <section class="panel" aria-labelledby="sub-title">
+            <div class="panel-header">
+                <h2 class="panel-title" id="sub-title">Subscription</h2>
+                <partial name="_SubscriptionStatus" model="s?.Status" />
+            </div>
+            @if (s is null)
+            {
+                <div class="panel-body">
+                    @if (t.IsPlatform)
+                    {
+                        <p class="text-muted mb-0">The platform tenant has no subscription; nothing in it is limited.</p>
+                    }
+                    else
+                    {
+                        <p class="text-muted">No subscription: every feature is on and nothing is limited.</p>
+                        @if (canManage && Model.Plans.Count > 0)
+                        {
+                            <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#subscribe-dialog"><icon name="credit-card" class="icon-sm" /> Subscribe to a plan</button>
+                        }
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="panel-body">
+                    <div class="d-flex flex-wrap align-items-baseline justify-content-between gap-2 mb-3">
+                        <div>
+                            <div class="h4 mb-0">@s.PlanName</div>
+                            <div class="text-muted">@Display.Money(s.Price, s.Currency)@Display.PerCycle(s.BillingCycle) · billed @s.BillingCycle.ToString().ToLowerInvariant()</div>
+                        </div>
+                        @if (s.StatusReason is not null) {<span class="chip"><icon name="info" /> @s.StatusReason</span>}
+                    </div>
+                    <ol class="timeline">
+                        <li class="is-done"><div class="timeline-title">Started</div><div class="timeline-time"><local-time value="s.StartedAt" /></div></li>
+                        @if (s.TrialEndsAt is { } trialEnd)
+                        {
+                            <li class="@(trialEnd <= now ? "is-done" : s.Status == SubscriptionStatus.Trialing ? "is-current" : "")"><div class="timeline-title">Trial @(trialEnd <= now ? "ended" : "ends")</div><div class="timeline-time"><local-time value="trialEnd" /></div></li>
+                        }
+                        @if (s.Status is SubscriptionStatus.Active or SubscriptionStatus.PastDue || s.TrialEndsAt is null || s.TrialEndsAt < s.CurrentPeriodEnd)
+                        {
+                            var label = s.IsEnded ? "Ended" : s.CancelAtPeriodEnd ? "Ends" : s.CurrentPeriodEnd <= now ? "Renewal was due" : "Renews";
+                            <li class="@(s.Status is SubscriptionStatus.PastDue ? "is-alert" : s.CurrentPeriodEnd <= now ? "is-done" : "is-current")"><div class="timeline-title">@label</div><div class="timeline-time"><local-time value="s.CurrentPeriodEnd" /></div></li>
+                        }
+                        @if (s.Status is SubscriptionStatus.Suspended or SubscriptionStatus.Cancelled or SubscriptionStatus.Expired)
+                        {
+                            <li class="is-alert"><div class="timeline-title">@Display.Status(s.Status)</div><div class="timeline-time"><local-time value="s.StatusChangedAt" /></div></li>
+                        }
+                    </ol>
+                    @if (s.ExternalReference is not null)
+                    {
+                        <dl class="kv mt-3"><dt>Billing reference</dt><dd class="font-monospace">@s.ExternalReference</dd></dl>
+                    }
+                </div>
+                @if (canManage)
+                {
+                    <div class="panel-footer d-flex flex-wrap gap-2">
+                        <button class="btn btn-primary btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#payment-dialog"><icon name="receipt" class="icon-sm" /> Record payment</button>
+                        <button class="btn btn-secondary btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#plan-dialog"><icon name="layers" class="icon-sm" /> Change plan</button>
+                        @if (s.Status == SubscriptionStatus.Trialing)
+                        {
+                            <button class="btn btn-secondary btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#extend-dialog"><icon name="calendar" class="icon-sm" /> Extend trial</button>
+                        }
+                        <span class="flex-grow-1"></span>
+                        <div class="dropdown">
+                            <button class="btn btn-ghost btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">More actions</button>
+                            <div class="dropdown-menu dropdown-menu-end">
+                                @if (s.Status == SubscriptionStatus.Suspended)
+                                {
+                                    <form method="post" asp-action="Reinstate" asp-route-id="@t.Id"><button class="dropdown-item" type="submit"><icon name="rotate-ccw" class="icon-sm" /> Reinstate</button></form>
+                                }
+                                else if (!s.IsEnded)
+                                {
+                                    <button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#suspend-dialog"><icon name="circle-pause" class="icon-sm" /> Suspend…</button>
+                                }
+                                @if (s.CancelAtPeriodEnd && !s.IsEnded)
+                                {
+                                    <form method="post" asp-action="Resume" asp-route-id="@t.Id"><button class="dropdown-item" type="submit"><icon name="circle-play" class="icon-sm" /> Keep renewing</button></form>
+                                }
+                                else if (s.HasAccess)
+                                {
+                                    <form method="post" asp-action="Cancel" asp-route-id="@t.Id"><input type="hidden" name="atPeriodEnd" value="true" /><button class="dropdown-item" type="submit"><icon name="calendar" class="icon-sm" /> Cancel at period end</button></form>
+                                }
+                                @if (!s.IsEnded)
+                                {
+                                    <div class="dropdown-divider"></div>
+                                    <form method="post" asp-action="Cancel" asp-route-id="@t.Id"><input type="hidden" name="atPeriodEnd" value="false" /><button class="dropdown-item text-danger" type="submit"><icon name="circle-x" class="icon-sm" /> Cancel now</button></form>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+        </section>
+
+        <section class="panel" aria-labelledby="usage-title">
+            <div class="panel-header"><h2 class="panel-title" id="usage-title">Usage</h2><span class="text-muted small">Against the plan's limits</span></div>
+            <div class="panel-body"><partial name="_UsageMeters" model="Model.Details.Usage" /></div>
+        </section>
+    </div>
+
+    <div class="stack">
+        <section class="panel" aria-labelledby="org-title">
+            <div class="panel-header"><h2 class="panel-title" id="org-title">Organisation</h2></div>
+            <div class="panel-body">
+                @if (canManage)
+                {
+                    <form method="post" asp-action="Update" asp-route-id="@t.Id" class="stack">
+                        <div>
+                            <label class="form-label" for="org-name">Name</label>
+                            <input class="form-control" id="org-name" name="name" value="@t.Name" required />
+                        </div>
+                        <div>
+                            <label class="form-label" for="org-contact">Billing contact</label>
+                            <input class="form-control" id="org-contact" name="contactEmail" type="email" value="@t.ContactEmail" placeholder="billing@example.com" />
+                            <div class="form-text">Trial and payment notices go here.</div>
+                        </div>
+                        <div><button class="btn btn-secondary btn-sm" type="submit">Save</button></div>
+                    </form>
+                }
+                else
+                {
+                    <dl class="kv"><dt>Billing contact</dt><dd>@(t.ContactEmail ?? "—")</dd><dt>Created</dt><dd><local-time value="t.DateCreated" format="d MMM yyyy" /></dd></dl>
+                }
+            </div>
+        </section>
+
+        <section class="panel" aria-labelledby="domains-title">
+            <div class="panel-header"><h2 class="panel-title" id="domains-title">Domains</h2><span class="text-muted small">@Model.Details.Domains.Count</span></div>
+            @if (Model.Details.Domains.Count == 0)
+            {
+                <div class="panel-body text-muted small">No domains. The tenant can only be reached through a verified domain.</div>
+            }
+            else
+            {
+                <ul class="list-unstyled m-0">
+                    @foreach (var d in Model.Details.Domains)
+                    {
+                        <li class="d-flex align-items-center gap-2 px-3 py-2 border-bottom">
+                            <icon name="globe" class="icon-sm text-muted" />
+                            <span class="flex-grow-1 text-truncate">@d.Host</span>
+                            @if (d.IsVerified) {<span class="badge text-bg-success">Verified</span>} else {<span class="badge text-bg-warning">Unverified</span>}
+                            @if (canManage)
+                            {
+                                <div class="dropdown">
+                                    <button class="icon-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Actions for @d.Host"><icon name="ellipsis" /></button>
+                                    <div class="dropdown-menu dropdown-menu-end">
+                                        @if (!d.IsVerified)
+                                        {
+                                            <form method="post" asp-action="VerifyDomain" asp-route-id="@t.Id" asp-route-domainId="@d.Id"><button class="dropdown-item" type="submit"><icon name="check" class="icon-sm" /> Mark verified</button></form>
+                                        }
+                                        <form method="post" asp-action="RemoveDomain" asp-route-id="@t.Id" asp-route-domainId="@d.Id"><button class="dropdown-item text-danger" type="submit"><icon name="trash-2" class="icon-sm" /> Remove</button></form>
+                                    </div>
+                                </div>
+                            }
+                        </li>
+                    }
+                </ul>
+            }
+            @if (canManage)
+            {
+                <form method="post" asp-action="AddDomain" asp-route-id="@t.Id" class="panel-footer d-flex gap-2">
+                    <input class="form-control form-control-sm" name="host" placeholder="portal.example.com" aria-label="New domain" spellcheck="false" autocapitalize="off" required />
+                    <button class="btn btn-secondary btn-sm" type="submit"><icon name="plus" class="icon-sm" /> Add</button>
+                </form>
+            }
+        </section>
+    </div>
+</div>
+
+@if (canManage)
+{
+    var plans = Model.Plans;
+    <div class="modal fade" id="subscribe-dialog" tabindex="-1" aria-labelledby="subscribe-title" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <form class="modal-content" method="post" asp-action="Subscribe" asp-route-id="@t.Id">
+                <div class="modal-header"><h2 class="modal-title" id="subscribe-title">Subscribe to a plan</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body stack">
+                    <partial name="_PlanPicker" model="(plans, (Guid?)null, BillingCycle.Monthly)" />
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" id="sub-trial" name="withTrial" value="true" checked />
+                        <input type="hidden" name="withTrial" value="false" />
+                        <label class="form-check-label" for="sub-trial">Start with the plan's free trial</label>
+                    </div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" type="submit">Subscribe</button></div>
+            </form>
+        </div>
+    </div>
+
+    @if (s is not null)
+    {
+        <div class="modal fade" id="payment-dialog" tabindex="-1" aria-labelledby="payment-title" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <form class="modal-content" method="post" asp-action="RecordPayment" asp-route-id="@t.Id">
+                    <div class="modal-header"><h2 class="modal-title" id="payment-title">Record a payment</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                    <div class="modal-body stack">
+                        <p class="text-muted mb-0">Makes the subscription active for one more @(s.BillingCycle == BillingCycle.Annual ? "year" : "month") (@Display.Money(s.Price, s.Currency)), from today or from the end of the period already paid.</p>
+                        <div>
+                            <label class="form-label" for="pay-ref">Reference <span class="text-muted fw-normal">(optional)</span></label>
+                            <input class="form-control font-monospace" id="pay-ref" name="reference" maxlength="200" value="@s.ExternalReference" placeholder="Invoice or transaction number" />
+                        </div>
+                    </div>
+                    <div class="modal-footer"><button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" type="submit">Record payment</button></div>
+                </form>
+            </div>
+        </div>
+
+        <div class="modal fade" id="plan-dialog" tabindex="-1" aria-labelledby="plan-title" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <form class="modal-content" method="post" asp-action="ChangePlan" asp-route-id="@t.Id">
+                    <div class="modal-header"><h2 class="modal-title" id="plan-title">Change plan</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                    <div class="modal-body"><partial name="_PlanPicker" model="(plans, (Guid?)s.PlanId, s.BillingCycle)" /></div>
+                    <div class="modal-footer"><button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" type="submit">Change plan</button></div>
+                </form>
+            </div>
+        </div>
+
+        <div class="modal fade" id="extend-dialog" tabindex="-1" aria-labelledby="extend-title" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <form class="modal-content" method="post" asp-action="ExtendTrial" asp-route-id="@t.Id">
+                    <div class="modal-header"><h2 class="modal-title" id="extend-title">Extend the trial</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                    <div class="modal-body d-flex align-items-center gap-3">
+                        <div class="stepper" data-stepper>
+                            <button type="button" data-step="-7" aria-label="7 days fewer"><icon name="chevron-left" class="icon-sm" /></button>
+                            <input type="number" name="days" value="7" min="1" max="365" aria-label="Days" />
+                            <button type="button" data-step="7" aria-label="7 days more"><icon name="chevron-right" class="icon-sm" /></button>
+                        </div>
+                        <span class="text-muted">more days</span>
+                    </div>
+                    <div class="modal-footer"><button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" type="submit">Extend</button></div>
+                </form>
+            </div>
+        </div>
+
+        <div class="modal fade" id="suspend-dialog" tabindex="-1" aria-labelledby="suspend-title" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <form class="modal-content" method="post" asp-action="Suspend" asp-route-id="@t.Id">
+                    <div class="modal-header"><h2 class="modal-title" id="suspend-title">Suspend @t.Name</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                    <div class="modal-body stack">
+                        <p class="text-muted mb-0">Its users can still sign in, but only to see the reason. Nothing is deleted; reinstating restores access.</p>
+                        <div>
+                            <label class="form-label" for="suspend-reason">Reason</label>
+                            <textarea class="form-control" id="suspend-reason" name="reason" rows="2" maxlength="500" required placeholder="Shown to the tenant and in the audit trail"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer"><button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button><button class="btn btn-danger" type="submit">Suspend</button></div>
+                </form>
+            </div>
+        </div>
+    }
+}

@@ -48,6 +48,19 @@ public static class PermissionCodes
         public const string View = "Audit.View";
     }
 
+    public static class Subscription
+    {
+        public const string View = "Subscription.View";
+    }
+
+    /// <summary>Running the platform itself. Effective only for users of the platform (default) tenant.</summary>
+    public static class Platform
+    {
+        public const string TenantsView = "Platform.Tenants.View";
+        public const string TenantsManage = "Platform.Tenants.Manage";
+        public const string PlansManage = "Platform.Plans.Manage";
+    }
+
     public static class System
     {
         public const string HealthView = "System.Health.View";

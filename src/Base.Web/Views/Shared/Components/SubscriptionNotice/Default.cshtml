@@ -1,0 +1,9 @@
+@model Base.Web.ViewComponents.SubscriptionNotice
+<div class="app-banner app-banner-@Model.Tone" role="status">
+    <icon name="@(Model.Tone == "warning" ? "triangle-alert" : "info")" class="icon-sm" />
+    <span>@Model.Message @if (Model.Date is { } date) {<text>(<local-time value="date" format="d MMM yyyy" />)</text>}</span>
+    @if (Model.CanView)
+    {
+        <a class="app-banner-link" asp-controller="Subscription" asp-action="Index">View subscription <icon name="chevron-right" class="icon-sm" /></a>
+    }
+</div>

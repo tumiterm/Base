@@ -23,4 +23,7 @@ public sealed class SeedOptions
     public string? AdminEmail { get; set; }
 
     public string? AdminPassword { get; set; }
+
+    /// <summary>Adds three example plans (Starter, Professional, Enterprise) when there are none. Development only by default.</summary>
+    public bool SamplePlans { get; set; }
 }

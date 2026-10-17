@@ -1,0 +1,12 @@
+--- email.subject
+Your {{AppName}} trial ends on {{EndsOn}}
+--- email.html
+<p>Hello,</p>
+<p>Your organisation's trial of the {{PlanName}} plan ends on <strong>{{EndsOn}}</strong>.</p>
+<p>To keep using {{AppName}} without interruption, arrange payment before then. You can see your plan and usage at <a href="{{PublicBaseUrl}}/subscription">{{PublicBaseUrl}}/subscription</a>.</p>
+--- email.text
+Hello,
+
+Your organisation's trial of the {{PlanName}} plan ends on {{EndsOn}}.
+
+To keep using {{AppName}} without interruption, arrange payment before then. Your plan and usage: {{PublicBaseUrl}}/subscription

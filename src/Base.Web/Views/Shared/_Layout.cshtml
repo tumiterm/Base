@@ -95,6 +95,7 @@
                     <a class="btn btn-primary btn-sm" asp-controller="Account" asp-action="Login">Sign in</a>
                 }
             </header>
+            @await Component.InvokeAsync("SubscriptionNotice")
             <main class="app-content" id="content" role="main" tabindex="-1">
                 @RenderBody()
             </main>

@@ -1,12 +1,15 @@
 using Base.Application.Branding;
 using Base.Application.Common.Results;
 using Base.Application.Security;
+using Base.Application.Subscriptions;
 using Base.Web.Security;
+using Base.Web.Subscriptions;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Base.Web.Controllers;
 
 /// <summary>This tenant's look: accent colour, default theme and logo.</summary>
+[RequiresFeature(FeatureCodes.CustomBranding)]
 [Route("admin/appearance")]
 [HasPermission(PermissionCodes.Settings.Edit)]
 public sealed class AppearanceController(IBrandingService branding) : Controller

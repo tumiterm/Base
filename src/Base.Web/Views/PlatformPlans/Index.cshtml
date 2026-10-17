@@ -1,0 +1,62 @@
+@model IReadOnlyList<Base.Application.Subscriptions.PlanSummary>
+@{
+    ViewData["Title"] = "Plans";
+}
+<nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-controller="PlatformTenants" asp-action="Index">Tenants</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">Plans</span></nav>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Plans</h1>
+        <p class="page-subtitle">What tenants subscribe to. Changes apply to current subscribers straight away.</p>
+    </div>
+    <div class="page-actions">
+        <a class="btn btn-primary" asp-action="New"><icon name="plus" class="icon-sm" /> New plan</a>
+    </div>
+</div>
+
+@if (Model.Count == 0)
+{
+    <div class="empty-state">
+        <icon name="layers" />
+        <div class="empty-state-title">No plans yet</div>
+        <p class="mb-2">Without plans, every tenant is unrestricted. Create one to start trials and set limits.</p>
+        <a class="btn btn-primary" asp-action="New">New plan</a>
+    </div>
+}
+else
+{
+    <table class="table align-middle">
+        <thead>
+            <tr>
+                <th>Plan</th><th class="text-end">Monthly</th><th class="text-end">Annual</th><th>Trial</th>
+                @foreach (var limit in EntitlementCatalog.Limits) {<th>@limit.Name</th>}
+                <th>Features</th><th class="text-end">Subscribers</th><th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var plan in Model)
+            {
+                <tr>
+                    <td>
+                        <a class="entity text-decoration-none" asp-action="Edit" asp-route-id="@plan.Id">
+                            <span class="entity-text">
+                                <span class="entity-name">@plan.Name @if (!plan.IsActive) {<span class="badge text-bg-secondary ms-1">Retired</span>}</span>
+                                <span class="entity-sub font-monospace">@plan.Code</span>
+                            </span>
+                        </a>
+                    </td>
+                    <td class="text-end tabular">@Display.Money(plan.MonthlyPrice, plan.Currency)</td>
+                    <td class="text-end tabular">@Display.Money(plan.AnnualPrice, plan.Currency)</td>
+                    <td>@(plan.TrialDays == 0 ? "None" : $"{plan.TrialDays} days")</td>
+                    @foreach (var limit in EntitlementCatalog.Limits) {<td class="tabular">@Display.Limit(limit.Code, plan.ValueOf(limit.Code))</td>}
+                    <td>
+                        <div class="d-flex flex-wrap gap-1">
+                            @foreach (var feature in EntitlementCatalog.Features.Where(f => plan.ValueOf(f.Code) == 1)) {<span class="chip">@feature.Name</span>}
+                        </div>
+                    </td>
+                    <td class="text-end tabular">@plan.SubscriberCount</td>
+                    <td class="text-end"><a class="btn btn-ghost btn-sm" asp-action="Edit" asp-route-id="@plan.Id" aria-label="Edit @plan.Name"><icon name="pencil" class="icon-sm" /></a></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

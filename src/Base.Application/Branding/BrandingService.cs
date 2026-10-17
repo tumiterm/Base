@@ -1,6 +1,7 @@
 using Base.Application.Common.Results;
 using Base.Application.Files;
 using Base.Application.Settings;
+using Base.Application.Subscriptions;
 using Base.Domain.Files;
 
 namespace Base.Application.Branding;
@@ -32,13 +33,31 @@ public interface IBrandingService
     Task<BrandingLogo?> OpenLogoAsync(CancellationToken cancellationToken = default);
 }
 
-internal sealed class BrandingService(IApplicationSettingService settings, FileService files, Common.Persistence.IUnitOfWork unitOfWork) : IBrandingService
+internal sealed class BrandingService(
+    IApplicationSettingService settings,
+    FileService files,
+    Common.Persistence.IUnitOfWork unitOfWork,
+    ITenantEntitlements entitlements) : IBrandingService
 {
     internal const string Category = "branding";
     private const long MaxLogoBytes = 512 * 1024;
     private static readonly string[] LogoExtensions = [".png", ".jpg", ".jpeg", ".webp"];
 
-    public async Task<BrandingTheme> GetAsync(CancellationToken cancellationToken = default) => new(
+    public async Task<BrandingTheme> GetAsync(CancellationToken cancellationToken = default) =>
+        await entitlements.HasFeatureAsync(FeatureCodes.CustomBranding, cancellationToken)
+            ? await LoadAsync(cancellationToken)
+            : new BrandingTheme(
+                await settings.GetAsync(SettingCodes.General.ApplicationName, cancellationToken) ?? "Base",
+                SettingCatalog.Get(SettingCodes.Branding.PrimaryColor).DefaultValue!,
+                SettingCatalog.Get(SettingCodes.Branding.DefaultTheme).DefaultValue!,
+                null);
+
+    private async Task<ValidationResponse?> NotIncludedAsync(CancellationToken cancellationToken) =>
+        await entitlements.HasFeatureAsync(FeatureCodes.CustomBranding, cancellationToken)
+            ? null
+            : ValidationResponse.Forbidden("Your plan doesn't include custom branding.");
+
+    private async Task<BrandingTheme> LoadAsync(CancellationToken cancellationToken) => new(
         await settings.GetAsync(SettingCodes.General.ApplicationName, cancellationToken) ?? "Base",
         await settings.GetAsync(SettingCodes.Branding.PrimaryColor, cancellationToken) ?? "#4f5bd5",
         await settings.GetAsync(SettingCodes.Branding.DefaultTheme, cancellationToken) ?? "system",
@@ -46,6 +65,11 @@ internal sealed class BrandingService(IApplicationSettingService settings, FileS
 
     public async Task<ValidationResponse> SaveAsync(string primaryColor, string defaultTheme, CancellationToken cancellationToken = default)
     {
+        if (await NotIncludedAsync(cancellationToken) is { } notIncluded)
+        {
+            return notIncluded;
+        }
+
         var color = await settings.SetAsync(SettingCodes.Branding.PrimaryColor, primaryColor?.Trim().ToLowerInvariant(), cancellationToken);
         if (!color.IsSuccess)
         {
@@ -58,6 +82,11 @@ internal sealed class BrandingService(IApplicationSettingService settings, FileS
 
     public async Task<ValidationResponse> SetLogoAsync(Stream content, string fileName, CancellationToken cancellationToken = default)
     {
+        if (await NotIncludedAsync(cancellationToken) is { } notIncluded)
+        {
+            return notIncluded;
+        }
+
         // SVG is refused on purpose: it can carry script, and the logo is served on the sign-in page.
         var staged = await files.StageAsync(new FileUploadRequest(content, fileName, null, Category), null, LogoExtensions, replaceAllowList: true, cancellationToken, MaxLogoBytes);
         if (!staged.IsSuccess)

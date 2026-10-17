@@ -1,4 +1,8 @@
+@inject ICurrentUser CurrentUser
+@inject ITenantEntitlements Entitlements
 @{
+    var access = await Entitlements.GetAsync();
+    var showPlatform = CurrentUser.HasPermission(PermissionCodes.Platform.TenantsView) || CurrentUser.HasPermission(PermissionCodes.System.HealthView);
     var controller = ViewContext.RouteData.Values["controller"] as string ?? string.Empty;
     string Active(params string[] controllers) => controllers.Contains(controller, StringComparer.OrdinalIgnoreCase) ? "active" : "";
     string? Current(params string[] controllers) => controllers.Contains(controller, StringComparer.OrdinalIgnoreCase) ? "page" : null;
@@ -7,8 +11,8 @@
     <div class="nav-section">
         <div class="nav-section-label">Workspace</div>
         <a class="nav-link-app @Active("Home")" aria-current="@Current("Home")" asp-controller="Home" asp-action="Index" title="Home" data-palette-label="Home"><icon name="layout-dashboard" /><span class="nav-label">Home</span></a>
-        <a class="nav-link-app @Active("Documents")" aria-current="@Current("Documents")" asp-controller="Documents" asp-action="Index" asp-permission="@PermissionCodes.Documents.Create" title="Documents"><icon name="file-text" /><span class="nav-label">Documents</span></a>
-        <a class="nav-link-app @Active("Imports", "Exports")" aria-current="@Current("Imports", "Exports")" asp-controller="Imports" asp-action="Index" title="Import and export"><icon name="database" /><span class="nav-label">Import &amp; export</span></a>
+        <a class="nav-link-app @Active("Documents")" aria-current="@Current("Documents")" asp-controller="Documents" asp-action="Index" asp-permission="@PermissionCodes.Documents.Create" asp-feature="@FeatureCodes.Documents" title="Documents"><icon name="file-text" /><span class="nav-label">Documents</span></a>
+        <a class="nav-link-app @Active("Imports", "Exports")" aria-current="@Current("Imports", "Exports")" asp-controller="Imports" asp-action="Index" asp-feature="@FeatureCodes.DataExchange" title="Import and export"><icon name="database" /><span class="nav-label">Import &amp; export</span></a>
         <a class="nav-link-app @Active("Notifications")" aria-current="@Current("Notifications")" asp-controller="Notifications" asp-action="Index" title="Inbox"><icon name="inbox" /><span class="nav-label">Inbox</span></a>
     </div>
     <div class="nav-section">
@@ -17,10 +21,19 @@
         <a class="nav-link-app @Active("RoleAdmin")" aria-current="@Current("RoleAdmin")" asp-controller="RoleAdmin" asp-action="Index" asp-permission="@PermissionCodes.Roles.Manage" title="Roles"><icon name="shield-check" /><span class="nav-label">Roles</span></a>
         <a class="nav-link-app @Active("NotificationAdmin")" aria-current="@Current("NotificationAdmin")" asp-controller="NotificationAdmin" asp-action="Index" asp-permission="@PermissionCodes.Notifications.View" title="Messages"><icon name="mail" /><span class="nav-label">Messages</span></a>
         <a class="nav-link-app @Active("AuditAdmin")" aria-current="@Current("AuditAdmin")" asp-controller="AuditAdmin" asp-action="Index" asp-permission="@PermissionCodes.Audit.View" title="Audit trail"><icon name="history" /><span class="nav-label">Audit trail</span></a>
-        <a class="nav-link-app @Active("Appearance")" aria-current="@Current("Appearance")" asp-controller="Appearance" asp-action="Index" asp-permission="@PermissionCodes.Settings.Edit" title="Appearance"><icon name="palette" /><span class="nav-label">Appearance</span></a>
+        <a class="nav-link-app @Active("Appearance")" aria-current="@Current("Appearance")" asp-controller="Appearance" asp-action="Index" asp-permission="@PermissionCodes.Settings.Edit" asp-feature="@FeatureCodes.CustomBranding" title="Appearance"><icon name="palette" /><span class="nav-label">Appearance</span></a>
+        @if (access.IsRestricted)
+        {
+            <a class="nav-link-app @Active("Subscription")" aria-current="@Current("Subscription")" asp-controller="Subscription" asp-action="Index" asp-permission="@PermissionCodes.Subscription.View" title="Subscription"><icon name="credit-card" /><span class="nav-label">Subscription</span></a>
+        }
     </div>
-    <div class="nav-section" asp-permission="@PermissionCodes.System.HealthView">
-        <div class="nav-section-label">Platform</div>
-        <a class="nav-link-app @Active("SystemAdmin")" aria-current="@Current("SystemAdmin")" asp-controller="SystemAdmin" asp-action="Index" title="System"><icon name="activity" /><span class="nav-label">System</span></a>
-    </div>
+    @if (showPlatform)
+    {
+        <div class="nav-section">
+            <div class="nav-section-label">@(CurrentUser.HasPermission(PermissionCodes.Platform.TenantsView) ? "Platform" : "Operations")</div>
+            <a class="nav-link-app @Active("PlatformTenants")" aria-current="@Current("PlatformTenants")" asp-controller="PlatformTenants" asp-action="Index" asp-permission="@PermissionCodes.Platform.TenantsView" title="Tenants"><icon name="building-2" /><span class="nav-label">Tenants</span></a>
+            <a class="nav-link-app @Active("PlatformPlans")" aria-current="@Current("PlatformPlans")" asp-controller="PlatformPlans" asp-action="Index" asp-permission="@PermissionCodes.Platform.PlansManage" title="Plans"><icon name="layers" /><span class="nav-label">Plans</span></a>
+            <a class="nav-link-app @Active("SystemAdmin")" aria-current="@Current("SystemAdmin")" asp-controller="SystemAdmin" asp-action="Index" asp-permission="@PermissionCodes.System.HealthView" title="System"><icon name="activity" /><span class="nav-label">System</span></a>
+        </div>
+    }
 </nav>

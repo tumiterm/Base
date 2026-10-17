@@ -1,0 +1,14 @@
+@model IReadOnlyList<Base.Application.Subscriptions.UsageView>
+<div class="stack">
+    @foreach (var usage in Model)
+    {
+        var tone = usage.Limit is null ? "is-unlimited" : usage.Percent >= 100 ? "is-full" : usage.Percent >= 80 ? "is-high" : "";
+        <div class="meter @tone" data-meter="@(usage.Percent ?? 0)">
+            <div class="meter-head">
+                <span class="meter-label">@usage.Name</span>
+                <span class="meter-value"><strong>@usage.Used.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)</strong>@(usage.Unit is null ? "" : " " + usage.Unit) of @Display.Limit(usage.Code, usage.Limit)</span>
+            </div>
+            <div class="meter-track" role="progressbar" aria-label="@usage.Name used" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@(usage.Percent ?? 0)"><div class="meter-fill"></div></div>
+        </div>
+    }
+</div>

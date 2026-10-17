@@ -61,6 +61,23 @@ event in the tenant it was raised in.
 
 Users belong to a tenant; user names are unique per tenant. Roles and their permissions are global.
 
+The **default tenant is the platform tenant** (`IPlatformTenant`). Only its users receive platform permissions
+(`PermissionDefinition.IsPlatform`: tenants, plans, roles); the claims factory drops them for everyone else.
+`ITenantAdministration` creates tenants (domain + subscription in one transaction, then the first administrator's
+invitation, sent as the new tenant so its links use the tenant's domain).
+
+## Plans, subscriptions and entitlements
+
+- `Plan` (platform data) has prices, a trial and entitlements from `EntitlementCatalog` (`FeatureCodes`,
+  `LimitCodes`). `TenantSubscription` (one per tenant) carries the lifecycle: Trialing → Active → PastDue →
+  Suspended, or Cancelled / Expired. The `subscription-lifecycle` job advances it hourly and sends the trial reminder.
+- `ITenantEntitlements` answers "may this tenant…" (cached per tenant). Enforcement:
+  `[RequiresFeature]` on controllers, `asp-feature` in views, `EnsureWithinLimitAsync` before an action that uses a
+  limit (invites, uploads), and `SubscriptionGateMiddleware` for tenants without access.
+- No subscription = unrestricted. Payments arrive through `ISubscriptionService.RecordPaymentAsync` (screen or API);
+  billing integrations react to `SubscriptionStatusChanged`.
+- A new feature or limit: a constant in `FeatureCodes`/`LimitCodes` + an `EntitlementCatalog` entry + the check.
+
 ## Authorization
 
 Permissions are constants in `PermissionCodes` with one `PermissionCatalog` entry each (unit-tested both ways).

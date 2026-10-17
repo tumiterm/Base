@@ -1,0 +1,97 @@
+@model TenantListViewModel
+@inject TimeProvider Time
+@{
+    ViewData["Title"] = "Tenants";
+    var results = Model.Tenants;
+    var filters = new (SubscriptionStatus? Status, string Label)[]
+    {
+        (null, "All"), (SubscriptionStatus.Trialing, "Trial"), (SubscriptionStatus.Active, "Active"),
+        (SubscriptionStatus.PastDue, "Past due"), (SubscriptionStatus.Suspended, "Suspended"), (SubscriptionStatus.Cancelled, "Cancelled"),
+    };
+    var now = Time.GetUtcNow();
+}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Tenants</h1>
+        <p class="page-subtitle">Organisations on the platform, their plans and where each subscription stands.</p>
+    </div>
+    <div class="page-actions">
+        <a class="btn btn-secondary" asp-controller="PlatformPlans" asp-action="Index" asp-permission="@PermissionCodes.Platform.PlansManage"><icon name="layers" class="icon-sm" /> Plans</a>
+        <a class="btn btn-primary" asp-action="New" asp-permission="@PermissionCodes.Platform.TenantsManage"><icon name="plus" class="icon-sm" /> New tenant</a>
+    </div>
+</div>
+
+<div class="toolbar">
+    <nav class="segmented scroll-x" aria-label="Filter by status">
+        @foreach (var f in filters)
+        {
+            var active = f.Status == Model.Status;
+            <a class="@(active ? "is-active" : "")" aria-current="@(active ? "page" : null)" asp-action="Index" asp-route-status="@f.Status" asp-route-search="@Model.Search">@f.Label</a>
+        }
+    </nav>
+    <span class="toolbar-spacer"></span>
+    <form method="get" class="toolbar-search" role="search">
+        <input type="hidden" name="status" value="@Model.Status" />
+        <label class="input-affix">
+            <icon name="search" class="icon-sm" />
+            <input class="form-control" type="search" name="search" value="@Model.Search" placeholder="Name, code, domain or email" aria-label="Search tenants" />
+        </label>
+    </form>
+</div>
+
+@if (results.Total == 0)
+{
+    <div class="empty-state">
+        <icon name="building-2" />
+        <div class="empty-state-title">@(string.IsNullOrEmpty(Model.Search) && Model.Status is null ? "No tenants yet" : "No tenants match")</div>
+        <p class="mb-2">@(string.IsNullOrEmpty(Model.Search) && Model.Status is null ? "Create the first organisation; its administrator gets an invitation." : "Try another status or search term.")</p>
+        <a class="btn btn-primary" asp-action="New" asp-permission="@PermissionCodes.Platform.TenantsManage">New tenant</a>
+    </div>
+}
+else
+{
+    <table class="table align-middle">
+        <thead>
+            <tr><th>Tenant</th><th>Plan</th><th>Status</th><th>Renews or ends</th><th class="text-end">Users</th><th>Created</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var t in results.Items)
+            {
+                <tr>
+                    <td>
+                        <a class="entity text-decoration-none" asp-action="Details" asp-route-id="@t.Id">
+                            <span class="avatar avatar-square" aria-hidden="true">@Display.Initials(t.Name)</span>
+                            <span class="entity-text">
+                                <span class="entity-name">@t.Name @if (t.IsPlatform) {<span class="badge text-bg-light ms-1">Platform</span>} @if (!t.IsActive) {<span class="badge text-bg-secondary ms-1">Deactivated</span>}</span>
+                                <span class="entity-sub">@(t.PrimaryHost ?? t.Code)</span>
+                            </span>
+                        </a>
+                    </td>
+                    <td>@(t.PlanName ?? (t.IsPlatform ? "—" : "Unrestricted"))</td>
+                    <td><partial name="_SubscriptionStatus" model="t.Status" /></td>
+                    <td>
+                        @if (t.PeriodEnd is { } end)
+                        {
+                            <local-time value="end" format="d MMM yyyy" />
+                            @if (end < now && t.Status is SubscriptionStatus.PastDue) {<span class="text-muted small"> · overdue</span>}
+                        }
+                        else
+                        {
+                            <span class="text-muted">—</span>
+                        }
+                    </td>
+                    <td class="text-end tabular">@t.UserCount</td>
+                    <td class="text-muted"><local-time value="t.DateCreated" format="d MMM yyyy" /></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <div class="d-flex justify-content-between align-items-center">
+        <span class="text-muted small">@results.Total tenant(s) · page @results.Page of @results.TotalPages</span>
+        <nav class="btn-group btn-group-sm" aria-label="Pages">
+            <a class="btn btn-outline-secondary @(results.HasPrevious ? "" : "disabled")" asp-action="Index" asp-route-page="@(results.Page - 1)" asp-route-search="@Model.Search" asp-route-status="@Model.Status">Previous</a>
+            <a class="btn btn-outline-secondary @(results.HasNext ? "" : "disabled")" asp-action="Index" asp-route-page="@(results.Page + 1)" asp-route-search="@Model.Search" asp-route-status="@Model.Status">Next</a>
+        </nav>
+    </div>
+}

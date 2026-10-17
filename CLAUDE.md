@@ -32,7 +32,13 @@ cross-cutting feature or adding a package:
   `Remove` soft-deletes. Raw SQL is `FormattableString` only.
 - Use cases return `ValidationResponse`/`ValidationResponse<T>`; Web maps them with `ToActionResult` / `AddToModelState`.
 - New permission = constant in `PermissionCodes` + `PermissionCatalog` entry; gate with `[HasPermission]`.
-  New setting = constant in `SettingCodes` + `SettingCatalog` entry (no migration). Secrets are never settings.
+  Permissions that act across tenants or on shared data (roles) are `IsPlatform`: only the platform (default)
+  tenant's users get them.
+- Plan-dependent behaviour: new feature/limit = constant in `FeatureCodes`/`LimitCodes` + `EntitlementCatalog` entry
+  and enforcement (`[RequiresFeature]` + `asp-feature`, or `ITenantEntitlements.EnsureWithinLimitAsync` before the
+  action). Never check plan codes or prices in code. Tenants are created through `ITenantAdministration`,
+  subscriptions changed through `ISubscriptionService` (payments come from outside; no gateway in the base).
+- New setting = constant in `SettingCodes` + `SettingCatalog` entry (no migration). Secrets are never settings.
 - Files only through `IFileService`: bytes go to object storage. The `Database` provider is only for small files in chosen
   categories (`Files.CategoryProviders`), capped by the `Files.Database.*` settings; it can't be the default. Extra
   upload checks (virus scanning, ...) implement `IFileUploadCheck`.

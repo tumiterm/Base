@@ -1,0 +1,10 @@
+@model EntitlementDefinition
+@{
+    ViewData["Title"] = Model.Name;
+}
+<div class="empty-state feature-unavailable">
+    <icon name="sparkles" />
+    <div class="empty-state-title">@Model.Name isn't in your plan</div>
+    <p class="mb-2">@Model.Description Ask your administrator about moving to a plan that includes it.</p>
+    <a class="btn btn-secondary" asp-controller="Subscription" asp-action="Index" asp-permission="@PermissionCodes.Subscription.View">See your plan</a>
+</div>

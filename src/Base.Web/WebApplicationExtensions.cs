@@ -4,6 +4,7 @@ using Base.Infrastructure.Jobs;
 using Base.Web.Errors;
 using Base.Web.Http;
 using Base.Web.Security;
+using Base.Web.Subscriptions;
 using Base.Web.Tenancy;
 using Base.Web.Theming;
 using Hangfire;
@@ -150,6 +151,7 @@ internal static class WebApplicationExtensions
         app.UseRateLimiter();
         app.UseMiddleware<TenantResolutionMiddleware>();
         app.UseAuthentication();
+        app.UseMiddleware<SubscriptionGateMiddleware>();
         app.UseAuthorization();
 
         app.MapBranding();

@@ -8,9 +8,11 @@ using Base.Application.Messaging;
 using Base.Application.Notifications;
 using Base.Application.Operations;
 using Base.Application.Settings;
+using Base.Application.Subscriptions;
 using Base.Application.Users;
 using Base.Domain.DataExchange;
 using Base.Domain.Notifications;
+using Base.Domain.Subscriptions;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -30,6 +32,14 @@ public static class DependencyInjection
         services.AddScoped<IAuditTrail, AuditTrailService>();
 
         services.AddScoped<IBrandingService, BrandingService>();
+
+        services.AddScoped<ITenantEntitlements, TenantEntitlements>();
+        services.AddScoped<IPlanAdministration, PlanAdministration>();
+        services.AddScoped<ISubscriptionService, SubscriptionService>();
+        services.AddScoped<IScheduledJob, SubscriptionLifecycleJob>();
+        services.AddScoped<SubscriptionNotices>();
+        services.AddScoped<IDomainEventHandler<SubscriptionStatusChanged>>(sp => sp.GetRequiredService<SubscriptionNotices>());
+        services.AddScoped<IDomainEventHandler<SubscriptionTrialEnding>>(sp => sp.GetRequiredService<SubscriptionNotices>());
         services.AddScoped<ExportService>();
         services.AddScoped<IExportService>(sp => sp.GetRequiredService<ExportService>());
         services.AddScoped<ImportService>();

@@ -1,0 +1,22 @@
+@model (IReadOnlyList<Base.Application.Subscriptions.PlanSummary> Plans, Guid? Current, BillingCycle Cycle)
+@{
+    var selected = Model.Current ?? (Model.Plans.Count > 0 ? Model.Plans[0].Id : (Guid?)null);
+}
+<div class="stack">
+    <div class="choice-grid" role="radiogroup" aria-label="Plan">
+        @foreach (var plan in Model.Plans)
+        {
+            <label class="choice-card @(plan.Id == Model.Current ? "is-current" : "")">
+                <input type="radio" name="planId" value="@plan.Id" checked="@(plan.Id == selected)" required />
+                <span class="choice-check"><icon name="check" /></span>
+                <span class="choice-title">@plan.Name @if (plan.Id == Model.Current) {<span class="badge text-bg-light ms-1">Current</span>}</span>
+                <span class="choice-price">@Display.Money(plan.MonthlyPrice, plan.Currency) <small>/month</small></span>
+                <partial name="_PlanFeatures" model="plan" />
+            </label>
+        }
+    </div>
+    <div class="segmented" role="radiogroup" aria-label="Billing cycle">
+        <input type="radio" name="billingCycle" id="cycle-m-@Model.Current" value="Monthly" checked="@(Model.Cycle == BillingCycle.Monthly)" /><label for="cycle-m-@Model.Current">Monthly</label>
+        <input type="radio" name="billingCycle" id="cycle-a-@Model.Current" value="Annual" checked="@(Model.Cycle == BillingCycle.Annual)" /><label for="cycle-a-@Model.Current">Annual</label>
+    </div>
+</div>

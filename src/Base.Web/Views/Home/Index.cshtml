@@ -1,20 +1,28 @@
 @inject ICurrentUser CurrentUser
 @inject Base.Application.Branding.IBrandingService Branding
+@inject ITenantEntitlements Entitlements
 @{
     ViewData["Title"] = "Home";
     var theme = await Branding.GetAsync(Context.RequestAborted);
-    var shortcuts = new (string Icon, string Title, string Hint, string Controller, string? Permission)[]
+    var access = await Entitlements.GetAsync(Context.RequestAborted);
+    var shortcuts = new (string Icon, string Title, string Hint, string Controller, string? Permission, string? Feature)[]
     {
-        ("file-text", "Documents", "Versioned files linked to any record", "Documents", PermissionCodes.Documents.Create),
-        ("database", "Import & export", "Bring data in, take lists out", "Imports", null),
-        ("inbox", "Inbox", "Messages sent to you", "Notifications", null),
-        ("users", "Users", "Invite people and manage access", "UserAdmin", PermissionCodes.Users.View),
-        ("shield-check", "Roles", "Group permissions into roles", "RoleAdmin", PermissionCodes.Roles.Manage),
-        ("history", "Audit trail", "Who changed what, and when", "AuditAdmin", PermissionCodes.Audit.View),
-        ("palette", "Appearance", "Colour, logo and default theme", "Appearance", PermissionCodes.Settings.Edit),
-        ("activity", "System", "Health, jobs, storage and errors", "SystemAdmin", PermissionCodes.System.HealthView),
+        ("file-text", "Documents", "Versioned files linked to any record", "Documents", PermissionCodes.Documents.Create, FeatureCodes.Documents),
+        ("database", "Import & export", "Bring data in, take lists out", "Imports", null, FeatureCodes.DataExchange),
+        ("inbox", "Inbox", "Messages sent to you", "Notifications", null, null),
+        ("users", "Users", "Invite people and manage access", "UserAdmin", PermissionCodes.Users.View, null),
+        ("shield-check", "Roles", "Group permissions into roles", "RoleAdmin", PermissionCodes.Roles.Manage, null),
+        ("history", "Audit trail", "Who changed what, and when", "AuditAdmin", PermissionCodes.Audit.View, null),
+        ("palette", "Appearance", "Colour, logo and default theme", "Appearance", PermissionCodes.Settings.Edit, FeatureCodes.CustomBranding),
+        ("credit-card", "Subscription", "Your plan, usage and renewal", "Subscription", access.IsRestricted ? PermissionCodes.Subscription.View : "", null),
+        ("building-2", "Tenants", "Organisations, domains and subscriptions", "PlatformTenants", PermissionCodes.Platform.TenantsView, null),
+        ("layers", "Plans", "Prices, trials, features and limits", "PlatformPlans", PermissionCodes.Platform.PlansManage, null),
+        ("activity", "System", "Health, jobs, storage and errors", "SystemAdmin", PermissionCodes.System.HealthView, null),
     };
-    var visible = shortcuts.Where(s => s.Permission is null || CurrentUser.HasPermission(s.Permission)).ToList();
+    var visible = shortcuts
+        .Where(s => s.Permission is null || (s.Permission.Length > 0 && CurrentUser.HasPermission(s.Permission)))
+        .Where(s => s.Feature is null || access.HasFeature(s.Feature))
+        .ToList();
 }
 
 @if (!CurrentUser.IsAuthenticated)

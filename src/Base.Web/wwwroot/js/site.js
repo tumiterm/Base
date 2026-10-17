@@ -203,3 +203,42 @@ document.querySelectorAll('.drop-zone').forEach((zone) => {
     picker.addEventListener('input', () => set(picker.value, picker));
     text.addEventListener('input', () => set(text.value.trim(), text));
 })();
+
+// Small form helpers: usage meters, number steppers, a code derived from a name, and "unlimited" switches.
+(() => {
+    document.querySelectorAll('[data-meter]').forEach((m) => {
+        const fill = m.querySelector('.meter-fill');
+        if (fill) fill.style.setProperty('--meter', `${Math.max(0, Math.min(100, Number(m.dataset.meter) || 0))}%`);
+    });
+
+    document.querySelectorAll('[data-stepper]').forEach((s) => {
+        const input = s.querySelector('input');
+        s.querySelectorAll('[data-step]').forEach((b) => b.addEventListener('click', () => {
+            const min = input.min === '' ? -Infinity : Number(input.min);
+            const max = input.max === '' ? Infinity : Number(input.max);
+            input.value = String(Math.max(min, Math.min(max, (Number(input.value) || 0) + Number(b.dataset.step))));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        }));
+    });
+
+    // Fills a code field from a name until the user edits the code themselves.
+    document.querySelectorAll('[data-slug-from]').forEach((code) => {
+        const source = document.querySelector(code.dataset.slugFrom);
+        if (!source) return;
+        let touched = code.value !== '';
+        code.addEventListener('input', () => { touched = code.value !== ''; });
+        source.addEventListener('input', () => {
+            if (touched) return;
+            code.value = source.value.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50);
+        });
+    });
+
+    document.querySelectorAll('[data-unlimited-for]').forEach((toggle) => {
+        const input = document.querySelector(toggle.dataset.unlimitedFor);
+        if (!input) return;
+        const sync = () => { input.disabled = toggle.checked; if (toggle.checked) input.value = ''; };
+        toggle.addEventListener('change', sync);
+        sync();
+    });
+})();

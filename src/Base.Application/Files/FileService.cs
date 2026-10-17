@@ -3,6 +3,7 @@ using Base.Application.Common.Abstractions;
 using Base.Application.Common.Persistence;
 using Base.Application.Common.Results;
 using Base.Application.Settings;
+using Base.Application.Subscriptions;
 using Base.Domain.Common;
 using Base.Domain.Files;
 using Microsoft.Extensions.Logging;
@@ -16,6 +17,7 @@ internal sealed partial class FileService(
     IApplicationSettingService settings,
     IEnumerable<IFileUploadCheck> checks,
     ITenantContext tenant,
+    ITenantEntitlements entitlements,
     ICurrentUser currentUser,
     TimeProvider time,
     ILogger<FileService> logger) : IFileService
@@ -129,6 +131,12 @@ internal sealed partial class FileService(
             {
                 return Fail(verdict.Message ?? "The file was rejected.");
             }
+        }
+
+        var quota = await entitlements.EnsureWithinLimitAsync(LimitCodes.StorageMb, size, cancellationToken);
+        if (quota.IsError)
+        {
+            return Fail(quota.Message ?? "The plan's storage is full.");
         }
 
         var provider = await ResolveUploadProviderAsync(request.Category, cancellationToken);

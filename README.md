@@ -115,6 +115,13 @@ scripts/new-project.cs  Creates a renamed copy for a new project.
   or through `/api/audit`.
 - **Multi-tenancy (optional):** host-based resolution, per-tenant users and settings, cross-tenant writes blocked
   in the interceptor. Single-tenant deployments run as one default tenant.
+- **Tenants and subscriptions:** platform screens at `/platform/tenants` and `/platform/plans` (and an API). They
+  create a tenant with its domain, plan and first administrator in one step, and manage domains. Plans set prices,
+  trials, features and limits. The lifecycle (trial, active, past due, suspended, cancelled or expired) is advanced
+  by a job, with trial reminders and status emails. Payments are recorded by an operator or a billing integration;
+  no payment gateway is built in. Limits are enforced on invites and uploads; features gate modules and their
+  navigation. Suspended tenants see only `/subscription`. A tenant without a plan is unrestricted. Development seeds
+  three example plans.
 - **Settings:** a typed, validated catalogue; tenant → platform → default resolution; HybridCache with tag
   invalidation; a seeder that never overwrites an administrator's value.
 - **Files:** the bytes go to object storage (S3-compatible, Azure Blob, local disk) and SQL holds only a metadata

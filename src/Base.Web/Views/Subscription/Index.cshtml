@@ -1,0 +1,96 @@
+@model SubscriptionPageViewModel
+@inject ICurrentUser CurrentUser
+@{
+    ViewData["Title"] = "Subscription";
+    var s = Model.Mine.Subscription;
+    var canView = CurrentUser.HasPermission(PermissionCodes.Subscription.View);
+}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Subscription</h1>
+        <p class="page-subtitle">Your organisation's plan, what it includes, and how much of it is in use.</p>
+    </div>
+</div>
+
+@if (!Model.Access.HasAccess && s is not null)
+{
+    <div class="alert alert-danger d-flex gap-2 align-items-start" role="alert">
+        <icon name="circle-alert" />
+        <div>
+            <strong>Access is paused: the subscription is @Display.Status(s.Status).ToLowerInvariant().</strong>
+            <div>@(s.StatusReason ?? "Contact us to restore access.") Your data is kept and access returns as soon as the subscription is active.</div>
+        </div>
+    </div>
+}
+
+@if (s is null)
+{
+    <div class="empty-state">
+        <icon name="sparkles" />
+        <div class="empty-state-title">No subscription needed</div>
+        <p class="mb-0">This organisation isn't on a plan, so every feature is on and nothing is limited.</p>
+    </div>
+}
+else if (!canView)
+{
+    <div class="panel"><div class="panel-body d-flex align-items-center justify-content-between gap-3">
+        <div><div class="fw-semibold">@s.PlanName</div><div class="text-muted small">Ask an administrator for details.</div></div>
+        <partial name="_SubscriptionStatus" model="s.Status" />
+    </div></div>
+}
+else
+{
+    <div class="detail-grid">
+        <div class="stack">
+            <section class="panel" aria-labelledby="plan-title">
+                <div class="panel-header">
+                    <h2 class="panel-title" id="plan-title">Current plan</h2>
+                    <partial name="_SubscriptionStatus" model="s.Status" />
+                </div>
+                <div class="panel-body">
+                    <div class="d-flex flex-wrap align-items-baseline justify-content-between gap-2 mb-3">
+                        <div class="h4 mb-0">@s.PlanName</div>
+                        <div class="choice-price">@Display.Money(s.Price, s.Currency) <small>@Display.PerCycle(s.BillingCycle)</small></div>
+                    </div>
+                    <dl class="kv">
+                        @if (s.Status == SubscriptionStatus.Trialing)
+                        {
+                            <dt>Trial ends</dt><dd><local-time value="s.CurrentPeriodEnd" format="d MMMM yyyy" /></dd>
+                        }
+                        else if (s.HasAccess)
+                        {
+                            <dt>@(s.CancelAtPeriodEnd ? "Ends" : s.Status == SubscriptionStatus.PastDue ? "Was due" : "Renews")</dt><dd><local-time value="s.CurrentPeriodEnd" format="d MMMM yyyy" /></dd>
+                        }
+                        <dt>Billing</dt><dd>@s.BillingCycle</dd>
+                        <dt>Member since</dt><dd><local-time value="s.StartedAt" format="d MMMM yyyy" /></dd>
+                        @if (s.StatusReason is not null) {<dt>Note</dt><dd>@s.StatusReason</dd>}
+                    </dl>
+                </div>
+            </section>
+
+            @if (Model.Mine.Plans.Count > 0)
+            {
+                <section aria-labelledby="compare-title">
+                    <h2 class="h5 mb-3" id="compare-title">Plans</h2>
+                    <div class="choice-grid">
+                        @foreach (var plan in Model.Mine.Plans)
+                        {
+                            var current = plan.Id == s.PlanId;
+                            <div class="choice-card @(current ? "is-current" : "")">
+                                <span class="choice-title">@plan.Name @if (current) {<span class="badge text-bg-primary ms-1">Your plan</span>}</span>
+                                <span class="choice-price">@Display.Money(plan.MonthlyPrice, plan.Currency) <small>/month</small></span>
+                                @if (plan.Description is not null) {<span class="choice-desc">@plan.Description</span>}
+                                <partial name="_PlanFeatures" model="plan" />
+                            </div>
+                        }
+                    </div>
+                    <p class="text-muted small mt-3 mb-0">To change plan, contact us; the change applies as soon as it's made.</p>
+                </section>
+            }
+        </div>
+        <section class="panel" aria-labelledby="usage-title">
+            <div class="panel-header"><h2 class="panel-title" id="usage-title">Usage</h2></div>
+            <div class="panel-body"><partial name="_UsageMeters" model="Model.Mine.Usage" /></div>
+        </section>
+    </div>
+}

@@ -5,6 +5,7 @@ using Base.Domain.Documents;
 using Base.Domain.Files;
 using Base.Domain.Notifications;
 using Base.Domain.Settings;
+using Base.Domain.Subscriptions;
 using Base.Domain.Tenancy;
 using Base.Infrastructure.Files;
 using Base.Infrastructure.Identity;
@@ -28,6 +29,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
     public DbSet<Tenant> Tenants => Set<Tenant>();
 
     public DbSet<TenantDomain> TenantDomains => Set<TenantDomain>();
+
+    public DbSet<Plan> Plans => Set<Plan>();
+
+    public DbSet<PlanEntitlement> PlanEntitlements => Set<PlanEntitlement>();
+
+    public DbSet<TenantSubscription> TenantSubscriptions => Set<TenantSubscription>();
 
     public DbSet<ApplicationSetting> ApplicationSettings => Set<ApplicationSetting>();
 

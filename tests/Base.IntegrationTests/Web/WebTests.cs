@@ -422,6 +422,25 @@ public sealed partial class WebTests(SqlServerFixture sql) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Platform_and_subscription_pages_render_for_the_platform_administrator()
+    {
+        var client = Client();
+        await SignInAsync(client);
+
+        foreach (var path in new[] { "/platform/tenants", "/platform/tenants/new", "/platform/plans", "/platform/plans/new", "/subscription" })
+        {
+            var page = await client.GetAsync(path, TestContext.Current.CancellationToken);
+            page.StatusCode.ShouldBe(HttpStatusCode.OK, path);
+        }
+
+        (await client.GetStringAsync("/subscription", TestContext.Current.CancellationToken)).ShouldContain("No subscription needed");
+        var home = await client.GetStringAsync("/", TestContext.Current.CancellationToken);
+        home.ShouldContain("Tenants");
+        (await Client().GetAsync("/api/platform/tenants", TestContext.Current.CancellationToken)).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        (await client.GetFromJsonAsync<JsonElement>("/api/subscription/access", TestContext.Current.CancellationToken)).GetProperty("isRestricted").GetBoolean().ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task Password_pages_are_anonymous_and_set_password_is_never_cached()
     {
         var client = Client();

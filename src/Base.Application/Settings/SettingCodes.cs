@@ -26,6 +26,15 @@ public static class SettingCodes
         public const string LogoFileId = "Branding.LogoFileId";
     }
 
+    public static class Subscriptions
+    {
+        /// <summary>Days a past-due subscription keeps access before it is suspended.</summary>
+        public const string GraceDays = "Subscriptions.GraceDays";
+
+        /// <summary>How many days before a trial ends its contact is told.</summary>
+        public const string TrialReminderDays = "Subscriptions.TrialReminderDays";
+    }
+
     public static class Files
     {
         public const string MaxUploadSizeMb = "Files.MaxUploadSizeMb";

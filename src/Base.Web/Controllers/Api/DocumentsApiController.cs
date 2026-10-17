@@ -3,8 +3,10 @@ using Base.Application.Common.Results;
 using Base.Application.Documents;
 using Base.Application.Documents.Generation;
 using Base.Application.Files;
+using Base.Application.Subscriptions;
 using Base.Domain.Documents;
 using Base.Web.Results;
+using Base.Web.Subscriptions;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Base.Web.Controllers.Api;
@@ -14,6 +16,7 @@ namespace Base.Web.Controllers.Api;
 /// read is a 404). Named apart from the page controller so tag helpers never link pages to the API.
 /// </summary>
 [ApiController]
+[RequiresFeature(FeatureCodes.Documents)]
 [Route("api/documents")]
 public sealed class DocumentsApiController(IDocumentService documents, IDocumentGenerator generator) : ControllerBase
 {

@@ -1,0 +1,111 @@
+@model CreateTenantViewModel
+@{
+    ViewData["Title"] = "New tenant";
+}
+<nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-action="Index">Tenants</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">New tenant</span></nav>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">New tenant</h1>
+        <p class="page-subtitle">Sets up the organisation, its address and plan, and invites its first administrator.</p>
+    </div>
+</div>
+
+<form method="post" class="panel" novalidate>
+    <div class="panel-body">
+        <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+
+        <section class="form-section">
+            <div>
+                <h2 class="form-section-title">Organisation</h2>
+                <p class="form-section-desc">The code appears in links and storage paths, so it can't change later.</p>
+            </div>
+            <div class="row g-3">
+                <div class="col-md-7">
+                    <label asp-for="Name" class="form-label">Name</label>
+                    <input asp-for="Name" class="form-control" autocomplete="organization" required autofocus />
+                    <span asp-validation-for="Name" class="text-danger"></span>
+                </div>
+                <div class="col-md-5">
+                    <label asp-for="Code" class="form-label">Code</label>
+                    <input asp-for="Code" class="form-control font-monospace" data-slug-from="#Name" maxlength="50" spellcheck="false" autocapitalize="off" required />
+                    <span asp-validation-for="Code" class="text-danger"></span>
+                </div>
+                <div class="col-12">
+                    <label asp-for="Host" class="form-label">Address <span class="text-muted fw-normal">(optional)</span></label>
+                    <div class="input-group">
+                        <span class="input-group-text">https://</span>
+                        <input asp-for="Host" class="form-control" placeholder="acme.example.com" spellcheck="false" autocapitalize="off" inputmode="url" />
+                    </div>
+                    <div class="form-text">Point its DNS at the platform. Without one, add a domain later; the tenant isn't reachable until it has a verified domain.</div>
+                    <span asp-validation-for="Host" class="text-danger"></span>
+                </div>
+            </div>
+        </section>
+
+        <section class="form-section">
+            <div>
+                <h2 class="form-section-title">First administrator</h2>
+                <p class="form-section-desc">Receives an invitation to set a password, and the organisation's billing notices.</p>
+            </div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label asp-for="AdminName" class="form-label">Full name</label>
+                    <input asp-for="AdminName" class="form-control" autocomplete="off" required />
+                    <span asp-validation-for="AdminName" class="text-danger"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="AdminEmail" class="form-label">Email</label>
+                    <input asp-for="AdminEmail" class="form-control" type="email" autocomplete="off" required />
+                    <span asp-validation-for="AdminEmail" class="text-danger"></span>
+                </div>
+            </div>
+        </section>
+
+        <section class="form-section">
+            <div>
+                <h2 class="form-section-title">Plan</h2>
+                <p class="form-section-desc">Sets features and limits. Without a plan the tenant is unrestricted, like the platform.</p>
+            </div>
+            <div class="stack">
+                <div class="choice-grid" role="radiogroup" aria-label="Plan">
+                    @foreach (var plan in Model.Plans)
+                    {
+                        <label class="choice-card">
+                            <input type="radio" name="PlanId" value="@plan.Id" checked="@(Model.PlanId == plan.Id)" />
+                            <span class="choice-check"><icon name="check" /></span>
+                            <span class="choice-title">@plan.Name</span>
+                            <span class="choice-price">@Display.Money(plan.MonthlyPrice, plan.Currency) <small>/month</small></span>
+                            @if (plan.TrialDays > 0) {<span class="choice-desc">@plan.TrialDays-day free trial</span>}
+                            <partial name="_PlanFeatures" model="plan" />
+                        </label>
+                    }
+                    <label class="choice-card">
+                        <input type="radio" name="PlanId" value="" checked="@(Model.PlanId is null)" />
+                        <span class="choice-check"><icon name="check" /></span>
+                        <span class="choice-title">No subscription</span>
+                        <span class="choice-desc">Every feature, no limits, no billing. For internal or partner organisations.</span>
+                    </label>
+                </div>
+                <span asp-validation-for="PlanId" class="text-danger"></span>
+                <div class="d-flex flex-wrap align-items-center gap-4">
+                    <div>
+                        <div class="form-label">Billing</div>
+                        <div class="segmented" role="radiogroup" aria-label="Billing cycle">
+                            <input type="radio" name="BillingCycle" id="bc-monthly" value="Monthly" checked="@(Model.BillingCycle == BillingCycle.Monthly)" /><label for="bc-monthly">Monthly</label>
+                            <input type="radio" name="BillingCycle" id="bc-annual" value="Annual" checked="@(Model.BillingCycle == BillingCycle.Annual)" /><label for="bc-annual">Annual</label>
+                        </div>
+                    </div>
+                    <div class="form-check form-switch mt-3">
+                        <input class="form-check-input" type="checkbox" role="switch" id="WithTrial" name="WithTrial" value="true" checked="@Model.WithTrial" />
+                        <input type="hidden" name="WithTrial" value="false" />
+                        <label class="form-check-label" for="WithTrial">Start with the plan's free trial</label>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+    <div class="panel-footer d-flex justify-content-end gap-2">
+        <a class="btn btn-ghost" asp-action="Index">Cancel</a>
+        <button class="btn btn-primary" type="submit"><icon name="building-2" class="icon-sm" /> Create tenant</button>
+    </div>
+</form>

@@ -2,7 +2,9 @@ using System.Security.Claims;
 using Base.Application.Common.Abstractions;
 using Base.Application.Security;
 using Base.Application.Settings;
+using Base.Application.Subscriptions;
 using Base.Domain.Settings;
+using Base.Domain.Subscriptions;
 using Base.Domain.Tenancy;
 using Base.Infrastructure.Identity;
 using Base.Infrastructure.Persistence;
@@ -187,4 +189,36 @@ internal sealed partial class IdentitySeedTask(
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Seeded administrator account {Email}. Change its password after first sign-in.")]
     private static partial void LogAdminCreated(ILogger logger, string email);
+}
+
+/// <summary>Example plans so the subscription screens have something to show. Only when <c>Seed:SamplePlans</c> is on and no plan exists.</summary>
+internal sealed class SamplePlansSeedTask(AppDbContext db, IOptions<SeedOptions> seed) : IStartupTask
+{
+    public int Order => 40;
+
+    public async Task ExecuteAsync(CancellationToken cancellationToken)
+    {
+        if (!seed.Value.SamplePlans || await db.Plans.IgnoreQueryFilters().AnyAsync(cancellationToken))
+        {
+            return;
+        }
+
+        db.Plans.AddRange(
+            Build("starter", "Starter", "For small teams getting started.", 499m, 4990m, 14, 10, users: 5, storageMb: 1024, dataExchange: false, branding: false),
+            Build("professional", "Professional", "Everything a growing organisation needs.", 1499m, 14990m, 14, 20, users: 25, storageMb: 10240, dataExchange: true, branding: true),
+            Build("enterprise", "Enterprise", "No limits, for large organisations.", 4999m, 49990m, 30, 30, users: null, storageMb: null, dataExchange: true, branding: true));
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static Plan Build(string code, string name, string description, decimal monthly, decimal annual, int trialDays, int order, long? users, long? storageMb, bool dataExchange, bool branding)
+    {
+        var plan = new Plan(code, name, "ZAR", monthly, annual, trialDays);
+        plan.Update(name, description, "ZAR", monthly, annual, trialDays, order);
+        plan.SetEntitlement(FeatureCodes.Documents, 1);
+        plan.SetEntitlement(FeatureCodes.DataExchange, dataExchange ? 1 : 0);
+        plan.SetEntitlement(FeatureCodes.CustomBranding, branding ? 1 : 0);
+        plan.SetEntitlement(LimitCodes.Users, users);
+        plan.SetEntitlement(LimitCodes.StorageMb, storageMb);
+        return plan;
+    }
 }

@@ -1,0 +1,12 @@
+@model Base.Application.Subscriptions.PlanSummary
+<ul class="choice-list">
+    @foreach (var limit in EntitlementCatalog.Limits)
+    {
+        <li><icon name="check" /> @Display.Limit(limit.Code, Model.ValueOf(limit.Code)) @limit.Name.ToLowerInvariant()</li>
+    }
+    @foreach (var feature in EntitlementCatalog.Features)
+    {
+        var on = Model.ValueOf(feature.Code) == 1;
+        <li class="@(on ? "" : "is-off")"><icon name="@(on ? "check" : "x")" /> @feature.Name</li>
+    }
+</ul>
