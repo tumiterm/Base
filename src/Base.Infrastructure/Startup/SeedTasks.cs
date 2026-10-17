@@ -20,6 +20,9 @@ internal sealed partial class MigrateDatabaseTask(AppDbContext db, IOptions<Data
 
     public async Task ExecuteAsync(CancellationToken cancellationToken)
     {
+        var connection = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(db.Database.GetConnectionString());
+        LogDatabase(logger, connection.DataSource, connection.InitialCatalog);
+
         if (!options.Value.MigrateOnStartup)
         {
             return;
@@ -32,6 +35,9 @@ internal sealed partial class MigrateDatabaseTask(AppDbContext db, IOptions<Data
             await db.Database.MigrateAsync(cancellationToken);
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Database: {Server} / {Database}")]
+    private static partial void LogDatabase(ILogger logger, string server, string database);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Applying {Count} migration(s): {Migrations}")]
     private static partial void LogMigrating(ILogger logger, int count, IReadOnlyList<string> migrations);

@@ -47,11 +47,12 @@ public static class DependencyInjection
         services.AddOptions<TenancyOptions>().BindConfiguration(TenancyOptions.SectionName).ValidateDataAnnotations().ValidateOnStart();
         services.AddOptions<OutboxOptions>().BindConfiguration(OutboxOptions.SectionName).ValidateDataAnnotations().ValidateOnStart();
 
-        AddPersistence(services, configuration, environment);
+        var connectionString = ResolveConnectionString(configuration, environment);
+        AddPersistence(services, connectionString, environment);
         AddIdentityCore(services);
         AddFileStorage(services, configuration, environment);
         AddEmail(services, configuration);
-        AddHangfire(services, configuration);
+        AddHangfire(services, configuration, connectionString);
 
         services.AddScoped<ITenantContext, TenantContext>();
         services.AddScoped<ITenantResolver, TenantResolver>();
@@ -75,12 +76,26 @@ public static class DependencyInjection
         return services;
     }
 
-    private static void AddPersistence(IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
+    /// <summary>
+    /// The configured connection string. In Development only, an empty one falls back to
+    /// <see cref="DevelopmentDatabase"/> (LocalDB on Windows, docker-compose SQL Server elsewhere).
+    /// </summary>
+    internal static string ResolveConnectionString(IConfiguration configuration, IHostEnvironment environment)
     {
-        var connectionString = configuration.GetConnectionString(ConnectionStringName)
-            ?? throw new InvalidOperationException(
-                $"Connection string '{ConnectionStringName}' is missing. Set it with: dotnet user-secrets set \"ConnectionStrings:{ConnectionStringName}\" \"...\"");
+        var configured = configuration.GetConnectionString(ConnectionStringName);
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            return configured;
+        }
 
+        return environment.IsDevelopment()
+            ? DevelopmentDatabase.Default
+            : throw new InvalidOperationException(
+                $"Connection string '{ConnectionStringName}' is missing. Set the ConnectionStrings__{ConnectionStringName} environment variable, or for local work: dotnet user-secrets set \"ConnectionStrings:{ConnectionStringName}\" \"...\"");
+    }
+
+    private static void AddPersistence(IServiceCollection services, string connectionString, IHostEnvironment environment)
+    {
         services.AddScoped<AuditingInterceptor>();
         services.AddScoped<DomainEventOutboxInterceptor>();
         services.AddScoped<AuditTrailInterceptor>();
@@ -201,7 +216,7 @@ public static class DependencyInjection
         }
     }
 
-    private static void AddHangfire(IServiceCollection services, IConfiguration configuration)
+    private static void AddHangfire(IServiceCollection services, IConfiguration configuration, string connectionString)
     {
         var options = configuration.GetSection(HangfireOptions.SectionName).Get<HangfireOptions>() ?? new HangfireOptions();
         services.AddSingleton(Options.Create(options));
@@ -214,7 +229,7 @@ public static class DependencyInjection
             .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
             .UseSimpleAssemblyNameTypeSerializer()
             .UseRecommendedSerializerSettings()
-            .UseSqlServerStorage(configuration.GetConnectionString(ConnectionStringName), new SqlServerStorageOptions
+            .UseSqlServerStorage(connectionString, new SqlServerStorageOptions
             {
                 SchemaName = "hangfire",
                 PrepareSchemaIfNecessary = true,

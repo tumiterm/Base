@@ -20,24 +20,45 @@ The script copies the repository, renames `Base.*` projects, namespaces and the 
 
 ## Run it locally
 
-Prerequisites: .NET 10 SDK, Docker.
+In Development the app needs no configuration. With no connection string set it uses:
+
+- **Windows:** SQL Server **LocalDB** (installed with Visual Studio's ASP.NET workload), database `Base`.
+- **macOS / Linux:** the docker-compose SQL Server (`docker compose up -d sqlserver`).
+
+On startup it applies migrations, seeds the default tenant, settings and roles, and creates the
+**`admin@base.local` / `Admin-Dev-Password-1`** account (Development only). Uploads go to local disk under `.data/`,
+and emails are written to the log. The API reference is at `/scalar`.
+
+### Windows + Visual Studio
+
+1. Open `Base.slnx` and set **Base.Web** as the startup project.
+2. Press **F5** (the `https` profile). Sign in as `admin@base.local` / `Admin-Dev-Password-1`.
+3. Tests: **Test Explorer → Run All**. Without Docker, the integration tests use LocalDB and drop their databases
+   at the end.
+
+If LocalDB isn't installed: Visual Studio Installer → Modify → Individual components → *SQL Server Express LocalDB*.
+Check it with `sqllocaldb info` (it should list `MSSQLLocalDB`).
+
+### Command line, any OS
 
 ```bash
 docker compose up -d                                   # SQL Server + OpenTelemetry dashboard (http://localhost:18888)
-cd src/Base.Web
-dotnet user-secrets set "Seed:AdminPassword" "<a 12+ character password>"
-dotnet run --launch-profile https
+dotnet run --project src/Base.Web --launch-profile https
 ```
 
-In Development the app applies migrations, seeds the default tenant, settings, roles and the `admin@base.local`
-account, and stores uploads on local disk under `.data/`. The API reference is at `/scalar`.
+### Using a different database
+
+Set `ConnectionStrings:Default`, which always wins over the fallback:
+`dotnet user-secrets set "ConnectionStrings:Default" "Server=.;Database=Base;Trusted_Connection=True;TrustServerCertificate=True" --project src/Base.Web`.
+Integration tests can be pointed at any SQL Server with the `BASE_TEST_SQLSERVER` environment variable.
+Outside Development a missing connection string is a startup error: there is no fallback.
 
 ## Everyday commands
 
 | Task | Command |
 | --- | --- |
 | Build (warnings are errors) | `dotnet build` |
-| All tests (needs Docker for SQL Server) | `dotnet test` |
+| All tests (Docker, or LocalDB on Windows) | `dotnet test` |
 | One test project | `dotnet test --project tests/Base.UnitTests` |
 | Format / style check | `dotnet format --verify-no-changes` |
 | Add a migration | `dotnet ef migrations add <Name> --project src/Base.Infrastructure --startup-project src/Base.Infrastructure --output-dir Persistence/Migrations` |

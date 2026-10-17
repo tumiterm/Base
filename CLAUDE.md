@@ -9,7 +9,10 @@ cross-cutting feature or adding a package:
 ## Commands
 
 - Build: `dotnet build` (warnings are errors; NuGet audit fails on vulnerable packages)
-- Test: `dotnet test` (all), `dotnet test --project tests/Base.UnitTests` (one). Integration tests need Docker.
+- Test: `dotnet test` (all), `dotnet test --project tests/Base.UnitTests` (one). Integration tests use Docker, LocalDB on
+  Windows without Docker, or `BASE_TEST_SQLSERVER`.
+- Run: in Development no config is needed (LocalDB on Windows, docker-compose SQL elsewhere; admin `admin@base.local` /
+  `Admin-Dev-Password-1`).
 - Style: `dotnet format --verify-no-changes`
 - Migration: `dotnet ef migrations add <Name> --project src/Base.Infrastructure --startup-project src/Base.Infrastructure --output-dir Persistence/Migrations`
 - Drift check: `dotnet ef migrations has-pending-model-changes --project src/Base.Infrastructure --startup-project src/Base.Infrastructure`
