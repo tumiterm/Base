@@ -229,7 +229,7 @@ public sealed class NotificationTests(SqlServerFixture sql) : IAsyncLifetime
         await Notify(new Notification(NotificationTemplates.Identity.PasswordChanged, NotificationRecipient.ToUser(userId)));
         _app.Time.Advance(TimeSpan.FromDays(366));
 
-        var removed = await ActivatorUtilities.CreateInstance<NotificationRetentionService>(_app.Services).PurgeAsync(CancellationToken.None);
+        var removed = await _app.InScopeAsync(null, sp => sp.GetServices<Base.Application.Operations.IScheduledJob>().OfType<Base.Infrastructure.Jobs.NotificationRetentionJob>().Single().PurgeAsync(CancellationToken.None));
 
         removed.ShouldBe(2);
         (await Messages(userId)).ShouldBeEmpty();

@@ -1,0 +1,19 @@
+@model ErrorDetailsViewModel
+@{
+    var error = Model.Error;
+    ViewData["Title"] = error.Ticket;
+}
+<nav class="mb-2"><a asp-action="Errors">&larr; Errors</a></nav>
+<h1 class="h3 mb-1">@error.Ticket</h1>
+<p class="text-muted small"><local-time value="@error.OccurredAt" /> · @error.Method @error.Path · @(error.User ?? "anonymous")</p>
+<div class="d-flex gap-2 mb-3">
+    @if (Model.TraceUrl is { } trace) { <a class="btn btn-sm btn-outline-primary" href="@trace" target="_blank" rel="noopener">Open the trace</a> }
+    @if (Model.LogSearchUrl is { } logs) { <a class="btn btn-sm btn-outline-primary" href="@logs" target="_blank" rel="noopener">Search the logs</a> }
+</div>
+<dl class="row small">
+    <dt class="col-sm-2">Type</dt><dd class="col-sm-10">@error.ExceptionType</dd>
+    <dt class="col-sm-2">Message</dt><dd class="col-sm-10">@error.Message</dd>
+    <dt class="col-sm-2">Trace id</dt><dd class="col-sm-10"><code>@(error.TraceId ?? "-")</code></dd>
+    <dt class="col-sm-2">Fingerprint</dt><dd class="col-sm-10"><code>@error.Fingerprint</code> <span class="text-muted">(same type and place = same fingerprint)</span></dd>
+</dl>
+<pre class="small bg-body-tertiary p-3 border rounded text-wrap">@error.Details</pre>

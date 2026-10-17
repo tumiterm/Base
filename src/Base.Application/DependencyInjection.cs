@@ -5,6 +5,7 @@ using Base.Application.Documents.Generation;
 using Base.Application.Files;
 using Base.Application.Messaging;
 using Base.Application.Notifications;
+using Base.Application.Operations;
 using Base.Application.Settings;
 using Base.Application.Users;
 using Base.Domain.DataExchange;
@@ -42,6 +43,7 @@ public static class DependencyInjection
         services.AddScoped<DocumentService>();
         services.AddScoped<IDocumentService>(sp => sp.GetRequiredService<DocumentService>());
         services.AddScoped<IDocumentRetention, DocumentRetention>();
+        services.AddScoped<IScheduledJob, DocumentRetentionJob>();
         services.AddScoped<IDocumentGenerator, DocumentGenerator>();
         services.AddSingleton<IDocumentRenderer, HtmlDocumentRenderer>();
         services.TryAddScoped<IDocumentAccessPolicy, DefaultDocumentAccessPolicy>();

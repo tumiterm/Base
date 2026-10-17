@@ -1,0 +1,10 @@
+@model Base.Application.Operations.HealthState
+@{
+    var css = Model switch
+    {
+        Base.Application.Operations.HealthState.Healthy => "text-bg-success",
+        Base.Application.Operations.HealthState.Degraded => "text-bg-warning",
+        _ => "text-bg-danger",
+    };
+}
+<span class="badge @css">@Model</span>

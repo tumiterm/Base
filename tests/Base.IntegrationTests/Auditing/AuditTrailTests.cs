@@ -207,7 +207,7 @@ public sealed class AuditTrailTests(SqlServerFixture sql) : IAsyncLifetime
             return await uow.SaveAsync();
         });
 
-        var removed = await ActivatorUtilities.CreateInstance<AuditRetentionService>(_app.Services).PurgeAsync(CancellationToken.None);
+        var removed = await _app.InScopeAsync(null, sp => sp.GetServices<Base.Application.Operations.IScheduledJob>().OfType<Base.Infrastructure.Jobs.AuditRetentionJob>().Single().PurgeAsync(CancellationToken.None));
 
         removed.ShouldBeGreaterThan(0);
         var remaining = await _app.InScopeAsync(null, sp => sp.GetRequiredService<AppDbContext>().AuditEntries.IgnoreQueryFilters([QueryFilters.Tenant]).Select(e => e.Changes).ToListAsync());

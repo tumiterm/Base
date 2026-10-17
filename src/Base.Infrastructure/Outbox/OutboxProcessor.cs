@@ -18,8 +18,6 @@ internal sealed partial class OutboxProcessor(
     TimeProvider time,
     ILogger<OutboxProcessor> logger) : BackgroundService
 {
-    private DateTimeOffset _nextCleanup;
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var settings = options.Value;
@@ -33,8 +31,6 @@ internal sealed partial class OutboxProcessor(
                 {
                     // A full batch means there is probably more waiting: keep going without waiting for the timer.
                 }
-
-                await CleanupAsync(settings, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -118,21 +114,6 @@ internal sealed partial class OutboxProcessor(
 
         message.LockedUntil = null;
         await db.SaveChangesAsync(CancellationToken.None);
-    }
-
-    private async Task CleanupAsync(OutboxOptions settings, CancellationToken cancellationToken)
-    {
-        var now = time.GetUtcNow();
-        if (now < _nextCleanup)
-        {
-            return;
-        }
-
-        _nextCleanup = now.AddHours(1);
-        var cutoff = now.AddDays(-settings.RetentionDays);
-        await using var scope = scopeFactory.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        await db.OutboxMessages.Where(m => m.ProcessedAt != null && m.ProcessedAt < cutoff).ExecuteDeleteAsync(cancellationToken);
     }
 
     private static string Truncate(string value, int length) => value.Length <= length ? value : value[..length];

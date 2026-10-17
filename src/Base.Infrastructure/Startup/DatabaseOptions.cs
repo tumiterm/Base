@@ -10,6 +10,9 @@ public sealed class DatabaseOptions
     public int CommandTimeoutSeconds { get; set; } = 30;
 
     public int MaxRetryCount { get; set; } = 5;
+
+    /// <summary>Commands slower than this are logged as warnings with their SQL and trace id; 0 turns it off.</summary>
+    public int SlowQueryThresholdMs { get; set; } = 500;
 }
 
 public sealed class SeedOptions

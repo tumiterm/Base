@@ -43,7 +43,7 @@
                         <a class="nav-link" href="/api/settings">Settings (API)</a>
                     </li>
                     <li class="nav-item" asp-permission="@PermissionCodes.System.HealthView">
-                        <a class="nav-link" href="/health/ready">Health</a>
+                        <a class="nav-link" asp-controller="SystemAdmin" asp-action="Index">System</a>
                     </li>
                 </ul>
                 <div class="d-flex align-items-center gap-2">

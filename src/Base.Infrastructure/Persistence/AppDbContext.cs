@@ -8,6 +8,8 @@ using Base.Domain.Settings;
 using Base.Domain.Tenancy;
 using Base.Infrastructure.Files;
 using Base.Infrastructure.Identity;
+using Base.Infrastructure.Jobs;
+using Base.Infrastructure.Operations;
 using Base.Infrastructure.Outbox;
 using Base.Infrastructure.Persistence.Conventions;
 using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
@@ -42,6 +44,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
     public DbSet<DocumentVersion> DocumentVersions => Set<DocumentVersion>();
 
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+
+    public DbSet<ScheduledJobState> ScheduledJobStates => Set<ScheduledJobState>();
+
+    public DbSet<ScheduledJobRun> ScheduledJobRuns => Set<ScheduledJobRun>();
+
+    public DbSet<ErrorLogEntry> ErrorLogEntries => Set<ErrorLogEntry>();
 
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
 

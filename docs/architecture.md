@@ -198,11 +198,28 @@ streaming).
 
 - **Outbox** (`OutboxProcessor`): due messages are claimed with an atomic lease, so several instances are safe.
   Handlers implement `IDomainEventHandler<TEvent>` and must be idempotent. Failures retry with exponential
-  backoff and are dead-lettered after `MaxAttempts`. Processed messages are purged after `RetentionDays`.
+  backoff and are dead-lettered after `MaxAttempts`; the system page can retry them. The `outbox-cleanup` job purges
+  processed messages after `RetentionDays`.
+- **Scheduled jobs** (`IScheduledJob`, run by `JobSchedulerService`): audit, notification, file, document and error-log
+  retention, and outbox cleanup. Each job runs on one instance at a time (a lease row in `ScheduledJobs`), in system
+  scope, as "System". Every run is recorded with its duration and summary. `/admin/system` shows them and can run one
+  now. Turn the scheduler off per host with `Jobs:Enabled`.
 - **Hangfire** (optional): scheduled and recurring jobs with SQL storage in the `hangfire` schema; dashboard
   behind `System.Jobs.Manage`.
 - **Startup tasks** (`IStartupTask`): migrate (when enabled), default tenant, settings, roles and administrator.
   All idempotent.
+
+## Health and diagnostics
+
+- `/health/live` (process up) and `/health/ready` (database) are anonymous, for orchestrators.
+- Every other check is tagged `dependency` and shown on `/admin/system` (and `/api/system/health`) with its data.
+  The checks: storage providers, the database file quota, notification provider reachability, Gotenberg, ClamAV,
+  outbox, scheduled jobs and Hangfire.
+- Unhandled errors get a ticket in the response. The background reporter records them in `ErrorLog` and emails the
+  alert recipients. `/admin/system/errors/{ticket}` shows the stack trace and links to the trace and logs
+  (`Observability:TraceUrlTemplate`, `LogSearchUrlTemplate`).
+- Commands slower than `Database:SlowQueryThresholdMs` are logged with their SQL and trace id and counted as
+  `base.db.slow_commands`. EF Core's meter is exported too.
 
 ## Testing strategy
 

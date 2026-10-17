@@ -84,3 +84,9 @@ public interface IValidatableProviderOptions
 {
     IEnumerable<string> MissingSettings();
 }
+
+/// <summary>Where a provider sends to, so the notification health check can test that it is reachable.</summary>
+public interface IProviderEndpoint
+{
+    Uri Endpoint { get; }
+}

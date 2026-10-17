@@ -42,8 +42,10 @@ public sealed partial class LogNotificationProvider(string name, NotificationCha
 }
 
 /// <summary>Email over SMTP (MailKit). Connection or server errors are retryable; a rejected recipient is not.</summary>
-public sealed class SmtpEmailProvider(string name, SmtpProviderOptions options) : INotificationProvider
+public sealed class SmtpEmailProvider(string name, SmtpProviderOptions options) : INotificationProvider, IProviderEndpoint
 {
+    public Uri Endpoint => new($"smtp://{options.Host}:{options.Port}");
+
     public string Name { get; } = name;
 
     public NotificationChannel Channel => NotificationChannel.Email;

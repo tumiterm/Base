@@ -129,6 +129,13 @@ scripts/new-project.cs  Creates a renamed copy for a new project.
   Gotenberg, and you can plug in your own engine.
 - **Reliability:** transactional outbox (domain events saved with the change, dispatched with retries, backoff and
   dead-lettering, safe across instances); startup tasks; health probes (`/health/live`, `/health/ready`).
+- **Operations:**
+  - `/admin/system` shows the health of every dependency: database, storage, database file quota, email, SMS and
+    WhatsApp providers, Gotenberg, ClamAV, outbox and jobs.
+  - It also shows scheduled jobs with their run history and a "Run now" button, database size and the largest tables,
+    storage per tenant, outbox dead letters with retry, and recorded errors searchable by ticket, with links to the
+    trace and logs.
+  - Slow queries are logged and counted.
 - **Diagnostics:** ProblemDetails everywhere with a ticket number; correlation ids; redacted logging; throttled,
   HTML-encoded error alert emails; Serilog; OpenTelemetry traces and metrics (OTLP).
 - **Quality gates:** central package management; warnings as errors; .NET + Meziantou analyzers; banned APIs
@@ -140,7 +147,7 @@ scripts/new-project.cs  Creates a renamed copy for a new project.
 | Section | Purpose |
 | --- | --- |
 | `ConnectionStrings:Default` | SQL Server. Development points at the docker-compose container; elsewhere use secrets/env. |
-| `Database` | `MigrateOnStartup`, `CommandTimeoutSeconds`, `MaxRetryCount`. |
+| `Database` | `MigrateOnStartup`, `CommandTimeoutSeconds`, `MaxRetryCount`, `SlowQueryThresholdMs` (500). |
 | `Tenancy` | `MultiTenant`, `DefaultTenantCode`, `FallbackToDefaultTenant`. |
 | `FileStorage` | `LocalDisk`, `S3` (Bucket, ServiceUrl, Region, AccessKey, SecretKey, ForcePathStyle), `AzureBlob`. |
 | `Notifications` | Channels on/off and provider instances (see below). Default: email to the log, in-app on, SMS/WhatsApp off. |
@@ -148,6 +155,8 @@ scripts/new-project.cs  Creates a renamed copy for a new project.
 | `Documents:Pdf:Gotenberg` | `BaseUrl` (e.g. `http://gotenberg:3000/`), `TimeoutSeconds`. Set it to generate PDFs. |
 | `Outbox` | Poll interval, batch size, max attempts, retention. |
 | `Hangfire` | Optional job server and dashboard (`Enabled: false` by default). |
+| `Jobs` | `Enabled`, `StartDelaySeconds`, `PollSeconds`, `HistoryDays` for the housekeeping scheduler. |
+| `Observability` | `TraceUrlTemplate` (`{traceId}`) and `LogSearchUrlTemplate` (`{ticket}`): links from an error to its trace and logs. |
 | `Seed` | First administrator (`AdminEmail`; `AdminPassword` from user-secrets only). |
 | `Serilog`, `OTEL_EXPORTER_OTLP_ENDPOINT` | Logging and telemetry export. |
 

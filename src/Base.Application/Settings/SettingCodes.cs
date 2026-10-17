@@ -47,6 +47,11 @@ public static class SettingCodes
         public const string RetentionDays = "Imports.RetentionDays";
     }
 
+    public static class System
+    {
+        public const string ErrorRetentionDays = "System.ErrorRetentionDays";
+    }
+
     public static class Audit
     {
         public const string RetentionDays = "Audit.RetentionDays";

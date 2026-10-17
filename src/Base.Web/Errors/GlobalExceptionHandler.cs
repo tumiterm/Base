@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Base.Application.Common.Abstractions;
 using Base.Web.Http;
 using Microsoft.AspNetCore.Diagnostics;
@@ -54,7 +55,9 @@ internal sealed partial class GlobalExceptionHandler(
             currentUser?.AuditName,
             tenant?.TenantCode,
             environment.EnvironmentName,
-            time.GetUtcNow()));
+            time.GetUtcNow(),
+            tenant is { IsResolved: true } ? tenant.TenantId : null,
+            Activity.Current?.TraceId.ToString()));
 
         if (!IsApiRequest(path, request.Headers))
         {

@@ -41,6 +41,9 @@ cross-cutting feature or adding a package:
 - Lists are exported by an `IExporter` (`Exporter<TRow>`, paging an existing use case) and files are imported by an
   `IImporter` (apply rows through existing use cases); register them in DI. Never hand-build CSV/Excel. Background work
   that acts for a person uses `IRunAsUser`, so their permissions apply.
+- Recurring housekeeping is an `IScheduledJob` (re-runnable; the scheduler leases, records and shows it), not a
+  `BackgroundService` with its own timer. A new external dependency gets an `IHealthCheck` tagged `dependency`
+  (never `ready` unless the app can't serve without it).
 - Notify people only through `INotificationService` (template code + recipient + data). New template = constant in
   `NotificationTemplates` + `NotificationCatalog` entry + `Notifications/Templates/{Code}.txt` (tests check they match).
   Templates containing secrets are `IsSensitive` (sent at once, stored without content). Providers are configured

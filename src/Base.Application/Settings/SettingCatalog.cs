@@ -51,6 +51,9 @@ public static class SettingCatalog
         new(SettingCodes.Imports.RetentionDays, "Imports: keep uploaded files (days)", SettingDataType.Integer, "30", "Data exchange",
             "Uploaded import files (and their error reports) are kept this long.", Min: 1, Max: 365),
 
+        new(SettingCodes.System.ErrorRetentionDays, "Error log retention (days)", SettingDataType.Integer, "90", "System",
+            "Recorded unhandled errors (by ticket number) older than this are deleted by a daily job.", SettingScope.Platform, Min: 7, Max: 3650),
+
         new(SettingCodes.Audit.RetentionDays, "Audit retention (days)", SettingDataType.Integer, "730", "Audit",
             "Audit entries older than this are deleted by a daily job. Check your legal retention obligations first.",
             SettingScope.Platform, Min: 30, Max: 3650),

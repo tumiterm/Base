@@ -308,6 +308,39 @@ public sealed partial class WebTests(SqlServerFixture sql) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Unhandled_errors_are_recorded_and_found_by_ticket_on_the_system_page()
+    {
+        var client = Client();
+        await SignInAsync(client);
+        var failure = await client.GetAsync("/api/test/throw", TestContext.Current.CancellationToken);
+        var ticket = (await failure.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken)).GetProperty("ticket").GetString()!;
+
+        // Recorded off the request by the background reporter.
+        HttpResponseMessage found;
+        var attempts = 0;
+        do
+        {
+            await Task.Delay(200, TestContext.Current.CancellationToken);
+            found = await client.GetAsync($"/api/system/errors/{ticket}", TestContext.Current.CancellationToken);
+        }
+        while (found.StatusCode == HttpStatusCode.NotFound && ++attempts < 50);
+
+        found.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await found.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken)).GetProperty("exceptionType").GetString().ShouldBe("System.InvalidOperationException");
+
+        foreach (var path in new[] { "/admin/system", "/admin/system/errors", $"/admin/system/errors/{ticket}", $"/admin/system/errors?search={ticket}" })
+        {
+            var page = await client.GetAsync(path, TestContext.Current.CancellationToken);
+            page.StatusCode.ShouldBe(HttpStatusCode.OK, path);
+            (await page.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).ShouldContain(path == "/admin/system" ? "Scheduled jobs" : ticket, customMessage: path);
+        }
+
+        var health = await client.GetFromJsonAsync<JsonElement>("/api/system/health", TestContext.Current.CancellationToken);
+        health.GetProperty("checks").EnumerateArray().Select(c => c.GetProperty("name").GetString()).ShouldContain("file-storage");
+        (await Client().GetAsync("/api/system/health", TestContext.Current.CancellationToken)).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
     public async Task Password_pages_are_anonymous_and_set_password_is_never_cached()
     {
         var client = Client();

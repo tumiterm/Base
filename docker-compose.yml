@@ -3,6 +3,7 @@
 #   docker compose --profile s3 up -d     ... plus MinIO (S3-compatible storage)
 #   docker compose --profile pdf up -d    ... plus Gotenberg (HTML to PDF):  Documents__Pdf__Gotenberg__BaseUrl=http://localhost:3000/
 #   docker compose --profile scan up -d   ... plus ClamAV (virus scanning):  FileScanning__ClamAv__Host=localhost
+#   docker compose --profile logs up -d   ... plus Seq (searchable logs, http://localhost:5341; Development logs to it)
 #   docker compose --profile app up -d    ... plus the app itself, built from src/Base.Web/Dockerfile
 # Passwords here are for local containers only. Real credentials go in user-secrets or environment variables.
 name: base
@@ -60,6 +61,16 @@ services:
     image: clamav/clamav:1.4
     ports:
       - "3310:3310"
+
+  # Searchable structured logs. Free for development and small teams; see datalust.co for production licensing.
+  seq:
+    profiles: ["logs"]
+    image: datalust/seq:2025.2
+    environment:
+      ACCEPT_EULA: "Y"
+      SEQ_FIRSTRUN_NOAUTHENTICATION: "true"
+    ports:
+      - "5341:80"
 
   web:
     profiles: ["app"]

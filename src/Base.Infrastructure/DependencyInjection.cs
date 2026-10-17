@@ -8,15 +8,18 @@ using Base.Application.Documents.Generation;
 using Base.Application.Files;
 using Base.Application.Messaging;
 using Base.Application.Notifications;
+using Base.Application.Operations;
 using Base.Application.Users;
 using Base.Infrastructure.Auditing;
 using Base.Infrastructure.DataExchange;
 using Base.Infrastructure.Documents;
 using Base.Infrastructure.Files;
+using Base.Infrastructure.Health;
 using Base.Infrastructure.Identity;
 using Base.Infrastructure.Jobs;
 using Base.Infrastructure.Notifications;
 using Base.Infrastructure.Notifications.Providers;
+using Base.Infrastructure.Operations;
 using Base.Infrastructure.Outbox;
 using Base.Infrastructure.Persistence;
 using Base.Infrastructure.Persistence.Interceptors;
@@ -61,6 +64,7 @@ public static class DependencyInjection
         AddNotifications(services);
         AddDocuments(services, configuration);
         AddDataExchange(services);
+        AddOperations(services, configuration);
         AddHangfire(services, configuration, connectionString);
 
         services.AddScoped<ITenantContext, TenantContext>();
@@ -73,14 +77,13 @@ public static class DependencyInjection
         }
 
         services.AddSingleton<AuditedEntityTypes>();
-        services.AddHostedService<AuditRetentionService>();
 
         services.AddScoped<IStartupTask, MigrateDatabaseTask>();
         services.AddScoped<IStartupTask, DefaultTenantSeedTask>();
         services.AddScoped<IStartupTask, SettingsSeedTask>();
         services.AddScoped<IStartupTask, IdentitySeedTask>();
 
-        services.AddHealthChecks().AddDbContextCheck<AppDbContext>("database", tags: ["ready"]);
+        AddHealthChecks(services, configuration);
 
         return services;
     }
@@ -108,6 +111,7 @@ public static class DependencyInjection
         services.AddScoped<AuditingInterceptor>();
         services.AddScoped<DomainEventOutboxInterceptor>();
         services.AddScoped<AuditTrailInterceptor>();
+        services.AddSingleton<SlowQueryInterceptor>();
 
         services.AddDbContext<AppDbContext>((provider, options) =>
         {
@@ -121,7 +125,8 @@ public static class DependencyInjection
             options.AddInterceptors(
                 provider.GetRequiredService<DomainEventOutboxInterceptor>(),
                 provider.GetRequiredService<AuditingInterceptor>(),
-                provider.GetRequiredService<AuditTrailInterceptor>()); // last: sees final ids, stamps and tenants
+                provider.GetRequiredService<AuditTrailInterceptor>(), // last of the save interceptors: sees final ids, stamps and tenants
+                provider.GetRequiredService<SlowQueryInterceptor>());
 
             if (environment.IsDevelopment())
             {
@@ -209,7 +214,6 @@ public static class DependencyInjection
             services.AddSingleton<IFileStorageProvider>(new LocalDiskFileStorageProvider(fullRoot));
         }
 
-        services.AddHostedService<FileRetentionService>();
 
         if (!string.IsNullOrWhiteSpace(configuration[ClamAvOptions.SectionName + ":" + nameof(ClamAvOptions.Host)]))
         {
@@ -231,7 +235,6 @@ public static class DependencyInjection
         services.AddScoped<INotificationRecipientResolver, NotificationRecipientResolver>();
         services.AddScoped<IEmailSender, NotificationEmailSender>();
         services.AddScoped<IStartupTask, NotificationConfigurationCheck>();
-        services.AddHostedService<NotificationRetentionService>();
     }
 
     /// <summary>
@@ -252,6 +255,57 @@ public static class DependencyInjection
             ?? (ICurrentUser)ActivatorUtilities.CreateInstance(sp, descriptor.ImplementationType!);
     }
 
+    /// <summary>
+    /// The database gates readiness (<c>/health/ready</c>). Everything else is a <see cref="HealthTags.Dependency"/>:
+    /// shown on the system page, but the app keeps serving when one is down.
+    /// </summary>
+    private static void AddHealthChecks(IServiceCollection services, IConfiguration configuration)
+    {
+        var timeout = TimeSpan.FromSeconds(10);
+        string[] dependency = [HealthTags.Dependency];
+        var checks = services.AddHealthChecks()
+            .AddDbContextCheck<AppDbContext>("database", tags: [HealthTags.Ready])
+            .AddCheck<FileStorageHealthCheck>("file-storage", tags: dependency, timeout: timeout)
+            .AddCheck<DatabaseFileQuotaHealthCheck>("database-file-quota", tags: dependency, timeout: timeout)
+            .AddCheck<NotificationProvidersHealthCheck>("notification-providers", tags: dependency, timeout: timeout)
+            .AddCheck<OutboxHealthCheck>("outbox", tags: dependency, timeout: timeout)
+            .AddCheck<ScheduledJobsHealthCheck>("scheduled-jobs", tags: dependency, timeout: timeout);
+
+        if (configuration.GetSection(GotenbergOptions.SectionName).Get<GotenbergOptions>()?.BaseUrl is not null)
+        {
+            checks.AddCheck<GotenbergHealthCheck>("gotenberg", tags: dependency, timeout: timeout);
+        }
+
+        if (!string.IsNullOrWhiteSpace(configuration[ClamAvOptions.SectionName + ":" + nameof(ClamAvOptions.Host)]))
+        {
+            checks.AddCheck<ClamAvHealthCheck>("clamav", tags: dependency, timeout: timeout);
+        }
+
+        if ((configuration.GetSection(HangfireOptions.SectionName).Get<HangfireOptions>() ?? new HangfireOptions()).Enabled)
+        {
+            checks.AddCheck<HangfireHealthCheck>("hangfire", tags: dependency, timeout: timeout);
+        }
+    }
+
+    private static void AddOperations(IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<JobSchedulerOptions>().BindConfiguration(JobSchedulerOptions.SectionName).ValidateDataAnnotations().ValidateOnStart();
+        services.AddSingleton<JobSignal>();
+        services.AddScoped<IJobScheduler, JobSchedulerStatus>();
+        if (configuration.GetValue(JobSchedulerOptions.SectionName + ":" + nameof(JobSchedulerOptions.Enabled), true))
+        {
+            services.AddHostedService<JobSchedulerService>();
+        }
+
+        services.AddScoped<IScheduledJob, AuditRetentionJob>();
+        services.AddScoped<IScheduledJob, NotificationRetentionJob>();
+        services.AddScoped<IScheduledJob, FileRetentionJob>();
+        services.AddScoped<IScheduledJob, OutboxCleanupJob>();
+        services.AddScoped<IScheduledJob, ErrorLogRetentionJob>();
+        services.AddScoped<IErrorLog, ErrorLog>();
+        services.AddScoped<ISystemStatus, SystemStatus>();
+    }
+
     private static void AddDataExchange(IServiceCollection services)
     {
         services.AddSingleton<ITabularWriter, CsvWriter>();
@@ -262,7 +316,6 @@ public static class DependencyInjection
 
     private static void AddDocuments(IServiceCollection services, IConfiguration configuration)
     {
-        services.AddHostedService<DocumentRetentionService>();
 
         var gotenberg = configuration.GetSection(GotenbergOptions.SectionName).Get<GotenbergOptions>();
         if (gotenberg?.BaseUrl is { } baseUrl)

@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Channels;
 using Base.Application.Common.Abstractions;
+using Base.Application.Operations;
 using Base.Application.Settings;
 using Microsoft.Extensions.Caching.Memory;
 
@@ -22,7 +23,9 @@ internal sealed record ErrorAlert(
     string? User,
     string? Tenant,
     string Environment,
-    DateTimeOffset OccurredAt)
+    DateTimeOffset OccurredAt,
+    Guid? TenantId = null,
+    string? TraceId = null)
 {
     /// <summary>Same exception type thrown from the same method = same fingerprint, so a storm sends one email.</summary>
     public static string FingerprintOf(Exception exception)
@@ -45,7 +48,10 @@ internal sealed class ErrorAlertQueue
     public IAsyncEnumerable<ErrorAlert> ReadAllAsync(CancellationToken cancellationToken) => _channel.Reader.ReadAllAsync(cancellationToken);
 }
 
-/// <summary>Emails queued alerts to the configured recipients, at most once per fingerprint per throttle window.</summary>
+/// <summary>
+/// Records every queued error in the error log (searchable by ticket on the system page), then emails it to the
+/// configured recipients, at most once per fingerprint per throttle window. Runs outside the request.
+/// </summary>
 internal sealed partial class ErrorAlertSender(
     ErrorAlertQueue queue,
     IServiceScopeFactory scopes,
@@ -58,6 +64,16 @@ internal sealed partial class ErrorAlertSender(
         {
             try
             {
+                await RecordAsync(alert, stoppingToken);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                // The database may be what failed; the log line from the handler still has everything.
+                LogRecordFailed(logger, exception, alert.Ticket);
+            }
+
+            try
+            {
                 await SendAsync(alert, stoppingToken);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
@@ -65,6 +81,16 @@ internal sealed partial class ErrorAlertSender(
                 LogSendFailed(logger, exception, alert.Ticket);
             }
         }
+    }
+
+    private async Task RecordAsync(ErrorAlert alert, CancellationToken cancellationToken)
+    {
+        await using var scope = scopes.CreateAsyncScope();
+        await scope.ServiceProvider.GetRequiredService<IErrorLog>().RecordAsync(
+            new ErrorRecord(
+                alert.Ticket, alert.OccurredAt, alert.ExceptionType, alert.Message, alert.Method, alert.Path + alert.Query, alert.User,
+                alert.TenantId, alert.TraceId, alert.Fingerprint, alert.Details),
+            cancellationToken);
     }
 
     private async Task SendAsync(ErrorAlert alert, CancellationToken cancellationToken)
@@ -112,6 +138,9 @@ internal sealed partial class ErrorAlertSender(
             .Append("</table><pre>").Append(WebUtility.HtmlEncode(alert.Details)).Append("</pre>")
             .ToString();
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Failed to record error {Ticket} in the error log")]
+    private static partial void LogRecordFailed(ILogger logger, Exception exception, string ticket);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Failed to send error alert for ticket {Ticket}")]
     private static partial void LogSendFailed(ILogger logger, Exception exception, string ticket);

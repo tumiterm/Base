@@ -20,6 +20,8 @@ internal static class ObservabilityExtensions
             .Enrich.FromLogContext()
             .Enrich.WithProperty("Application", builder.Environment.ApplicationName));
 
+        builder.Services.AddOptions<ObservabilityLinks>().BindConfiguration(ObservabilityLinks.SectionName);
+
         var otlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
         var otel = builder.Services.AddOpenTelemetry()
             .ConfigureResource(resource => resource.AddService(builder.Environment.ApplicationName))
@@ -30,7 +32,8 @@ internal static class ObservabilityExtensions
             .WithMetrics(metrics => metrics
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
-                .AddRuntimeInstrumentation());
+                .AddRuntimeInstrumentation()
+                .AddMeter("Microsoft.EntityFrameworkCore", "Base")); // EF Core's own metrics; Base: slow commands
 
         if (!string.IsNullOrWhiteSpace(otlpEndpoint))
         {

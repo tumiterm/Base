@@ -10,8 +10,11 @@ using Base.Domain.Notifications;
 namespace Base.Infrastructure.Notifications.Providers;
 
 /// <summary>Shared HTTP plumbing: one named client, and the retry rule (408, 429 and 5xx are retryable; the rest are not).</summary>
-public abstract class HttpNotificationProvider(IHttpClientFactory httpClients, string name) : INotificationProvider
+public abstract class HttpNotificationProvider(IHttpClientFactory httpClients, string name) : INotificationProvider, IProviderEndpoint
 {
+    /// <summary>The API base address, probed by the notification health check.</summary>
+    public abstract Uri Endpoint { get; }
+
     public const string HttpClientName = "notifications";
 
     public string Name { get; } = name;
@@ -81,6 +84,8 @@ public abstract class HttpNotificationProvider(IHttpClientFactory httpClients, s
 /// <summary>SendGrid v3 Mail Send (<c>POST /v3/mail/send</c>).</summary>
 public sealed class SendGridEmailProvider(IHttpClientFactory httpClients, string name, SendGridOptions options) : HttpNotificationProvider(httpClients, name)
 {
+    public override Uri Endpoint => options.BaseUrl;
+
     public override NotificationChannel Channel => NotificationChannel.Email;
 
     protected override HttpRequestMessage BuildRequest(OutgoingMessage message)
@@ -118,6 +123,8 @@ public sealed class SendGridEmailProvider(IHttpClientFactory httpClients, string
 public abstract class TwilioProviderBase(IHttpClientFactory httpClients, string name, TwilioOptions options) : HttpNotificationProvider(httpClients, name)
 {
     protected TwilioOptions Options { get; } = options;
+
+    public override Uri Endpoint => Options.BaseUrl;
 
     protected HttpRequestMessage Request(IEnumerable<KeyValuePair<string, string>> form) =>
         new(HttpMethod.Post, new Uri(Options.BaseUrl, $"2010-04-01/Accounts/{Options.AccountSid}/Messages.json"))
@@ -167,6 +174,8 @@ public sealed class TwilioWhatsAppProvider(IHttpClientFactory httpClients, strin
 /// <summary>Clickatell Platform One API (<c>POST /v1/message</c>).</summary>
 public sealed class ClickatellSmsProvider(IHttpClientFactory httpClients, string name, ClickatellOptions options) : HttpNotificationProvider(httpClients, name)
 {
+    public override Uri Endpoint => options.BaseUrl;
+
     public override NotificationChannel Channel => NotificationChannel.Sms;
 
     protected override HttpRequestMessage BuildRequest(OutgoingMessage message)
@@ -199,6 +208,8 @@ public sealed class ClickatellSmsProvider(IHttpClientFactory httpClients, string
 /// <summary>BulkSMS JSON REST API (<c>POST /v1/messages</c>).</summary>
 public sealed class BulkSmsProvider(IHttpClientFactory httpClients, string name, BulkSmsOptions options) : HttpNotificationProvider(httpClients, name)
 {
+    public override Uri Endpoint => options.BaseUrl;
+
     public override NotificationChannel Channel => NotificationChannel.Sms;
 
     protected override HttpRequestMessage BuildRequest(OutgoingMessage message)
@@ -223,6 +234,8 @@ public sealed class BulkSmsProvider(IHttpClientFactory httpClients, string name,
 /// <summary>Meta WhatsApp Cloud API (<c>POST /{version}/{phone-number-id}/messages</c>), approved templates only.</summary>
 public sealed class MetaWhatsAppProvider(IHttpClientFactory httpClients, string name, MetaWhatsAppOptions options) : HttpNotificationProvider(httpClients, name)
 {
+    public override Uri Endpoint => options.BaseUrl;
+
     public override NotificationChannel Channel => NotificationChannel.WhatsApp;
 
     protected override HttpRequestMessage? BuildRequest(OutgoingMessage message)

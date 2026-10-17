@@ -262,7 +262,7 @@ public sealed class DocumentTests(SqlServerFixture sql) : IAsyncLifetime
         _app.InScopeAsync(null, sp => sp.GetRequiredService<AppDbContext>().StoredFiles.IgnoreQueryFilters().Where(f => f.IsDeleted).ToListAsync());
 
     private Task<int> PurgeFilesAsync() =>
-        _app.Services.GetServices<Microsoft.Extensions.Hosting.IHostedService>().OfType<FileRetentionService>().Single().PurgeAsync(CancellationToken.None);
+        _app.InScopeAsync(null, sp => sp.GetServices<Base.Application.Operations.IScheduledJob>().OfType<Base.Infrastructure.Jobs.FileRetentionJob>().Single().PurgeAsync(CancellationToken.None));
 
     private Task<DocumentRetentionResult> RetentionAsync() =>
         _app.InScopeAsync(null, sp => sp.GetRequiredService<IDocumentRetention>().ApplyAsync());

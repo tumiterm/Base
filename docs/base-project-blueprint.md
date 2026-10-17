@@ -325,3 +325,7 @@ provider per category; upload-check hook with ClamAV; purge of deleted files (AD
 **Round 7 (Oct 2026): exports and imports.** Any list to CSV/Excel (immediate or background, recorded and audited);
 imports with a dry run, all-or-nothing by default, per-row error reports and templates; background work runs as the
 requester (`IRunAsUser`) so permissions still apply (ADR 0013).
+
+**Round 8 (Oct 2026): operations and health.** One leased, recorded job scheduler for all housekeeping; health checks
+for every dependency; `/admin/system` with jobs (run now), database size and largest tables, storage per tenant,
+outbox dead letters (retry) and errors by ticket; slow-query logging and metrics; Seq in docker-compose (ADR 0014).

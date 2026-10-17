@@ -18,3 +18,4 @@ otherwise have to reverse-engineer. Format: context → decision → consequence
 | [0011](0011-notifications.md) | One notification service, pluggable providers, outbox delivery |
 | [0012](0012-documents-and-capped-database-storage.md) | Documents on top of files, capped database storage, engine-free generation |
 | [0013](0013-exports-and-imports.md) | Exports and imports through registered exporters and importers, run as the requester |
+| [0014](0014-operations-and-health.md) | One job scheduler, dependency health checks, a recorded error log |
