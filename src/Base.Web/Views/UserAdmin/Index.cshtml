@@ -64,7 +64,13 @@ else
                     <td><span class="badge text-bg-@status.Tone">@status.Label</span></td>
                     <td class="text-muted text-nowrap">@if (user.LastSignInAt is { } at) {<local-time value="at" format="d MMM yyyy, HH:mm" />} else {<text>Never</text>}</td>
                     <td class="text-end cell-actions">
-                        <div class="dropdown">
+                        @if (canManage && !user.HasPassword && !user.IsLockedOut)
+                        {
+                            <form class="d-inline-block" method="post" asp-action="InviteLink" asp-route-id="@user.Id" data-invite-link>
+                                <button class="icon-btn" type="submit" title="Copy invitation link" aria-label="Copy the invitation link for @user.DisplayName"><icon name="link" /></button>
+                            </form>
+                        }
+                        <div class="dropdown d-inline-block">
                             <button class="icon-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Actions for @user.DisplayName"><icon name="ellipsis" /></button>
                             <div class="dropdown-menu dropdown-menu-end">
                                 <a class="dropdown-item" asp-action="Edit" asp-route-id="@user.Id"><icon name="pencil" class="icon-sm" /> Open</a>
@@ -73,6 +79,12 @@ else
                                     <form method="post" asp-action="SendPasswordReset" asp-route-id="@user.Id">
                                         <button class="dropdown-item" type="submit"><icon name="send" class="icon-sm" /> @(user.HasPassword ? "Email a password reset" : "Resend invitation")</button>
                                     </form>
+                                    @if (!user.HasPassword && !user.IsLockedOut)
+                                    {
+                                        <form method="post" asp-action="InviteLink" asp-route-id="@user.Id" data-invite-link>
+                                            <button class="dropdown-item" type="submit"><icon name="link" class="icon-sm" /> Copy invitation link</button>
+                                        </form>
+                                    }
                                     <div class="dropdown-divider"></div>
                                     @if (user.IsLockedOut)
                                     {

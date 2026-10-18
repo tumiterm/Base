@@ -180,6 +180,7 @@ public static class DependencyInjection
         services.Configure<DataProtectionTokenProviderOptions>(o => o.TokenLifespan = TimeSpan.FromHours(1));
 
         services.AddScoped<IdentityQueries>();
+        services.AddScoped<PasswordLinks>();
         services.AddScoped<IUserAdministration, UserAdministrationService>();
         services.AddScoped<Application.Common.Records.IRecordLabelProvider, UserRecordLabels>();
         services.AddScoped<Application.Common.Records.IRecordLabelProvider, RoleRecordLabels>();

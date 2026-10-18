@@ -76,8 +76,15 @@
                 <div class="panel-body stack">
                     <form asp-action="SendPasswordReset" asp-route-id="@Model.Id" method="post">
                         <button type="submit" class="btn btn-secondary w-100"><icon name="send" class="icon-sm" /> @(Model.HasPassword ? "Email a password reset link" : "Resend the invitation")</button>
-                        <div class="form-text">@(Model.HasPassword ? "They choose a new password from the link. Their current one keeps working until then." : "Sends a fresh link; earlier ones stop working.")</div>
+                        <div class="form-text">@(Model.HasPassword ? "They choose a new password from the link. Their current one keeps working until then." : "Emails a fresh link. Earlier links work until they expire or the password is set; lock the account to cancel them all.")</div>
                     </form>
+                    @if (!Model.HasPassword && !Model.IsLockedOut)
+                    {
+                        <form asp-action="InviteLink" asp-route-id="@Model.Id" method="post" data-invite-link>
+                            <button type="submit" class="btn btn-secondary w-100"><icon name="link" class="icon-sm" /> Copy the invitation link</button>
+                            <div class="form-text">To send it by WhatsApp, text or any other way. It works once, for 72 hours.</div>
+                        </form>
+                    }
                     @if (Model.IsLockedOut)
                     {
                         <form asp-action="Unlock" asp-route-id="@Model.Id" method="post">

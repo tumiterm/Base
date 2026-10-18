@@ -284,6 +284,39 @@ internal sealed partial class TenantAdministrationService(
         });
     }
 
+    public async Task<ValidationResponse<InviteLink>> CreateInviteLinkAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken = default)
+    {
+        var target = await FindAsync(tenantId, cancellationToken);
+        if (target is null)
+        {
+            return ValidationResponse.NotFound("Tenant not found.").As<InviteLink>();
+        }
+
+        return await AsTenantAsync(target.Id, target.Code, async services =>
+        {
+            var users = services.GetRequiredService<UserManager<ApplicationUser>>();
+            var user = await users.FindByIdAsync(userId.ToString());
+            if (user is null || user.TenantId != target.Id)
+            {
+                return ValidationResponse.NotFound("User not found.").As<InviteLink>();
+            }
+
+            if (user.HasPassword)
+            {
+                return ValidationResponse.Conflict($"{user.DisplayName} has already accepted and set a password.").As<InviteLink>();
+            }
+
+            if (await users.IsLockedOutAsync(user))
+            {
+                return ValidationResponse.Conflict($"{user.DisplayName}'s account is locked. Unlock it first.").As<InviteLink>();
+            }
+
+            var link = await services.GetRequiredService<PasswordLinks>().CreateInviteAsync(user, cancellationToken);
+            LogInviteLinkCreated(logger, target.Code, user.Id);
+            return (ValidationResponse<InviteLink>)link;
+        });
+    }
+
     private async Task<Tenant?> FindAsync(Guid tenantId, CancellationToken cancellationToken)
     {
         using (tenant.BeginSystemScope())
@@ -363,4 +396,7 @@ internal sealed partial class TenantAdministrationService(
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Tenant {Code} was created but its administrator could not be invited: {Reason}")]
     private static partial void LogInviteFailed(ILogger logger, string code, string? reason);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Invitation link created for user {UserId} of tenant {Code}")]
+    private static partial void LogInviteLinkCreated(ILogger logger, string code, Guid userId);
 }

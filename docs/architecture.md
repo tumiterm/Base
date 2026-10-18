@@ -111,7 +111,10 @@ the API at `/api/users`, `/api/roles` and `/api/permissions`.
 
 - **Invite-only onboarding.** Administrators never set passwords. An invite creates the account without a password
   and raises `UserInvited`; the outbox handler generates a 72-hour token at send time and emails a link built from
-  the `General.PublicBaseUrl` setting. Tokens embed the security stamp, so a link works once.
+  the `General.PublicBaseUrl` setting. Tokens embed the security stamp, so a link works once. `PasswordLinks` builds
+  every link; `CreateInviteLinkAsync` hands a fresh one to an administrator to send another way (guarded like any
+  user change, never stored, `no-store`, logged without the token). Locking the account rotates the stamp and
+  cancels every link handed out.
 - **Self-service.** Forgot password always answers the same way, whether or not the account exists. Reset tokens
   last 1 hour. Changing a password rotates the security stamp: other sessions end within a minute, and the current
   one is refreshed.

@@ -51,6 +51,35 @@ public sealed partial class UserAdministrationTests(SqlServerFixture sql) : IAsy
     }
 
     [Fact]
+    public async Task A_copied_invitation_link_activates_the_account_and_is_only_offered_while_pending()
+    {
+        var userId = (await Users(u => u.InviteAsync(new("copy.link@example.com", "Copy Link", [RoleNames.User])))).GetDataOrThrow();
+
+        var link = (await Users(u => u.CreateInviteLinkAsync(userId))).GetDataOrThrow();
+
+        link.DisplayName.ShouldBe("Copy Link");
+        link.Url.ShouldStartWith("https://localhost:7262/account/set-password?kind=invite&userId=" + userId);
+        link.ExpiresAt.ShouldBe(_app.Time.GetUtcNow().AddHours(72));
+        (await Accounts(a => a.SetPasswordAsync(SetPasswordFrom(link.Url, "A-long-enough-passphrase")))).IsSuccess.ShouldBeTrue();
+        (await Users(u => u.CreateInviteLinkAsync(userId))).ErrorType.ShouldBe(ErrorType.Conflict);
+    }
+
+    [Fact]
+    public async Task Locking_an_invited_account_cancels_the_links_already_handed_out()
+    {
+        var userId = (await Users(u => u.InviteAsync(new("wrong.person@example.com", "Wrong Person", [RoleNames.User])))).GetDataOrThrow();
+        var link = (await Users(u => u.CreateInviteLinkAsync(userId))).GetDataOrThrow();
+
+        (await Users(u => u.LockAsync(userId))).IsSuccess.ShouldBeTrue();
+        (await Users(u => u.CreateInviteLinkAsync(userId))).ErrorType.ShouldBe(ErrorType.Conflict);
+        (await Users(u => u.UnlockAsync(userId))).IsSuccess.ShouldBeTrue();
+
+        (await Accounts(a => a.SetPasswordAsync(SetPasswordFrom(link.Url, "A-long-enough-passphrase")))).IsError.ShouldBeTrue();
+        var fresh = (await Users(u => u.CreateInviteLinkAsync(userId))).GetDataOrThrow();
+        (await Accounts(a => a.SetPasswordAsync(SetPasswordFrom(fresh.Url, "A-long-enough-passphrase")))).IsSuccess.ShouldBeTrue();
+    }
+
+    [Fact]
     public async Task Forgot_password_never_reveals_whether_an_account_exists()
     {
         var unknown = await Accounts(a => a.RequestPasswordResetAsync("nobody@example.com"));

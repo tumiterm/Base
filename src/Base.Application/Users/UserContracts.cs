@@ -28,6 +28,9 @@ public sealed record RoleSummary(
 
 public sealed record SaveRoleRequest(string Name, string? Description, IReadOnlyList<string> Permissions);
 
+/// <summary>A set-password link to hand over by any channel. It works once and stops working at <paramref name="ExpiresAt"/>.</summary>
+public sealed record InviteLink(string Url, DateTimeOffset ExpiresAt, string DisplayName);
+
 public enum PasswordTokenKind
 {
     Reset = 0,

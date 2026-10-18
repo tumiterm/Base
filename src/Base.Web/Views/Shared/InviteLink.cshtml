@@ -1,0 +1,32 @@
+@model InviteLinkViewModel
+@{
+    ViewData["Title"] = "Invitation link";
+    var link = Model.Link;
+    var message = $"Hi {link.DisplayName}, you've been invited. Open this link to set your password and sign in: {link.Url}";
+}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Invitation link for @link.DisplayName</h1>
+        <p class="page-subtitle">Send it by WhatsApp, text or any other channel. Opening it lets them set their password and sign in.</p>
+    </div>
+</div>
+<section class="panel key-panel" aria-labelledby="link-title">
+    <div class="panel-header"><h2 class="panel-title" id="link-title">Link</h2><span class="text-muted small">Works until <local-time value="link.ExpiresAt" format="d MMMM, HH:mm" /></span></div>
+    <div class="panel-body stack">
+        <div class="key-value">
+            <code id="invite-link">@link.Url</code>
+            <button class="btn btn-primary" type="button" data-copy="#invite-link"><icon name="copy" class="icon-sm" /> <span data-copy-label>Copy</span></button>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a class="btn btn-secondary" href="https://wa.me/?text=@Uri.EscapeDataString(message)" target="_blank" rel="noopener noreferrer"><icon name="send" class="icon-sm" /> Send by WhatsApp</a>
+            <a class="btn btn-secondary" href="sms:?&body=@Uri.EscapeDataString(message)"><icon name="phone" class="icon-sm" /> Send by text</a>
+        </div>
+        <div class="alert alert-warning d-flex gap-2 mb-0" role="note">
+            <icon name="triangle-alert" />
+            <div>Treat it like a password: whoever opens it first sets the password, so send it only to @link.DisplayName. Each link works until it expires or the password is set. If one goes to the wrong person, lock the account to cancel every link, then unlock it and send a new one.</div>
+        </div>
+    </div>
+    <div class="panel-footer d-flex justify-content-end">
+        <a class="btn btn-secondary" href="@Model.BackUrl">Done</a>
+    </div>
+</section>

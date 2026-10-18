@@ -81,6 +81,11 @@ public sealed class PlatformTenantsController(ITenantAdministration tenants, ISu
     public Task<IActionResult> ResendWelcome(Guid id, Guid userId, CancellationToken cancellationToken) =>
         Run(id, tenants.ResendWelcomeAsync(id, userId, cancellationToken));
 
+    [HttpPost("{id:guid}/users/{userId:guid}/invite-link")]
+    [HasPermission(PermissionCodes.Platform.TenantsManage)]
+    public async Task<IActionResult> InviteLink(Guid id, Guid userId, CancellationToken cancellationToken) =>
+        this.InviteLinkResult(await tenants.CreateInviteLinkAsync(id, userId, cancellationToken), Url.Action(nameof(Details), new { id })!);
+
     [HttpPost("{id:guid}")]
     [HasPermission(PermissionCodes.Platform.TenantsManage)]
     public Task<IActionResult> Update(Guid id, string name, string? contactEmail, CancellationToken cancellationToken) =>

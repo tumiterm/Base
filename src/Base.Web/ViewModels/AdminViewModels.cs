@@ -157,3 +157,5 @@ public sealed class NotificationLogFilterViewModel
 }
 
 public sealed record NotificationLogViewModel(PagedResult<Application.Notifications.NotificationLogItem> Messages, NotificationLogFilterViewModel Filter);
+
+public sealed record InviteLinkViewModel(InviteLink Link, string BackUrl);

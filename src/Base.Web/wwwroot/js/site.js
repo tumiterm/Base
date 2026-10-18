@@ -427,6 +427,66 @@ document.querySelectorAll('.drop-zone').forEach((zone) => {
     }));
 })();
 
+// Invitation links: <form data-invite-link> posts for a fresh link and puts it on the clipboard. The clipboard write
+// starts inside the click (ClipboardItem with a promise) so Safari allows it; if it's blocked, the form is submitted
+// normally and the server shows the link on a page instead.
+(() => {
+    const sprite = document.querySelector('svg use')?.getAttribute('href')?.split('#')[0] ?? '';
+    const icon = (name) => {
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('class', 'icon');
+        svg.setAttribute('aria-hidden', 'true');
+        const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+        use.setAttribute('href', `${sprite}#${name}`);
+        svg.append(use);
+        return svg;
+    };
+    const toast = (text, ok) => {
+        let stack = document.querySelector('.toast-stack');
+        if (!stack) { stack = document.createElement('div'); stack.className = 'toast-stack'; stack.setAttribute('aria-live', 'polite'); document.body.append(stack); }
+        const item = document.createElement('div');
+        item.className = `toast-item ${ok ? 'toast-success' : 'toast-error'}`;
+        item.setAttribute('role', ok ? 'status' : 'alert');
+        const body = document.createElement('div');
+        body.className = 'toast-body';
+        body.textContent = text;
+        const close = document.createElement('button');
+        close.type = 'button';
+        close.className = 'icon-btn toast-close';
+        close.setAttribute('aria-label', 'Dismiss');
+        close.append(icon('x'));
+        const leave = () => { item.classList.add('is-leaving'); item.addEventListener('animationend', () => item.remove(), { once: true }); };
+        close.addEventListener('click', leave);
+        item.append(icon(ok ? 'circle-check' : 'circle-alert'), body, close);
+        stack.append(item);
+        if (ok) setTimeout(leave, 6000);
+    };
+    const hoursLeft = (iso) => Math.max(1, Math.round((new Date(iso) - Date.now()) / 3600000));
+
+    document.querySelectorAll('form[data-invite-link]').forEach((form) => form.addEventListener('submit', async (e) => {
+        if (!navigator.clipboard) return; // Not a secure context: let the page show the link.
+        e.preventDefault();
+        const request = fetch(form.action, { method: 'POST', body: new FormData(form), headers: { Accept: 'application/json' }, credentials: 'same-origin' })
+            .then(async (response) => {
+                const body = await response.json().catch(() => ({}));
+                if (!response.ok) throw Object.assign(new Error(body.detail || 'The link could not be made.'), { server: true });
+                return body;
+            });
+        try {
+            if (window.ClipboardItem && navigator.clipboard.write) {
+                await navigator.clipboard.write([new ClipboardItem({ 'text/plain': request.then((link) => new Blob([link.url], { type: 'text/plain' })) })]);
+            } else {
+                await navigator.clipboard.writeText((await request).url);
+            }
+            const link = await request;
+            toast(`Invitation link for ${link.displayName} copied. It works once, for the next ${hoursLeft(link.expiresAt)} hours.`, true);
+        } catch (error) {
+            if (error.server) toast(error.message, false);
+            else form.submit();
+        }
+    }));
+})();
+
 // A drawer or dialog that must open when the page loads (e.g. its form came back with errors).
 (() => {
     document.querySelectorAll('[data-open-on-load="true"]').forEach((el) => {

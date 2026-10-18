@@ -2,7 +2,6 @@ using System.Globalization;
 using Base.Application.Common.Abstractions;
 using Base.Application.Messaging;
 using Base.Application.Notifications;
-using Base.Application.Settings;
 using Base.Application.Subscriptions;
 using Base.Application.Users;
 using Base.Domain.Subscriptions;
@@ -21,7 +20,7 @@ namespace Base.Infrastructure.Identity;
 internal sealed class IdentityEmailHandlers(
     UserManager<ApplicationUser> users,
     INotificationService notifications,
-    IApplicationSettingService settings,
+    PasswordLinks links,
     AppDbContext db,
     ITenantContext tenant,
     ISubscriptionService subscriptions) : IDomainEventHandler<UserInvited>, IDomainEventHandler<PasswordResetRequested>
@@ -76,24 +75,18 @@ internal sealed class IdentityEmailHandlers(
             _ => string.Empty,
         };
 
-        var baseUrl = await BaseUrlAsync(cancellationToken);
+        var baseUrl = await links.BaseUrlAsync(cancellationToken);
         await notifications.SendAsync(
             new Notification(
                 NotificationTemplates.Tenancy.Welcome,
                 new NotificationRecipient(user.Id, user.Email, null, user.DisplayName),
-                new { Link = Link(baseUrl, user, token, PasswordTokenKind.Invite), OrganisationName = organisation, SignInUrl = $"{baseUrl}/account/login", PlanLine = planLine }),
+                new { Link = PasswordLinks.Build(baseUrl, user, token, PasswordTokenKind.Invite), OrganisationName = organisation, SignInUrl = $"{baseUrl}/account/login", PlanLine = planLine }),
             cancellationToken);
     }
 
-    private async Task<string> BaseUrlAsync(CancellationToken cancellationToken) =>
-        (await settings.GetAsync(SettingCodes.General.PublicBaseUrl, cancellationToken))!.TrimEnd('/');
-
-    private static string Link(string baseUrl, ApplicationUser user, string token, PasswordTokenKind kind) =>
-        $"{baseUrl}/account/set-password?kind={kind.ToString().ToLowerInvariant()}&userId={user.Id}&token={Uri.EscapeDataString(token)}";
-
     private async Task SendAsync(string template, ApplicationUser user, string token, PasswordTokenKind kind, CancellationToken cancellationToken)
     {
-        var link = Link(await BaseUrlAsync(cancellationToken), user, token, kind);
+        var link = PasswordLinks.Build(await links.BaseUrlAsync(cancellationToken), user, token, kind);
 
         // Explicit address: an invited user's email isn't confirmed yet, and that's the point of the link.
         await notifications.SendAsync(

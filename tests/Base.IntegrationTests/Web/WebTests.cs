@@ -213,6 +213,46 @@ public sealed partial class WebTests(SqlServerFixture sql) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Invitation_links_can_be_copied_from_the_users_page_and_the_api_and_are_never_cached()
+    {
+        var client = Client();
+        await SignInAsync(client);
+        var token = await GetMetaTokenAsync(client);
+        using var invite = new HttpRequestMessage(HttpMethod.Post, "/api/users")
+        {
+            Content = JsonContent.Create(new { email = "copy.me@example.com", displayName = "Copy Me", roles = new[] { "User" } }),
+        };
+        invite.Headers.Add("X-CSRF-TOKEN", token);
+        var created = await client.SendAsync(invite, TestContext.Current.CancellationToken);
+        var id = (await created.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken)).GetProperty("id").GetString();
+
+        (await client.GetStringAsync("/admin/users", TestContext.Current.CancellationToken)).ShouldContain($"/admin/users/{id}/invite-link");
+
+        using var copy = new HttpRequestMessage(HttpMethod.Post, $"/admin/users/{id}/invite-link");
+        copy.Headers.Add("X-CSRF-TOKEN", token);
+        copy.Headers.Accept.ParseAdd("application/json");
+        var copied = await client.SendAsync(copy, TestContext.Current.CancellationToken);
+        copied.StatusCode.ShouldBe(HttpStatusCode.OK, await copied.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        copied.Headers.CacheControl!.NoStore.ShouldBeTrue();
+        var link = await copied.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
+        link.GetProperty("url").GetString()!.ShouldContain($"/account/set-password?kind=invite&userId={id}&token=");
+        link.GetProperty("displayName").GetString().ShouldBe("Copy Me");
+
+        using var page = new HttpRequestMessage(HttpMethod.Post, $"/admin/users/{id}/invite-link");
+        page.Headers.Add("X-CSRF-TOKEN", token);
+        var shown = await client.SendAsync(page, TestContext.Current.CancellationToken);
+        shown.StatusCode.ShouldBe(HttpStatusCode.OK);
+        shown.Headers.CacheControl!.NoStore.ShouldBeTrue();
+        (await shown.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).ShouldContain("Invitation link for Copy Me");
+
+        using var api = new HttpRequestMessage(HttpMethod.Post, $"/api/users/{id}/invite-link");
+        api.Headers.Add("X-CSRF-TOKEN", token);
+        var fromApi = await client.SendAsync(api, TestContext.Current.CancellationToken);
+        fromApi.StatusCode.ShouldBe(HttpStatusCode.OK);
+        fromApi.Headers.CacheControl!.NoStore.ShouldBeTrue();
+    }
+
+    [Fact]
     public async Task Documents_are_uploaded_generated_and_downloaded_through_the_api_and_pages()
     {
         var client = Client();

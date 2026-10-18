@@ -16,6 +16,10 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ### Added
 
+- Invitation links can be copied, to send by WhatsApp, text or any other channel: a link icon next to everyone who
+  hasn't accepted yet (Users, the user's page and the tenant's People), and `POST api/users/{id}/invite-link`. Each
+  copy is a fresh single-use link; if the clipboard is blocked the link is shown on a page with WhatsApp and text
+  buttons. Locking an account cancels every link handed out.
 - Tenants adopt releases at their own pace. Changes listed in `ReleaseCatalog` can be held back until an organisation
   takes their release, tried early or turned off; Administration → What's new shows what is waiting, and a banner
   tells administrators when they are behind. Platform → Releases shows how many organisations are on each release
@@ -35,6 +39,7 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ### Fixed
 
+- The user page no longer claims that resending an invitation cancels the earlier links; it says how to cancel them.
 - Source folders named `Releases` are no longer ignored by git.
 - Forms that list every validation message no longer trip the content security policy with an inline style.
 

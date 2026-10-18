@@ -112,6 +112,12 @@ public sealed class UserAdminController(IUserAdministration users, IRoleAdminist
     public async Task<IActionResult> SendPasswordReset(Guid id, CancellationToken cancellationToken) =>
         FlashAndReturn(id, await users.SendPasswordResetAsync(id, cancellationToken));
 
+    /// <summary>A fresh invitation link: JSON for the copy button, otherwise a page showing it.</summary>
+    [HttpPost("{id:guid}/invite-link")]
+    [HasPermission(PermissionCodes.Users.Manage)]
+    public async Task<IActionResult> InviteLink(Guid id, CancellationToken cancellationToken) =>
+        this.InviteLinkResult(await users.CreateInviteLinkAsync(id, cancellationToken), Url.Action(nameof(Index))!);
+
     private RedirectToActionResult FlashAndReturn(Guid id, Application.Common.Results.ValidationResponse result)
     {
         this.Flash(result);

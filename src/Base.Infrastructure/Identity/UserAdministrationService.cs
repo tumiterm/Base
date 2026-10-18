@@ -10,10 +10,11 @@ using Base.Infrastructure.Persistence;
 using FluentValidation;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Base.Infrastructure.Identity;
 
-internal sealed class UserAdministrationService(
+internal sealed partial class UserAdministrationService(
     UserManager<ApplicationUser> users,
     RoleManager<ApplicationRole> roles,
     AppDbContext db,
@@ -23,6 +24,8 @@ internal sealed class UserAdministrationService(
     IPlatformTenant platform,
     ITenantEntitlements entitlements,
     TimeProvider time,
+    PasswordLinks links,
+    ILogger<UserAdministrationService> logger,
     IValidator<InviteUserRequest> inviteValidator,
     IValidator<UpdateUserRequest> updateValidator) : IUserAdministration
 {
@@ -252,6 +255,35 @@ internal sealed class UserAdministrationService(
             : result.ToValidationResponse();
     }
 
+    public async Task<ValidationResponse<InviteLink>> CreateInviteLinkAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var user = await users.FindByIdAsync(userId.ToString());
+        if (user is null)
+        {
+            return ValidationResponse.NotFound("User not found.").As<InviteLink>();
+        }
+
+        var manageable = await CheckCanManageAsync(user, "copy this user's invitation link", cancellationToken);
+        if (manageable.IsError)
+        {
+            return manageable.As<InviteLink>();
+        }
+
+        if (user.HasPassword)
+        {
+            return ValidationResponse.Conflict($"{user.DisplayName} has already accepted and set a password.").As<InviteLink>();
+        }
+
+        if (await users.IsLockedOutAsync(user))
+        {
+            return ValidationResponse.Conflict($"{user.DisplayName}'s account is locked. Unlock it first.").As<InviteLink>();
+        }
+
+        var link = await links.CreateInviteAsync(user, cancellationToken);
+        LogInviteLinkCreated(logger, user.Id, actor.UserId);
+        return link;
+    }
+
     /// <summary>You can only manage users whose access you hold yourself.</summary>
     private async Task<ValidationResponse> CheckCanManageAsync(ApplicationUser user, string action, CancellationToken cancellationToken) =>
         PermissionGuard.EnsureHoldsAll(actor, await EffectiveAsync(await queries.PermissionsOfUserAsync(user.Id, cancellationToken), cancellationToken), action);
@@ -298,4 +330,7 @@ internal sealed class UserAdministrationService(
         user.HasPassword,
         user.LastSignInAt,
         user.DateCreated);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Invitation link for user {UserId} created by {ActorId}")]
+    private static partial void LogInviteLinkCreated(ILogger logger, Guid userId, Guid? actorId);
 }

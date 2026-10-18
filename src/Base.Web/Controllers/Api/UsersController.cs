@@ -49,4 +49,13 @@ public sealed class UsersController(IUserAdministration users) : ControllerBase
     [HasPermission(PermissionCodes.Users.Manage)]
     public async Task<IActionResult> SendPasswordReset(Guid id, CancellationToken cancellationToken) =>
         (await users.SendPasswordResetAsync(id, cancellationToken)).ToActionResult(this);
+
+    /// <summary>A fresh invitation link for someone who hasn't accepted yet. It works once; send it over a private channel.</summary>
+    [HttpPost("{id:guid}/invite-link")]
+    [HasPermission(PermissionCodes.Users.Manage)]
+    public async Task<IActionResult> CreateInviteLink(Guid id, CancellationToken cancellationToken)
+    {
+        Response.Headers.CacheControl = "no-store";
+        return (await users.CreateInviteLinkAsync(id, cancellationToken)).ToActionResult(this);
+    }
 }

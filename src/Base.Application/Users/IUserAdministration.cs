@@ -24,6 +24,12 @@ public interface IUserAdministration
 
     /// <summary>Emails the user a reset link (or a fresh invite if they never set a password).</summary>
     Task<ValidationResponse> SendPasswordResetAsync(Guid userId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// A fresh invitation link for someone who hasn't accepted yet, to send by WhatsApp or any other channel. Treat it
+    /// like a password: whoever opens it first sets the password.
+    /// </summary>
+    Task<ValidationResponse<InviteLink>> CreateInviteLinkAsync(Guid userId, CancellationToken cancellationToken = default);
 }
 
 /// <summary>Roles and their permissions. Roles are shared by all tenants; system roles cannot be renamed or deleted.</summary>

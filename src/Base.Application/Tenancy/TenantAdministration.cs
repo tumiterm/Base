@@ -39,6 +39,9 @@ public interface ITenantAdministration
 
     /// <summary>Sends the welcome (with a fresh set-password link) again to a user who hasn't accepted it yet.</summary>
     Task<ValidationResponse> ResendWelcomeAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken = default);
+
+    /// <summary>A fresh invitation link for a tenant user who hasn't accepted yet, to send by any channel.</summary>
+    Task<ValidationResponse<InviteLink>> CreateInviteLinkAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken = default);
 }
 
 public sealed record TenantQuery(string? Search = null, SubscriptionStatus? Status = null, int Page = 1, int PageSize = 25);

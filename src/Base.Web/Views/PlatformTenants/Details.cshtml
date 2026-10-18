@@ -101,7 +101,7 @@
                         <icon name="@(accepted && signedIn ? "circle-check" : "circle-dashed")" />
                         <div>
                             <div class="checklist-title">@(signedIn ? "Their administrator has signed in" : accepted ? "Password set, not signed in yet" : "Waiting for them to accept")</div>
-                            <div class="checklist-desc">@(signedIn ? "From here they run their own organisation: users, roles, branding and settings." : "Nothing more to do on your side. If the link expired or got lost, resend the welcome from People.")</div>
+                            <div class="checklist-desc">@(signedIn ? "From here they run their own organisation: users, roles, branding and settings." : "Nothing more to do on your side. If the email went missing, resend it or copy their link from People and send it another way.")</div>
                         </div>
                     </li>
                 </ol>
@@ -283,6 +283,9 @@
                             <span class="badge text-bg-@state.Item2">@state.Item1</span>
                             @if (canManage && !u.HasPassword && !u.IsLockedOut)
                             {
+                                <form method="post" asp-action="InviteLink" asp-route-id="@t.Id" asp-route-userId="@u.Id" data-invite-link>
+                                    <button class="icon-btn" type="submit" title="Copy invitation link" aria-label="Copy the invitation link for @u.DisplayName"><icon name="link" /></button>
+                                </form>
                                 <form method="post" asp-action="ResendWelcome" asp-route-id="@t.Id" asp-route-userId="@u.Id">
                                     <button class="icon-btn" type="submit" title="Send the welcome email again" aria-label="Send the welcome email to @u.DisplayName again"><icon name="send" /></button>
                                 </form>
