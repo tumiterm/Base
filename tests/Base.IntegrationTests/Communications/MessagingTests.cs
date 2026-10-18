@@ -1,11 +1,13 @@
 using Base.Application.Common.Abstractions;
 using Base.Application.Common.Results;
 using Base.Application.Communications;
+using Base.Application.Flags;
 using Base.Application.Notifications;
 using Base.Application.Operations;
 using Base.Application.People;
 using Base.Application.Security;
 using Base.Domain.Communications;
+using Base.Domain.Flags;
 using Base.Domain.Notifications;
 using Base.Infrastructure.Identity;
 using Base.Infrastructure.Outbox;
@@ -150,10 +152,34 @@ public sealed class MessagingTests(SqlServerFixture sql) : IAsyncLifetime
         (await As(sender, sp => Messaging(sp).SendAsync(Draft(chosen, [NotificationChannel.Email])))).IsSuccess.ShouldBeTrue();
     }
 
+    [Fact]
+    public async Task The_kill_switch_holds_messages_back_and_they_go_once_it_is_on_again()
+    {
+        var person = await AddPersonAsync("Naledi", "Khumalo", "it", "naledi@example.com", null);
+        var chosen = new AudienceChoice(BroadcastAudienceKind.Chosen, AudienceCodes.People, Keys: [person.ToString()]);
+        (await As(sp => Flags(sp).SetAsync(FeatureFlagCodes.MessageSending, new FeatureFlagSetting(FeatureFlagMode.Off, 0, [], false)))).IsSuccess.ShouldBeTrue();
+
+        var id = (await As(sp => Messaging(sp).SendAsync(Draft(chosen, [NotificationChannel.Email])))).GetDataOrThrow();
+        await DeliverAsync();
+        await DeliverAsync();
+        _app.Sent.All.ShouldBeEmpty();
+        (await As(sp => Messaging(sp).GetAsync(id))).GetDataOrThrow().Summary.Status.ShouldBe(BroadcastStatus.Scheduled);
+
+        _app.Time.Advance(TimeSpan.FromMinutes(11));
+        (await RunScheduledAsync()).ShouldBe("Nothing due; 1 paused by the message-sending switch");
+
+        (await As(sp => Flags(sp).SetAsync(FeatureFlagCodes.MessageSending, new FeatureFlagSetting(FeatureFlagMode.Everyone, 0, [], false)))).IsSuccess.ShouldBeTrue();
+        (await RunScheduledAsync()).ShouldBe("Sent 1 message(s)");
+        await DeliverAsync();
+        _app.Sent.On(NotificationChannel.Email).ShouldHaveSingleItem().To.ShouldBe("naledi@example.com");
+    }
+
     private static MessageDraft Draft(AudienceChoice audience, IReadOnlyList<NotificationChannel> channels, string subject = "Hello", string html = "<p>Hello {{FirstName}}</p>", string? sms = null, DateTimeOffset? sendAt = null) =>
         new("Test message", channels, subject, html, sms, null, null, null, audience, sendAt);
 
     private static IMessagingService Messaging(IServiceProvider sp) => sp.GetRequiredService<IMessagingService>();
+
+    private static IFeatureFlags Flags(IServiceProvider sp) => sp.GetRequiredService<IFeatureFlags>();
 
     private Task<Guid> AddPersonAsync(string first, string last, string department, string? email, string? phone) =>
         As(async sp => (await sp.GetRequiredService<IPersonService>().CreateAsync(new SavePersonRequest(first, last, Email: email, Phone: phone, DepartmentCode: department))).GetDataOrThrow());

@@ -5,7 +5,8 @@ using Base.Domain.Notifications;
 
 namespace Base.Web.ViewModels;
 
-public sealed record MessageListViewModel(PagedResult<BroadcastSummary> Messages, BroadcastStatus? Status);
+/// <param name="SendingPaused">The message-sending kill switch is off: messages wait until it is back on.</param>
+public sealed record MessageListViewModel(PagedResult<BroadcastSummary> Messages, BroadcastStatus? Status, bool SendingPaused = false);
 
 /// <summary>The composer form as posted. <see cref="Mode"/> picks how the audience is chosen.</summary>
 public sealed class ComposeForm
@@ -108,6 +109,7 @@ public sealed class ComposeForm
 /// <param name="Chosen">The people picked so far, to show as chips.</param>
 /// <param name="ChannelsOn">Which channels the organisation has switched on.</param>
 /// <param name="EditingId">Set when changing a scheduled message.</param>
+/// <param name="SendingPaused">The message-sending kill switch is off: messages wait until it is back on.</param>
 public sealed record ComposeViewModel(
     ComposeForm Form,
     IReadOnlyList<AudienceView> Audiences,
@@ -117,7 +119,8 @@ public sealed record ComposeViewModel(
     AudienceReach? Reach,
     MessagePreview? Preview,
     string TimeZoneName,
-    Guid? EditingId);
+    Guid? EditingId,
+    bool SendingPaused = false);
 
 public sealed record MessageDetailsViewModel(BroadcastDetails Message, PagedResult<BroadcastDelivery> Deliveries, NotificationStatus? Status, DateTime? LocalScheduledFor);
 

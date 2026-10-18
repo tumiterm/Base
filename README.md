@@ -29,6 +29,10 @@ account menu and at `GET api/system/version`.
 Tenants adopt releases at their own pace: changes listed in `ReleaseCatalog` stay off, or can be turned off, until an
 organisation takes their release, and the platform sees who is behind ([ADR 0022](docs/adr/0022-tenant-release-adoption.md)).
 
+Feature flags switch code on or off without a deployment: release flags try unfinished work with the platform's
+staff, chosen organisations or a share of them; kill switches (such as pausing Messages) stop something at once.
+Platform → Feature flags changes them, audited ([ADR 0025](docs/adr/0025-feature-flags.md)).
+
 ## Run it locally
 
 In Development the app needs no configuration. With no connection string set it uses:

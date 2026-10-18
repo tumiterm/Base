@@ -775,3 +775,17 @@ document.querySelectorAll('input[type="file"][data-fill-title]').forEach((input)
         });
     });
 })();
+
+// Feature flags: the targeting choices show only for "Some organisations".
+(() => {
+    document.querySelectorAll('form[data-flag-form]').forEach((form) => {
+        const targeting = form.querySelector('[data-flag-targeting]');
+        if (!targeting) return;
+        const layout = () => {
+            const mode = [...form.querySelectorAll('[data-flag-mode]')].find((m) => m.checked)?.value;
+            targeting.hidden = mode !== 'Targeted';
+        };
+        form.querySelectorAll('[data-flag-mode]').forEach((m) => m.addEventListener('change', layout));
+        layout();
+    });
+})();

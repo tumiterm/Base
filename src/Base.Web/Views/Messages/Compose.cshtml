@@ -28,6 +28,8 @@
     return;
 }
 
+<partial name="_SendingPaused" model="Model.SendingPaused" />
+
 @if (!ViewData.ModelState.IsValid)
 {
     <div asp-validation-summary="All" class="alert alert-danger" role="alert"></div>

@@ -1,5 +1,6 @@
 using Base.Application.Common.Abstractions;
 using Base.Application.Common.Persistence;
+using Base.Application.Flags;
 using Base.Application.Messaging;
 using Base.Application.Notifications;
 using Base.Application.Operations;
@@ -21,6 +22,7 @@ internal sealed partial class BroadcastSender(
     IRunAsUser runAs,
     ICurrentUser currentUser,
     ITenantEntitlements entitlements,
+    IFeatureFlags flags,
     AudienceResolver audiences,
     INotificationService notifications,
     TimeProvider time,
@@ -28,6 +30,12 @@ internal sealed partial class BroadcastSender(
 {
     public async Task<string> SendAsync(Guid broadcastId, CancellationToken cancellationToken)
     {
+        if (!await flags.IsOnAsync(FeatureFlagCodes.MessageSending, cancellationToken))
+        {
+            // Paused by the kill switch: it stays scheduled and the scheduled-messages job sends it once it's back on.
+            return "Message sending is paused";
+        }
+
         var broadcast = await unitOfWork.Repository<Broadcast>().GetAsync(b => b.Id == broadcastId, cancellationToken: cancellationToken);
         if (broadcast is null || !broadcast.TryStart(time.GetUtcNow()))
         {
@@ -126,7 +134,7 @@ internal sealed class BroadcastDueHandler(BroadcastSender sender) : IDomainEvent
 /// Sends scheduled messages when their time comes, in each one's own tenant. Also the safety net for a "send now"
 /// the outbox didn't get to, and for a send that stopped part-way.
 /// </summary>
-internal sealed class ScheduledMessagesJob(IUnitOfWork unitOfWork, ITenantContext tenant, IServiceScopeFactory scopes, TimeProvider time) : IScheduledJob
+internal sealed class ScheduledMessagesJob(IUnitOfWork unitOfWork, ITenantContext tenant, IFeatureFlags flags, IServiceScopeFactory scopes, TimeProvider time) : IScheduledJob
 {
     public string Code => "scheduled-messages";
 
@@ -148,10 +156,23 @@ internal sealed class ScheduledMessagesJob(IUnitOfWork unitOfWork, ITenantContex
                     b => (b.Status == BroadcastStatus.Scheduled && b.ScheduledFor <= now && (b.IsScheduled || b.ScheduledFor <= stale))
                         || (b.Status == BroadcastStatus.Sending && b.StartedAt <= stale),
                     q => q.OrderBy(b => b.ScheduledFor),
-                    take: 20,
+                    take: 200,
                     cancellationToken: cancellationToken))
                 .Select(b => (b.Id, b.TenantId)).ToList();
         }
+
+        // Organisations whose sending is paused keep theirs until the switch is back on, without holding up the rest.
+        var paused = new HashSet<Guid>();
+        foreach (var tenantId in due.Select(d => d.TenantId).Distinct())
+        {
+            if (!await flags.IsOnForAsync(FeatureFlagCodes.MessageSending, tenantId, cancellationToken))
+            {
+                paused.Add(tenantId);
+            }
+        }
+
+        var waiting = due.Count(d => paused.Contains(d.TenantId));
+        due = due.Where(d => !paused.Contains(d.TenantId)).Take(20).ToList();
 
         foreach (var (id, tenantId) in due)
         {
@@ -160,6 +181,7 @@ internal sealed class ScheduledMessagesJob(IUnitOfWork unitOfWork, ITenantContex
             await scope.ServiceProvider.GetRequiredService<BroadcastSender>().SendAsync(id, cancellationToken);
         }
 
-        return due.Count == 0 ? "Nothing due" : $"Sent {due.Count} message(s)";
+        var result = due.Count == 0 ? "Nothing due" : $"Sent {due.Count} message(s)";
+        return waiting == 0 ? result : $"{result}; {waiting} paused by the message-sending switch";
     }
 }

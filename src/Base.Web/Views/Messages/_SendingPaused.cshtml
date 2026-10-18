@@ -1,0 +1,11 @@
+@model bool
+@if (Model)
+{
+    <div class="status-callout is-warning mb-4" role="status">
+        <icon name="circle-pause" />
+        <div>
+            <div class="fw-semibold">Sending is paused</div>
+            <div class="small">The platform team has paused message sending for now. You can still write and schedule messages; they go out once sending is back on.</div>
+        </div>
+    </div>
+}

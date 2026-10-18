@@ -92,6 +92,11 @@ cross-cutting feature or adding a package:
   entry (introduced version, `OptIn`/`OnByDefault`) + a gate (`ITenantReleases.IsOnAsync`, `[RequiresRelease]`,
   `asp-release`), tested in both states. Never gate fixes. Once on everywhere, set `Retired`, then delete the old path
   (ADR 0022).
+- Code that isn't ready for everyone, or must be stoppable in production, is feature-flagged: constant in
+  `FeatureFlagCodes` + `FeatureFlagCatalog` entry (owner; `Release` with `RemoveBy`, or `KillSwitch`) + a gate
+  (`IFeatureFlags.IsOnAsync`, `[RequiresFlag]`, `asp-flag`), tested in both states. Flags are for engineering, never for
+  what customers pay for (plans), take (releases) or configure (settings). Delete a release flag and its old path once
+  it is on everywhere (ADR 0025).
 - UI is built from the design system (`design-system.css` tokens, `<icon>`, the shell in `_Layout`) and must meet
   `docs/ui-design-direction.md`: no stock Bootstrap look, no inline scripts or styles (strict CSP), light and dark,
   phone layouts. Brand colours come from `var(--accent*)` (per-tenant `Branding.*` settings), never hard-coded.

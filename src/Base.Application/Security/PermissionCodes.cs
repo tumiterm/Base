@@ -86,6 +86,7 @@ public static class PermissionCodes
         public const string TenantsView = "Platform.Tenants.View";
         public const string TenantsManage = "Platform.Tenants.Manage";
         public const string PlansManage = "Platform.Plans.Manage";
+        public const string FlagsManage = "Platform.Flags.Manage";
     }
 
     public static class System

@@ -1033,3 +1033,11 @@ a.stat-tile:hover { border-color: var(--border-strong); color: var(--text); }
   .compose-footer .btn-primary { flex: 1 1 100%; order: -1; }
   .compose-footer .btn:not(.btn-primary) { flex: 1 1 0; }
 }
+
+/* Feature flags */
+.flag-heading { min-width: 0; }
+.flag-share { max-width: 9rem; }
+@media (max-width: 575.98px) {
+  [data-flag-form] .segmented { display: flex; }
+  [data-flag-form] .segmented label { flex: 1 1 auto; justify-content: center; white-space: nowrap; padding-inline: var(--s-2); }
+}

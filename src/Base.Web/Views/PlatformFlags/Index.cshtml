@@ -1,0 +1,141 @@
+@model PlatformFlagsViewModel
+@using Base.Application.Flags
+@using Base.Domain.Flags
+@{
+    ViewData["Title"] = "Feature flags";
+    var on = Model.Flags.Count(f => f.TenantsOn > 0);
+    var stale = Model.Flags.Count(f => f.IsStale);
+    var killed = Model.Flags.Count(f => f.Flag.Kind == FeatureFlagKind.KillSwitch && f.TenantsOn < f.TenantsTotal);
+    string Who(FeatureFlagView f) => f.TenantsOn == f.TenantsTotal ? "On everywhere" : f.TenantsOn == 0 ? "Off everywhere" : $"On for {f.TenantsOn} of {f.TenantsTotal}";
+}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Feature flags</h1>
+        <p class="page-subtitle">Switch code in this build on or off without a deployment: try new work with a few organisations first, or stop something that misbehaves. Changes apply within a minute and are recorded in the audit trail.</p>
+    </div>
+</div>
+
+<div class="stat-grid">
+    <div class="panel stat-tile"><span class="file-tile is-code" aria-hidden="true"><icon name="toggle-right" /></span><div class="stat"><span class="stat-label">Flags</span><span class="stat-value">@Model.Flags.Count</span><span class="stat-sub">In this build</span></div></div>
+    <div class="panel stat-tile"><span class="file-tile" aria-hidden="true"><icon name="circle-check" /></span><div class="stat"><span class="stat-label">On somewhere</span><span class="stat-value">@on</span><span class="stat-sub">For at least one organisation</span></div></div>
+    <div class="panel stat-tile @(killed > 0 ? "is-alert" : "")"><span class="file-tile" aria-hidden="true"><icon name="circle-pause" /></span><div class="stat"><span class="stat-label">Switched off</span><span class="stat-value">@killed</span><span class="stat-sub">Kill switches not on everywhere</span></div></div>
+    <div class="panel stat-tile @(stale > 0 ? "is-warning" : "")"><span class="file-tile" aria-hidden="true"><icon name="hourglass" /></span><div class="stat"><span class="stat-label">Overdue</span><span class="stat-value">@stale</span><span class="stat-sub">Release flags past their remove-by date</span></div></div>
+</div>
+
+@if (Model.Flags.Count == 0)
+{
+    <div class="panel">
+        <div class="empty-state border-0">
+            <icon name="toggle-right" />
+            <div class="empty-state-title">No feature flags</div>
+            <p class="mb-0">Add a constant to <span class="mono">FeatureFlagCodes</span> and an entry to <span class="mono">FeatureFlagCatalog</span>, then gate the code with <span class="mono">IFeatureFlags</span>, <span class="mono">[RequiresFlag]</span> or <span class="mono">asp-flag</span>.</p>
+        </div>
+    </div>
+    return;
+}
+
+<div class="stack">
+    @foreach (var f in Model.Flags.OrderByDescending(x => x.IsStale).ThenBy(x => x.Flag.Name, StringComparer.CurrentCulture))
+    {
+        var id = "flag-" + f.Flag.Code;
+        var key = f.Flag.Code.Replace(".", "-", StringComparison.Ordinal);
+        var s = f.Setting;
+        var chosen = s.TenantIds.ToHashSet();
+        <section class="panel" id="@id" aria-labelledby="@key-title">
+            <div class="panel-header">
+                <div class="flag-heading">
+                    <h2 class="panel-title" id="@key-title">@f.Flag.Name</h2>
+                    <div class="small text-muted"><span class="mono">@f.Flag.Code</span> · @f.Flag.Owner</div>
+                </div>
+                <div class="chip-group">
+                    @if (f.Flag.Kind == FeatureFlagKind.KillSwitch)
+                    {
+                        <span class="chip chip-standard" title="Permanent: kept so it can be switched off in an emergency">Kill switch</span>
+                    }
+                    else
+                    {
+                        <span class="chip chip-premium" title="Temporary: removed once it is on everywhere">Release flag</span>
+                    }
+                    <span class="chip @(f.TenantsOn == 0 ? "" : "is-active")">@Who(f)</span>
+                </div>
+            </div>
+            <form method="post" asp-action="Save" asp-route-code="@f.Flag.Code" data-flag-form>
+                <div class="panel-body stack">
+                    <p class="mb-0">@f.Flag.Description</p>
+                    @if (f.IsStale)
+                    {
+                        <div class="status-callout is-warning">
+                            <icon name="hourglass" />
+                            <div class="small">This release flag was due to be removed by @f.Flag.RemoveBy!.Value.ToString("d MMMM yyyy", System.Globalization.CultureInfo.CurrentCulture). Once it is on everywhere, delete the flag and the old code path so they don't pile up.</div>
+                        </div>
+                    }
+                    else if (f.Flag.RemoveBy is { } removeBy)
+                    {
+                        <div class="small text-muted"><icon name="calendar" class="icon-sm" /> Remove by @removeBy.ToString("d MMMM yyyy", System.Globalization.CultureInfo.CurrentCulture)</div>
+                    }
+                    @if (f.Source == FeatureFlagSource.Configuration)
+                    {
+                        <div class="status-callout is-info">
+                            <icon name="info" />
+                            <div class="small">Configuration (<span class="mono">FeatureFlags:Overrides:@f.Flag.Code</span>) forces it <strong>@(f.Override == true ? "on" : "off")</strong> on this server, whatever is chosen here. What you save still applies where that isn't set.</div>
+                        </div>
+                    }
+
+                    <div class="segmented" role="radiogroup" aria-label="Who @f.Flag.Name is on for">
+                        <input type="radio" name="Mode" id="@key-off" value="@FeatureFlagMode.Off" checked="@(s.Mode == FeatureFlagMode.Off)" data-flag-mode /><label for="@key-off">Off</label>
+                        <input type="radio" name="Mode" id="@key-some" value="@FeatureFlagMode.Targeted" checked="@(s.Mode == FeatureFlagMode.Targeted)" data-flag-mode /><label for="@key-some">Some organisations</label>
+                        <input type="radio" name="Mode" id="@key-all" value="@FeatureFlagMode.Everyone" checked="@(s.Mode == FeatureFlagMode.Everyone)" data-flag-mode /><label for="@key-all">Everyone</label>
+                    </div>
+
+                    <div class="stack" data-flag-targeting hidden="@(s.Mode != FeatureFlagMode.Targeted)">
+                        <label class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" role="switch" name="IncludePlatform" value="true" checked="@s.IncludePlatform" />
+                            <span class="form-check-label">The platform's own staff, to try it first</span>
+                        </label>
+                        <div>
+                            <label class="form-label" for="@key-pct">A share of all organisations</label>
+                            <div class="input-group flag-share">
+                                <input class="form-control" type="number" id="@key-pct" name="Percentage" min="0" max="100" step="1" value="@s.Percentage" inputmode="numeric" />
+                                <span class="input-group-text">%</span>
+                            </div>
+                            <div class="form-text">Always the same organisations for this flag, so going from 10% to 50% keeps the first 10%.</div>
+                        </div>
+                        <div>
+                            <div class="form-label">Chosen organisations</div>
+                            @if (Model.Tenants.Count == 0)
+                            {
+                                <p class="text-muted small mb-0">No organisations yet.</p>
+                            }
+                            else
+                            {
+                                <div class="chip-group" id="@key-tenants">
+                                    @foreach (var t in Model.Tenants)
+                                    {
+                                        <label class="chip-check"><input type="checkbox" name="TenantIds" value="@t.Id" checked="@chosen.Contains(t.Id)" /><span>@t.Name</span></label>
+                                    }
+                                </div>
+                                @if (Model.TenantTotal > Model.Tenants.Count)
+                                {
+                                    <div class="form-text">Showing the first @Model.Tenants.Count of @Model.TenantTotal organisations; use the share for the rest.</div>
+                                }
+                            }
+                        </div>
+                    </div>
+                </div>
+                <div class="panel-footer d-flex flex-wrap align-items-center gap-3">
+                    <span class="small text-muted me-auto">
+                        @if (f.ChangedAt is { } changed)
+                        {
+                            <text>Last changed <time datetime="@changed.ToString("O", System.Globalization.CultureInfo.InvariantCulture)">@changed.ToString("d MMM yyyy, HH:mm", System.Globalization.CultureInfo.CurrentCulture) UTC</time>@(f.ChangedBy is null ? "" : " by " + f.ChangedBy)</text>
+                        }
+                        else
+                        {
+                            <text>Never changed: @(f.Flag.DefaultOn ? "on" : "off") for everyone by default</text>
+                        }
+                    </span>
+                    <button type="submit" class="btn btn-primary"><icon name="check" class="icon-sm" /> Save</button>
+                </div>
+            </form>
+        </section>
+    }
+</div>

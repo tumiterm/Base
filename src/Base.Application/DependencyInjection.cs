@@ -6,6 +6,7 @@ using Base.Application.DataExchange;
 using Base.Application.Documents;
 using Base.Application.Documents.Generation;
 using Base.Application.Files;
+using Base.Application.Flags;
 using Base.Application.Integrations;
 using Base.Application.MasterData;
 using Base.Application.Messaging;
@@ -98,6 +99,9 @@ public static class DependencyInjection
         services.AddScoped<INotificationLog, NotificationLog>();
         services.AddScoped<INotificationPreferences, NotificationPreferences>();
         services.AddScoped<INotificationTemplateAdmin, NotificationTemplateAdmin>();
+
+        services.TryAddSingleton<IFeatureFlagCatalog, DefaultFeatureFlagCatalog>();
+        services.AddScoped<IFeatureFlags, FeatureFlags>();
 
         services.AddScoped<AudienceResolver>();
         services.AddScoped<IAudienceSource, PersonAudience>();

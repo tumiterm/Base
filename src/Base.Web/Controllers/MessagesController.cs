@@ -2,6 +2,7 @@ using System.Text;
 using Base.Application.Common.Persistence;
 using Base.Application.Common.Results;
 using Base.Application.Communications;
+using Base.Application.Flags;
 using Base.Application.Notifications;
 using Base.Application.Security;
 using Base.Application.Settings;
@@ -24,13 +25,17 @@ public sealed class MessagesController(
     IMessagingService messaging,
     IMessageTemplateService templates,
     INotificationChannels channels,
-    IApplicationSettingService settings) : Controller
+    IApplicationSettingService settings,
+    IFeatureFlags flags) : Controller
 {
     private const long MaxListBytes = 2 * 1024 * 1024;
 
     [HttpGet("")]
     public async Task<IActionResult> Index(BroadcastStatus? status, int page = 1, CancellationToken cancellationToken = default) =>
-        View(new MessageListViewModel(await messaging.ListAsync(new BroadcastQuery(status, page, PageRequest.DefaultPageSize), cancellationToken), status));
+        View(new MessageListViewModel(
+            await messaging.ListAsync(new BroadcastQuery(status, page, PageRequest.DefaultPageSize), cancellationToken),
+            status,
+            !await flags.IsOnAsync(FeatureFlagCodes.MessageSending, cancellationToken)));
 
     /// <summary>A new message, optionally to someone already chosen (<c>?audience=people&amp;keys=...</c>) or from a template.</summary>
     [HttpGet("new")]
@@ -290,7 +295,8 @@ public sealed class MessagesController(
 
         var on = Enum.GetValues<NotificationChannel>().ToDictionary(c => c, channels.IsEnabled);
         var zone = await settings.GetAsync(SettingCodes.General.DisplayTimeZone, cancellationToken) ?? "UTC";
-        return new ComposeViewModel(form, audiences, await templates.ListAsync(cancellationToken), on, chosen, reach, preview, zone, editing);
+        var paused = !await flags.IsOnAsync(FeatureFlagCodes.MessageSending, cancellationToken);
+        return new ComposeViewModel(form, audiences, await templates.ListAsync(cancellationToken), on, chosen, reach, preview, zone, editing, paused);
     }
 
     private async Task ReadListFileAsync(ComposeForm form, CancellationToken cancellationToken)

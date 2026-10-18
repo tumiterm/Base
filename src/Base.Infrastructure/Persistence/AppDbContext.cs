@@ -4,6 +4,7 @@ using Base.Domain.Communications;
 using Base.Domain.DataExchange;
 using Base.Domain.Documents;
 using Base.Domain.Files;
+using Base.Domain.Flags;
 using Base.Domain.Integrations;
 using Base.Domain.MasterData;
 using Base.Domain.Notifications;
@@ -82,6 +83,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
     public DbSet<NotificationTemplateOverride> NotificationTemplateOverrides => Set<NotificationTemplateOverride>();
 
     public DbSet<Broadcast> Broadcasts => Set<Broadcast>();
+
+    public DbSet<FeatureFlagState> FeatureFlags => Set<FeatureFlagState>();
 
     public DbSet<MessageTemplate> MessageTemplates => Set<MessageTemplate>();
 

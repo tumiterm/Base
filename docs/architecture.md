@@ -309,6 +309,23 @@ pending; `ITenantReleases` caches the result per tenant and is what `[RequiresRe
 call. Administration → What's new takes releases and features; Platform → Releases shows the fleet. The
 `release-window` job enforces `Releases.MaxReleasesBehind`.
 
+## Feature flags
+
+`FeatureFlagCatalog` lists flags (ADR 0025): release flags (temporary, off by default, with a remove-by date) and
+kill switches (permanent, on by default). `FeatureFlagState` rows hold who a changed flag is on for: off, everyone, or
+targeted (the platform's staff, chosen organisations, a stable percentage). `FeatureFlagRules` evaluates; a
+`FeatureFlags:Overrides:{Code}` configuration value wins. `IFeatureFlags` caches the rows (tag `flags`) and is what
+`[RequiresFlag]`, `asp-flag` and services call; Platform → Feature flags changes them, audited.
+
+Which tool decides behaviour:
+
+| Question | Tool |
+| --- | --- |
+| Does this customer pay for it? | Plan feature or limit (`EntitlementCatalog`) |
+| Has this organisation taken the change yet? | Release feature (`ReleaseCatalog`) |
+| How does this organisation want it to work? | Setting (`SettingCatalog`) |
+| Is this code ready for them, or safe to run right now? | Feature flag (`FeatureFlagCatalog`) |
+
 ## UI and branding
 
 - `wwwroot/css/design-system.css` holds the tokens (light and dark) and the components. Bootstrap 5.3 is only the

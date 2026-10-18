@@ -65,6 +65,8 @@ public static class PermissionCatalog
             AdminOnly, [PermissionCodes.Platform.TenantsView], IsPlatform: true),
         new(PermissionCodes.Platform.PlansManage, "Manage plans", "Platform", "Create plans and set their prices, trials, features and limits.", AdminOnly,
             [PermissionCodes.Platform.TenantsView], IsPlatform: true),
+        new(PermissionCodes.Platform.FlagsManage, "Manage feature flags", "Platform", "Turn feature flags and kill switches on or off, for everyone or for chosen organisations.", AdminOnly,
+            [PermissionCodes.Platform.TenantsView], IsPlatform: true),
         new(PermissionCodes.System.HealthView, "View system health", "System", "See health checks, errors and storage usage.", AdminOnly, []),
         new(PermissionCodes.System.JobsManage, "Manage background jobs", "System", "Open the job dashboard and retry or delete jobs.", AdminOnly, [PermissionCodes.System.HealthView]),
     ];

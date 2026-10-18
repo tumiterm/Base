@@ -16,6 +16,14 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ### Added
 
+- **Feature flags**: switch code on or off without a deployment, from Platform → Feature flags.
+  - Off, everyone, or some organisations: the platform's own staff, chosen organisations and/or a stable percentage
+    (growing it keeps those already in).
+  - Release flags (temporary, with a remove-by date and an overdue warning) and kill switches (permanent). The Base
+    ships the **Message sending** kill switch: while it is off, messages wait and go out once it is back on, and
+    Messages says sending is paused.
+  - Gates: `IFeatureFlags.IsOnAsync`, `[RequiresFlag]` and `asp-flag`; `FeatureFlags:Overrides:{Code}` forces a flag
+    in configuration. Changes are audited. Permission **Manage feature flags** (platform). ADR 0025.
 - **Messages**: write to people by email, SMS, WhatsApp or in-app, from Messages in the navigation or "Send a
   message" on a person's or user's page.
   - Pick people one by one, send to everyone an audience's filters match (People by department, status or skill;

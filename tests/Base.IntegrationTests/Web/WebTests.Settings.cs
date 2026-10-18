@@ -108,6 +108,28 @@ public sealed partial class WebTests
     }
 
     [Fact]
+    public async Task Feature_flags_are_switched_from_the_platform_page_and_the_kill_switch_shows_where_it_bites()
+    {
+        var client = Client();
+        await SignInAsync(client);
+        var token = await GetFormTokenAsync(client, "/platform/flags");
+        (await client.GetStringAsync("/platform/flags", TestContext.Current.CancellationToken)).ShouldContain("Message sending");
+        try
+        {
+            (await PostFormAsync(client, "/platform/flags/Flag.MessageSending", token, ("Mode", "Off"), ("Percentage", "0")))
+                .StatusCode.ShouldBe(HttpStatusCode.Redirect);
+            (await client.GetStringAsync("/messages", TestContext.Current.CancellationToken)).ShouldContain("Sending is paused");
+            (await PostFormAsync(client, "/platform/flags/Flag.Unknown", token, ("Mode", "Off"))).StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        }
+        finally
+        {
+            await PostFormAsync(client, "/platform/flags/Flag.MessageSending", token, ("Mode", "Everyone"), ("Percentage", "0"));
+        }
+
+        (await client.GetStringAsync("/messages", TestContext.Current.CancellationToken)).ShouldNotContain("Sending is paused");
+    }
+
+    [Fact]
     public async Task The_running_version_is_reported()
     {
         var client = Client();

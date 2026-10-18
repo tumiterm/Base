@@ -1,5 +1,6 @@
 using Base.Application.Common.Persistence;
 using Base.Application.Common.Results;
+using Base.Application.Flags;
 using Base.Application.Notifications;
 using Base.Application.Security;
 using Base.Application.Subscriptions;
@@ -287,4 +288,38 @@ public sealed class PlatformReleasesController(Application.Releases.ITenantRelea
     [HttpGet("")]
     public async Task<IActionResult> Index(CancellationToken cancellationToken) =>
         View(new PlatformReleasesViewModel(await releases.FleetAsync(cancellationToken)));
+}
+
+/// <summary>Feature flags: who each flag in this build is on for, changed without a deployment.</summary>
+[Route("platform/flags")]
+[HasPermission(PermissionCodes.Platform.FlagsManage)]
+public sealed class PlatformFlagsController(IFeatureFlags flags, ITenantAdministration tenants) : Controller
+{
+    [HttpGet("")]
+    public async Task<IActionResult> Index(CancellationToken cancellationToken)
+    {
+        var list = await flags.ListAsync(cancellationToken);
+        if (list.IsError)
+        {
+            return list.ToActionResult(this);
+        }
+
+        var all = await tenants.SearchAsync(new TenantQuery(PageSize: PageRequest.MaxPageSize), cancellationToken);
+        return View(new PlatformFlagsViewModel(list.Data!, all.Items.OrderBy(t => t.Name, StringComparer.CurrentCultureIgnoreCase).ToList(), all.Total));
+    }
+
+    [HttpPost("{code}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Save(string code, FlagForm form, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(form);
+        var result = await flags.SetAsync(code, form.ToSetting(), cancellationToken);
+        if (result.ErrorType is ErrorType.Forbidden or ErrorType.NotFound)
+        {
+            return result.ToActionResult(this);
+        }
+
+        this.Flash(result.IsSuccess || result.Errors.Count == 0 ? result : ValidationResponse.Failure(string.Join(" ", result.Errors.Select(e => e.Message))));
+        return RedirectToAction(nameof(Index), null, null, "flag-" + code);
+    }
 }

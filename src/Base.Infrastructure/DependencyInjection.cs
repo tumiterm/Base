@@ -58,6 +58,7 @@ public static class DependencyInjection
 
         services.AddOptions<DatabaseOptions>().BindConfiguration(DatabaseOptions.SectionName);
         services.AddOptions<SeedOptions>().BindConfiguration(SeedOptions.SectionName);
+        services.AddOptions<Application.Flags.FeatureFlagOptions>().BindConfiguration(Application.Flags.FeatureFlagOptions.SectionName);
         services.AddOptions<TenancyOptions>().BindConfiguration(TenancyOptions.SectionName).ValidateDataAnnotations().ValidateOnStart();
         services.AddOptions<OutboxOptions>().BindConfiguration(OutboxOptions.SectionName).ValidateDataAnnotations().ValidateOnStart();
 

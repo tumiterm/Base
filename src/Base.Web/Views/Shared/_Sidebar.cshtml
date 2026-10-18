@@ -56,6 +56,7 @@
             <a class="nav-link-app @Active("PlatformTenants")" aria-current="@Current("PlatformTenants")" asp-controller="PlatformTenants" asp-action="Index" asp-permission="@PermissionCodes.Platform.TenantsView" title="Tenants"><icon name="building-2" /><span class="nav-label">Tenants</span></a>
             <a class="nav-link-app @Active("PlatformPlans")" aria-current="@Current("PlatformPlans")" asp-controller="PlatformPlans" asp-action="Index" asp-permission="@PermissionCodes.Platform.PlansManage" title="Plans"><icon name="layers" /><span class="nav-label">Plans</span></a>
             <a class="nav-link-app @Active("PlatformReleases")" aria-current="@Current("PlatformReleases")" asp-controller="PlatformReleases" asp-action="Index" asp-permission="@PermissionCodes.Platform.TenantsView" title="Releases"><icon name="git-branch" /><span class="nav-label">Releases</span></a>
+            <a class="nav-link-app @Active("PlatformFlags")" aria-current="@Current("PlatformFlags")" asp-controller="PlatformFlags" asp-action="Index" asp-permission="@PermissionCodes.Platform.FlagsManage" title="Feature flags"><icon name="toggle-right" /><span class="nav-label">Feature flags</span></a>
             <a class="nav-link-app @Active("SystemAdmin")" aria-current="@Current("SystemAdmin")" asp-controller="SystemAdmin" asp-action="Index" asp-permission="@PermissionCodes.System.HealthView" title="System"><icon name="server" /><span class="nav-label">System</span></a>
         </div>
     }
