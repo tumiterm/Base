@@ -53,7 +53,8 @@ public sealed partial class TenantSubscriptionTests(SqlServerFixture sql) : IAsy
         await ProcessOutboxAsync();
         var invitation = _app.Sent.On(NotificationChannel.Email).ShouldHaveSingleItem();
         invitation.To.ShouldBe("owner@acme.test");
-        WebUtility.HtmlDecode(Href().Match(invitation.HtmlBody!).Groups["href"].Value).ShouldStartWith("https://acme.example.com/account/set-password?kind=invite");
+        // The tenant's address keeps the platform address's scheme and port (https://localhost:7262 in these tests).
+        WebUtility.HtmlDecode(Href().Match(invitation.HtmlBody!).Groups["href"].Value).ShouldStartWith("https://acme.example.com:7262/account/set-password?kind=invite");
 
         // The tenant's administrator holds the Administrator role, but none of the platform's permissions.
         var principal = await _app.InScopeAsync(tenantId, async sp =>
@@ -86,7 +87,7 @@ public sealed partial class TenantSubscriptionTests(SqlServerFixture sql) : IAsy
 
         var link = (await Tenants(t => t.CreateInviteLinkAsync(gamma, owner))).GetDataOrThrow();
 
-        link.Url.ShouldStartWith($"https://gamma.example.com/account/set-password?kind=invite&userId={owner}");
+        link.Url.ShouldStartWith($"https://gamma.example.com:7262/account/set-password?kind=invite&userId={owner}");
         var query = QueryHelpers.ParseQuery(new Uri(link.Url).Query);
         var accepted = await _app.InScopeAsync(gamma, sp => sp.GetRequiredService<IAccountService>()
             .SetPasswordAsync(new SetPasswordRequest(owner, query["token"]!, PasswordTokenKind.Invite, "A-long-enough-passphrase", "A-long-enough-passphrase")));

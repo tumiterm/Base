@@ -23,8 +23,8 @@ public sealed partial class TenantSubscriptionTests
         await ProcessOutboxAsync();
         var welcome = _app.Sent.On(NotificationChannel.Email).ShouldHaveSingleItem();
         welcome.Subject.ShouldBe("Welcome to Base: Umoya Logistics is ready");
-        welcome.Body!.ShouldContain("https://umoya.example.com/account/set-password?kind=invite");
-        welcome.Body!.ShouldContain("Sign in at https://umoya.example.com/account/login");
+        welcome.Body!.ShouldContain("https://umoya.example.com:7262/account/set-password?kind=invite");
+        welcome.Body!.ShouldContain("Sign in at https://umoya.example.com:7262/account/login");
         welcome.Body!.ShouldContain("free trial of the STARTER plan until");
         welcome.Body!.ShouldContain("Invite your team");
 

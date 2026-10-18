@@ -1,6 +1,7 @@
 using Base.Application.Common.Abstractions;
 using Base.Application.Common.Results;
 using Base.Application.Settings;
+using Base.Application.Tenancy;
 using Base.Application.Users;
 using Base.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
@@ -70,15 +71,9 @@ internal sealed class PasswordLinks(
             return null;
         }
 
-        var uri = Uri.TryCreate(configured, UriKind.Absolute, out var parsed) ? parsed : null;
-        if (uri is not null && hosts.Contains(uri.Host, StringComparer.OrdinalIgnoreCase))
-        {
-            return configured;
-        }
-
-        var scheme = uri?.Scheme ?? Uri.UriSchemeHttps;
-        var port = uri is { IsDefaultPort: false } ? $":{uri.Port}" : string.Empty;
-        return $"{scheme}://{hosts[0]}{port}";
+        return Uri.TryCreate(configured, UriKind.Absolute, out var uri) && hosts.Contains(uri.Host, StringComparer.OrdinalIgnoreCase)
+            ? configured
+            : TenantAddresses.Url(hosts[0], configured);
     }
 
     private async Task<string> ConfiguredAsync(CancellationToken cancellationToken) =>

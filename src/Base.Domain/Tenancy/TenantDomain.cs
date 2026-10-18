@@ -26,5 +26,32 @@ public sealed class TenantDomain : EntityBase
 
     public void MarkVerified() => IsVerified = true;
 
-    public static string Normalize(string host) => host.Trim().TrimEnd('.').ToLowerInvariant();
+    /// <summary>
+    /// The bare host name, lower case. A pasted address works too: <c>https://MTN.dev.localhost:7262/login</c> becomes
+    /// <c>mtn.dev.localhost</c> (scheme, port and path are dropped; tenants are told apart by host name alone).
+    /// </summary>
+    public static string Normalize(string host)
+    {
+        ArgumentNullException.ThrowIfNull(host);
+        var value = host.Trim();
+        var scheme = value.IndexOf("://", StringComparison.Ordinal);
+        if (scheme >= 0)
+        {
+            value = value[(scheme + 3)..];
+        }
+
+        var end = value.IndexOfAny(['/', '?', '#']);
+        if (end >= 0)
+        {
+            value = value[..end];
+        }
+
+        var port = value.LastIndexOf(':');
+        if (port >= 0 && value[(port + 1)..].All(char.IsAsciiDigit))
+        {
+            value = value[..port];
+        }
+
+        return value.TrimEnd('.').ToLowerInvariant();
+    }
 }

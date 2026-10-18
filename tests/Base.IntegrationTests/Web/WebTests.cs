@@ -253,6 +253,35 @@ public sealed partial class WebTests(SqlServerFixture sql) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task In_development_each_tenant_opens_on_its_own_localhost_name_and_localhost_opens_the_platform()
+    {
+        var client = Client();
+        await SignInAsync(client);
+        var token = await GetMetaTokenAsync(client);
+        using var create = new HttpRequestMessage(HttpMethod.Post, "/api/platform/tenants")
+        {
+            // Pasted as an address: scheme and port are dropped.
+            Content = JsonContent.Create(new { name = "MTN", code = "mtn", host = "https://MTN.dev.localhost:7262/", adminEmail = "owner@mtn.test", adminName = "Owner" }),
+        };
+        create.Headers.Add("X-CSRF-TOKEN", token);
+        var created = await client.SendAsync(create, TestContext.Current.CancellationToken);
+        created.StatusCode.ShouldBe(HttpStatusCode.Created, await created.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        var id = (await created.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken)).GetProperty("id").GetString();
+        (await client.GetStringAsync($"/platform/tenants/{id}", TestContext.Current.CancellationToken)).ShouldContain("Reachable at https://mtn.dev.localhost:7262");
+
+        async Task<HttpStatusCode> OpenAsync(string host)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, "/account/login");
+            request.Headers.Host = host;
+            return (await Client().SendAsync(request, TestContext.Current.CancellationToken)).StatusCode;
+        }
+
+        (await OpenAsync("mtn.dev.localhost:7262")).ShouldBe(HttpStatusCode.OK);
+        (await OpenAsync("localhost")).ShouldBe(HttpStatusCode.OK);
+        (await OpenAsync("nobody.dev.localhost")).ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
     public async Task Documents_are_uploaded_generated_and_downloaded_through_the_api_and_pages()
     {
         var client = Client();

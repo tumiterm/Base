@@ -1,0 +1,14 @@
+@inject IWebHostEnvironment Env
+@inject Microsoft.Extensions.Options.IOptions<Base.Infrastructure.Tenancy.TenancyOptions> Tenancy
+@if (!Tenancy.Value.MultiTenant)
+{
+    <div class="form-text text-warning-emphasis">Multi-tenancy is off (<code>Tenancy:MultiTenant</code>), so every address opens the platform organisation and domains have no effect yet.</div>
+}
+else if (Env.IsDevelopment())
+{
+    <div class="form-text">On this machine, use a name ending in <code>.dev.localhost</code>, such as <code>mtn.dev.localhost</code>. Browsers send it to your computer and the development certificate covers it, so <code>https://mtn.dev.localhost:7262</code> opens the organisation once the domain is verified.</div>
+}
+else
+{
+    <div class="form-text">The host name only, such as <code>mtn.base.co.za</code>. Point its DNS at the platform, then mark it verified.</div>
+}

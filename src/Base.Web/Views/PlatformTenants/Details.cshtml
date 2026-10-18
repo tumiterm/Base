@@ -2,6 +2,9 @@
 @inject ICurrentUser CurrentUser
 @inject TimeProvider Time
 @inject Base.Application.Releases.ITenantReleases Releases
+@inject IWebHostEnvironment Env
+@inject Base.Application.Settings.IApplicationSettingService Settings
+@using Base.Application.Tenancy
 @{
     var t = Model.Details.Tenant;
     var s = Model.Details.Subscription;
@@ -15,6 +18,7 @@
     var emailOk = Model.EmailRoute.Delivers;
     var steps = new[] { true, reachable, admins.Count > 0, emailOk, accepted && signedIn };
     var done = steps.Count(x => x);
+    var platformAddress = await Settings.GetAsync(Base.Application.Settings.SettingCodes.General.PublicBaseUrl);
 }
 <nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-action="Index">Tenants</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">@t.Name</span></nav>
 <div class="page-header">
@@ -24,7 +28,7 @@
             <h1 class="page-title">@t.Name</h1>
             <p class="page-subtitle">
                 <span class="font-monospace">@t.Code</span>
-                @if (t.PrimaryHost is not null) {<text> · </text><a href="https://@t.PrimaryHost" rel="noopener" target="_blank">@t.PrimaryHost <icon name="external-link" class="icon-sm" /></a>}
+                @if (t.PrimaryHost is not null) {<text> · </text><a href="@TenantAddresses.Url(t.PrimaryHost, platformAddress)" rel="noopener" target="_blank">@t.PrimaryHost <icon name="external-link" class="icon-sm" /></a>}
                 · @t.UserCount @(t.UserCount == 1 ? "user" : "users")
             </p>
         </div>
@@ -71,7 +75,7 @@
                     <li class="@(reachable ? "is-done" : "is-alert")">
                         <icon name="@(reachable ? "circle-check" : "triangle-alert")" />
                         <div>
-                            <div class="checklist-title">@(reachable ? "Reachable at " + t.PrimaryHost : "No address yet")</div>
+                            <div class="checklist-title">@(reachable ? "Reachable at " + TenantAddresses.Url(t.PrimaryHost!, platformAddress) : "No address yet")</div>
                             <div class="checklist-desc">@(reachable ? "Its people sign in there. Links in its emails point there too." : "Nobody can reach this tenant until it has a verified domain. Add one under Domains, point its DNS at the platform, then mark it verified.")</div>
                         </div>
                     </li>
@@ -338,9 +342,10 @@
             @if (canManage)
             {
                 <form method="post" asp-action="AddDomain" asp-route-id="@t.Id" class="panel-footer d-flex gap-2">
-                    <input class="form-control form-control-sm" name="host" placeholder="portal.example.com" aria-label="New domain" spellcheck="false" autocapitalize="off" required />
+                    <input class="form-control form-control-sm" name="host" placeholder="@(Env.IsDevelopment() ? "mtn.dev.localhost" : "mtn.base.co.za")" aria-label="New domain" spellcheck="false" autocapitalize="off" required />
                     <button class="btn btn-secondary btn-sm" type="submit"><icon name="plus" class="icon-sm" /> Add</button>
                 </form>
+                <div class="px-3 pb-3"><partial name="_DomainHelp" /></div>
             }
         </section>
     </div>

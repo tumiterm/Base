@@ -34,9 +34,10 @@
                     <label asp-for="Host" class="form-label">Address <span class="text-muted fw-normal">(optional)</span></label>
                     <div class="input-group">
                         <span class="input-group-text">https://</span>
-                        <input asp-for="Host" class="form-control" placeholder="acme.example.com" spellcheck="false" autocapitalize="off" inputmode="url" />
+                        <input asp-for="Host" class="form-control" placeholder="mtn.base.co.za" spellcheck="false" autocapitalize="off" inputmode="url" />
                     </div>
-                    <div class="form-text">Point its DNS at the platform. Without one, add a domain later; the tenant isn't reachable until it has a verified domain.</div>
+                    <partial name="_DomainHelp" />
+                    <div class="form-text">Optional now: the tenant isn't reachable until it has a verified domain, and you can add one later.</div>
                     <span asp-validation-for="Host" class="text-danger"></span>
                 </div>
             </div>

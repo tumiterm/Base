@@ -56,8 +56,10 @@ Order matters; this is `WebApplicationExtensions.UseWeb`:
 ## Tenancy
 
 `ITenantContext` is scoped. In single-tenant mode every request is the default tenant. In multi-tenant mode
-the request host must be a verified `TenantDomain`; unknown hosts get 404 unless `FallbackToDefaultTenant`
-is set. Tenant isolation **fails closed**: with no tenant resolved, tenant-owned queries return nothing and
+the request host must be a verified `TenantDomain` or one of `DefaultTenantHosts` (the platform's own names;
+`localhost` in Development, which runs multi-tenant so `*.dev.localhost` domains work locally); unknown hosts get 404
+unless `FallbackToDefaultTenant` is set. Domains are stored as bare host names (`TenantDomain.Normalize` drops a
+pasted scheme, port and path), and `TenantAddresses.Url` opens one with the platform address's scheme and port. Tenant isolation **fails closed**: with no tenant resolved, tenant-owned queries return nothing and
 inserts throw. Platform jobs opt out explicitly with `using (tenant.BeginSystemScope())`. The outbox runs each
 event in the tenant it was raised in.
 

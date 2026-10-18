@@ -64,6 +64,28 @@ Set `ConnectionStrings:Default`, which always wins over the fallback:
 Integration tests can be pointed at any SQL Server with the `BASE_TEST_SQLSERVER` environment variable.
 Outside Development a missing connection string is a startup error: there is no fallback.
 
+### Organisations (tenants) on your machine
+
+Each organisation is told apart by the host name in the address. Development turns multi-tenancy on, with
+`localhost` opening the platform organisation (where you manage tenants).
+
+| | Production | Your machine |
+| --- | --- | --- |
+| Platform | `https://base.co.za` | `https://localhost:7262` |
+| MTN's domain (Platform > Tenants > MTN > Domains) | `mtn.base.co.za` | `mtn.dev.localhost` |
+| MTN opens at | `https://mtn.base.co.za` | `https://mtn.dev.localhost:7262` |
+
+- Enter the host name only. A pasted address (`https://mtn.dev.localhost:7262`) is reduced to `mtn.dev.localhost`.
+- Locally, names ending in `.dev.localhost` need no hosts-file entry (browsers send every `.localhost` name to
+  your own computer) and are covered by the ASP.NET development certificate, so there is no certificate warning.
+- A domain works once it is **verified**. In production, point its DNS at the platform first; locally, mark it
+  verified straight away (new tenants created with an address start verified).
+- Links in an organisation's emails and copied invitations use its own address, keeping the platform address's
+  scheme and port (`:7262` locally).
+- An unknown name gets 404; in Development the page says how to add it.
+- In production, set `Tenancy:MultiTenant` to `true` and list the platform's own host names in
+  `Tenancy:DefaultTenantHosts`.
+
 ## Everyday commands
 
 | Task | Command |
@@ -192,7 +214,7 @@ scripts/new-project.cs  Creates a renamed copy for a new project.
 | --- | --- |
 | `ConnectionStrings:Default` | SQL Server. Development points at the docker-compose container; elsewhere use secrets/env. |
 | `Database` | `MigrateOnStartup`, `CommandTimeoutSeconds`, `MaxRetryCount`, `SlowQueryThresholdMs` (500). |
-| `Tenancy` | `MultiTenant`, `DefaultTenantCode`, `FallbackToDefaultTenant`. |
+| `Tenancy` | `MultiTenant` (on in Development), `DefaultTenantCode`, `DefaultTenantHosts` (hosts that open the platform: `localhost` in Development), `FallbackToDefaultTenant`. |
 | `FileStorage` | `LocalDisk`, `S3` (Bucket, ServiceUrl, Region, AccessKey, SecretKey, ForcePathStyle), `AzureBlob`. |
 | `Notifications` | Channels on/off and provider instances (see below). Default: email to the log, in-app on, SMS/WhatsApp off. |
 | `FileScanning:ClamAv` | `Host`, `Port`, `TimeoutSeconds`. Set `Host` to scan every upload with clamd (uploads are refused if it is down). |

@@ -16,6 +16,10 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ### Added
 
+- Organisations work on your own machine: Development runs multi-tenant, `localhost` opens the platform (new
+  `Tenancy:DefaultTenantHosts`), and a domain such as `mtn.dev.localhost` opens its organisation at
+  `https://mtn.dev.localhost:7262` with no hosts-file entry or certificate warning. The tenant screens explain this,
+  and an unknown name says how to add it in Development.
 - Invitation links can be copied, to send by WhatsApp, text or any other channel: a link icon next to everyone who
   hasn't accepted yet (Users, the user's page and the tenant's People), and `POST api/users/{id}/invite-link`. Each
   copy is a fresh single-use link; if the clipboard is blocked the link is shown on a page with WhatsApp and text
@@ -39,6 +43,8 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ### Fixed
 
+- Domain fields accept a pasted address (`https://mtn.dev.localhost:7262`) and keep the host name, with a clearer
+  message when it isn't one; tenant addresses and links keep the platform address's port.
 - Invitation links for another organisation's users open that organisation (its verified domain) instead of the
   platform's address, where they said the link was invalid. An organisation with no verified domain gets a clear
   message instead of a link that can't work, and welcome emails link to the organisation's own sign-in page.

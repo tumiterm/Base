@@ -15,6 +15,12 @@ public sealed class TenancyOptions
     [Required]
     public string DefaultTenantName { get; set; } = "Default";
 
+    /// <summary>
+    /// Multi-tenant only: host names that open the default (platform) tenant without a domain record, such as
+    /// <c>localhost</c> in development or the platform's own address in production.
+    /// </summary>
+    public string[] DefaultTenantHosts { get; set; } = [];
+
     /// <summary>Multi-tenant only: serve unknown hosts as the default tenant (logged as a warning) instead of 404.</summary>
     public bool FallbackToDefaultTenant { get; set; }
 }

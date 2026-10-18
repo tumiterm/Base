@@ -179,9 +179,9 @@ internal sealed partial class TenantAdministrationService(
 
     public async Task<ValidationResponse> AddDomainAsync(Guid tenantId, string host, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(host) || !System.Text.RegularExpressions.Regex.IsMatch(host.Trim(), TenantRules.HostPattern, System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1)))
+        if (!TenantRules.IsValidHost(host))
         {
-            return ValidationResponse.Failure(new ValidationError("host", "Enter a host name such as acme.example.com.", "domain.invalid"));
+            return ValidationResponse.Failure(new ValidationError("host", TenantRules.HostMessage, "domain.invalid"));
         }
 
         var normalized = TenantDomain.Normalize(host);
@@ -367,7 +367,9 @@ internal sealed partial class TenantAdministrationService(
 
         if (host is not null)
         {
-            var address = await services.GetRequiredService<IApplicationSettingService>().SetAsync(SettingCodes.General.PublicBaseUrl, "https://" + host, cancellationToken);
+            var tenantSettings = services.GetRequiredService<IApplicationSettingService>();
+            var platformAddress = await tenantSettings.GetAsync(SettingCodes.General.PublicBaseUrl, cancellationToken);
+            var address = await tenantSettings.SetAsync(SettingCodes.General.PublicBaseUrl, TenantAddresses.Url(host, platformAddress), cancellationToken);
             if (address.IsError)
             {
                 return address;
