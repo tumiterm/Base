@@ -74,6 +74,19 @@ document.querySelectorAll('.drop-zone').forEach((zone) => {
         }));
     }
 
+    // Sidebar groups: open or closed as the person left them; the group holding the current page is always open.
+    document.querySelectorAll('[data-nav-group]').forEach((group) => {
+        const key = `nav-group:${group.dataset.navGroup}`;
+        const toggle = group.querySelector('.nav-group-toggle');
+        const set = (open) => { group.classList.toggle('is-open', open); toggle.setAttribute('aria-expanded', open ? 'true' : 'false'); };
+        if (!group.classList.contains('is-current') && store.get(key) === '1') set(true);
+        toggle.addEventListener('click', () => {
+            const open = !group.classList.contains('is-open');
+            set(open);
+            store.set(key, open ? '1' : null);
+        });
+    });
+
     // Theme: Auto (device) / Light / Dark, remembered in this browser.
     const root = document.documentElement;
     const media = window.matchMedia('(prefers-color-scheme: dark)');
@@ -116,7 +129,7 @@ document.querySelectorAll('.drop-zone').forEach((zone) => {
         const entries = [...document.querySelectorAll('.sidebar-nav a.nav-link-app, [data-palette-label]')]
             .map((a) => ({
                 label: a.dataset.paletteLabel || a.textContent.trim(),
-                section: a.closest('.nav-section')?.querySelector('.nav-section-label')?.textContent.trim() ?? 'Action',
+                section: (a.closest('.nav-group')?.querySelector('.nav-group-toggle') ?? a.closest('.nav-section')?.querySelector('.nav-section-label'))?.textContent.trim() ?? 'Action',
                 href: a.getAttribute('href'),
                 icon: a.querySelector('use')?.getAttribute('href'),
             }))

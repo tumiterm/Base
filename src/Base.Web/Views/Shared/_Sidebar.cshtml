@@ -5,6 +5,7 @@
     var showPlatform = CurrentUser.HasPermission(PermissionCodes.Platform.TenantsView) || CurrentUser.HasPermission(PermissionCodes.System.HealthView);
     var controller = ViewContext.RouteData.Values["controller"] as string ?? string.Empty;
     string Active(params string[] controllers) => controllers.Contains(controller, StringComparer.OrdinalIgnoreCase) ? "active" : "";
+    bool Has(params string[] controllers) => controllers.Contains(controller, StringComparer.OrdinalIgnoreCase);
     string? Current(params string[] controllers) => controllers.Contains(controller, StringComparer.OrdinalIgnoreCase) ? "page" : null;
 }
 <nav class="sidebar-nav">
@@ -18,19 +19,34 @@
     </div>
     <div class="nav-section">
         <div class="nav-section-label">Administration</div>
-        <a class="nav-link-app @Active("UserAdmin")" aria-current="@Current("UserAdmin")" asp-controller="UserAdmin" asp-action="Index" asp-permission="@PermissionCodes.Users.View" title="Users"><icon name="users" /><span class="nav-label">Users</span></a>
-        <a class="nav-link-app @Active("RoleAdmin")" aria-current="@Current("RoleAdmin")" asp-controller="RoleAdmin" asp-action="Index" asp-permission="@PermissionCodes.Roles.Manage" title="Roles"><icon name="shield-check" /><span class="nav-label">Roles</span></a>
-        <a class="nav-link-app @Active("NotificationAdmin")" aria-current="@Current("NotificationAdmin")" asp-controller="NotificationAdmin" asp-action="Index" asp-permission="@PermissionCodes.Notifications.View" title="Messages"><icon name="mail" /><span class="nav-label">Messages</span></a>
-        <a class="nav-link-app @Active("AuditAdmin")" aria-current="@Current("AuditAdmin")" asp-controller="AuditAdmin" asp-action="Index" asp-permission="@PermissionCodes.Audit.View" title="Audit trail"><icon name="history" /><span class="nav-label">Audit trail</span></a>
-        <a class="nav-link-app @Active("ApiClients")" aria-current="@Current("ApiClients")" asp-controller="ApiClients" asp-action="Index" asp-permission="@PermissionCodes.Api.ClientsManage" asp-feature="@FeatureCodes.Api" title="API clients"><icon name="key-round" /><span class="nav-label">API clients</span></a>
-        <a class="nav-link-app @Active("MasterData")" aria-current="@Current("MasterData")" asp-controller="MasterData" asp-action="Index" asp-permission="@PermissionCodes.MasterData.Manage" title="Lookup lists"><icon name="list" /><span class="nav-label">Lookup lists</span></a>
-        <a class="nav-link-app @Active("Appearance")" aria-current="@Current("Appearance")" asp-controller="Appearance" asp-action="Index" asp-permission="@PermissionCodes.Settings.Edit" asp-feature="@FeatureCodes.CustomBranding" title="Appearance"><icon name="palette" /><span class="nav-label">Appearance</span></a>
-        <a class="nav-link-app @Active("Releases")" aria-current="@Current("Releases")" asp-controller="Releases" asp-action="Index" asp-permission="@PermissionCodes.Releases.Manage" title="What's new"><icon name="rocket" /><span class="nav-label">What's new</span></a>
-        <a class="nav-link-app @Active("SettingsAdmin")" aria-current="@Current("SettingsAdmin")" asp-controller="SettingsAdmin" asp-action="Index" asp-permission="@PermissionCodes.Settings.View" title="Settings"><icon name="settings" /><span class="nav-label">Settings</span></a>
-        @if (access.IsRestricted)
-        {
-            <a class="nav-link-app @Active("Subscription")" aria-current="@Current("Subscription")" asp-controller="Subscription" asp-action="Index" asp-permission="@PermissionCodes.Subscription.View" title="Subscription"><icon name="credit-card" /><span class="nav-label">Subscription</span></a>
-        }
+        <div class="nav-group @(Has("UserAdmin", "RoleAdmin", "ApiClients") ? "is-open is-current" : "")" data-nav-group="access">
+            <button class="nav-link-app nav-group-toggle" type="button" aria-expanded="@(Has("UserAdmin", "RoleAdmin", "ApiClients") ? "true" : "false")" aria-controls="nav-group-access" title="Access"><icon name="lock" /><span class="nav-label">Access</span><icon name="chevron-right" class="icon-sm nav-group-chevron" /></button>
+            <div class="nav-group-items" id="nav-group-access">
+                <a class="nav-link-app @Active("UserAdmin")" aria-current="@Current("UserAdmin")" asp-controller="UserAdmin" asp-action="Index" asp-permission="@PermissionCodes.Users.View" title="Users"><icon name="users" /><span class="nav-label">Users</span></a>
+                <a class="nav-link-app @Active("RoleAdmin")" aria-current="@Current("RoleAdmin")" asp-controller="RoleAdmin" asp-action="Index" asp-permission="@PermissionCodes.Roles.Manage" title="Roles"><icon name="shield-check" /><span class="nav-label">Roles</span></a>
+                <a class="nav-link-app @Active("ApiClients")" aria-current="@Current("ApiClients")" asp-controller="ApiClients" asp-action="Index" asp-permission="@PermissionCodes.Api.ClientsManage" asp-feature="@FeatureCodes.Api" title="API clients"><icon name="key-round" /><span class="nav-label">API clients</span></a>
+            </div>
+        </div>
+        <div class="nav-group @(Has("SettingsAdmin", "Appearance", "MasterData", "Releases") ? "is-open is-current" : "")" data-nav-group="configuration">
+            <button class="nav-link-app nav-group-toggle" type="button" aria-expanded="@(Has("SettingsAdmin", "Appearance", "MasterData", "Releases") ? "true" : "false")" aria-controls="nav-group-configuration" title="Configuration"><icon name="sliders-horizontal" /><span class="nav-label">Configuration</span><icon name="chevron-right" class="icon-sm nav-group-chevron" /></button>
+            <div class="nav-group-items" id="nav-group-configuration">
+                <a class="nav-link-app @Active("SettingsAdmin")" aria-current="@Current("SettingsAdmin")" asp-controller="SettingsAdmin" asp-action="Index" asp-permission="@PermissionCodes.Settings.View" title="Settings"><icon name="settings" /><span class="nav-label">Settings</span></a>
+                <a class="nav-link-app @Active("Appearance")" aria-current="@Current("Appearance")" asp-controller="Appearance" asp-action="Index" asp-permission="@PermissionCodes.Settings.Edit" asp-feature="@FeatureCodes.CustomBranding" title="Appearance"><icon name="palette" /><span class="nav-label">Appearance</span></a>
+                <a class="nav-link-app @Active("MasterData")" aria-current="@Current("MasterData")" asp-controller="MasterData" asp-action="Index" asp-permission="@PermissionCodes.MasterData.Manage" title="Lookup lists"><icon name="list" /><span class="nav-label">Lookup lists</span></a>
+                <a class="nav-link-app @Active("Releases")" aria-current="@Current("Releases")" asp-controller="Releases" asp-action="Index" asp-permission="@PermissionCodes.Releases.Manage" title="What's new"><icon name="rocket" /><span class="nav-label">What's new</span></a>
+                @if (access.IsRestricted)
+                {
+                    <a class="nav-link-app @Active("Subscription")" aria-current="@Current("Subscription")" asp-controller="Subscription" asp-action="Index" asp-permission="@PermissionCodes.Subscription.View" title="Subscription"><icon name="credit-card" /><span class="nav-label">Subscription</span></a>
+                }
+            </div>
+        </div>
+        <div class="nav-group @(Has("NotificationAdmin", "AuditAdmin") ? "is-open is-current" : "")" data-nav-group="activity">
+            <button class="nav-link-app nav-group-toggle" type="button" aria-expanded="@(Has("NotificationAdmin", "AuditAdmin") ? "true" : "false")" aria-controls="nav-group-activity" title="Activity"><icon name="activity" /><span class="nav-label">Activity</span><icon name="chevron-right" class="icon-sm nav-group-chevron" /></button>
+            <div class="nav-group-items" id="nav-group-activity">
+                <a class="nav-link-app @Active("NotificationAdmin")" aria-current="@Current("NotificationAdmin")" asp-controller="NotificationAdmin" asp-action="Index" asp-permission="@PermissionCodes.Notifications.View" title="Messages"><icon name="mail" /><span class="nav-label">Messages</span></a>
+                <a class="nav-link-app @Active("AuditAdmin")" aria-current="@Current("AuditAdmin")" asp-controller="AuditAdmin" asp-action="Index" asp-permission="@PermissionCodes.Audit.View" title="Audit trail"><icon name="history" /><span class="nav-label">Audit trail</span></a>
+            </div>
+        </div>
     </div>
     @if (showPlatform)
     {
@@ -39,7 +55,7 @@
             <a class="nav-link-app @Active("PlatformTenants")" aria-current="@Current("PlatformTenants")" asp-controller="PlatformTenants" asp-action="Index" asp-permission="@PermissionCodes.Platform.TenantsView" title="Tenants"><icon name="building-2" /><span class="nav-label">Tenants</span></a>
             <a class="nav-link-app @Active("PlatformPlans")" aria-current="@Current("PlatformPlans")" asp-controller="PlatformPlans" asp-action="Index" asp-permission="@PermissionCodes.Platform.PlansManage" title="Plans"><icon name="layers" /><span class="nav-label">Plans</span></a>
             <a class="nav-link-app @Active("PlatformReleases")" aria-current="@Current("PlatformReleases")" asp-controller="PlatformReleases" asp-action="Index" asp-permission="@PermissionCodes.Platform.TenantsView" title="Releases"><icon name="git-branch" /><span class="nav-label">Releases</span></a>
-            <a class="nav-link-app @Active("SystemAdmin")" aria-current="@Current("SystemAdmin")" asp-controller="SystemAdmin" asp-action="Index" asp-permission="@PermissionCodes.System.HealthView" title="System"><icon name="activity" /><span class="nav-label">System</span></a>
+            <a class="nav-link-app @Active("SystemAdmin")" aria-current="@Current("SystemAdmin")" asp-controller="SystemAdmin" asp-action="Index" asp-permission="@PermissionCodes.System.HealthView" title="System"><icon name="server" /><span class="nav-label">System</span></a>
         </div>
     }
 </nav>

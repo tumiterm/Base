@@ -229,10 +229,24 @@ kbd { color: var(--text-2); background: var(--surface-1); border: 1px solid var(
 .nav-link-app .icon { color: var(--text-3); }
 .nav-link-app.active .icon, .nav-link-app:hover .icon { color: inherit; }
 .nav-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Collapsible groups: the group holding the current page starts open; empty groups and sections disappear. */
+.nav-group-toggle { width: 100%; border: 0; background: transparent; text-align: left; cursor: pointer; }
+.nav-group-chevron { margin-left: auto; transition: transform var(--dur-fast) var(--ease); }
+.nav-group.is-open > .nav-group-toggle .nav-group-chevron { transform: rotate(90deg); }
+.nav-group.is-current:not(.is-open) > .nav-group-toggle { color: var(--accent-subtle-text); }
+.nav-group.is-current:not(.is-open) > .nav-group-toggle .icon { color: var(--accent); }
+.nav-group-items { display: none; margin: 1px 0 var(--s-1) calc(var(--s-2) + 0.5rem); padding-left: var(--s-2); border-left: 1px solid var(--border); }
+.nav-group.is-open > .nav-group-items { display: block; }
+.nav-group-items .nav-link-app.active::before { left: calc(-1 * var(--s-2) - 1px); }
+.nav-group:not(:has(.nav-group-items a)), .nav-section:not(:has(a.nav-link-app)) { display: none; }
+@media (prefers-reduced-motion: reduce) { .nav-group-chevron { transition: none; } }
 .sidebar-footer { border-top: 1px solid var(--border); padding: var(--s-2); }
 .app.is-collapsed .nav-label, .app.is-collapsed .nav-section-label, .app.is-collapsed .brand-name, .app.is-collapsed .sidebar-collapse-label { display: none; }
 .app.is-collapsed .nav-link-app { justify-content: center; padding: 0; }
 .app.is-collapsed .sidebar-brand { padding: 0; justify-content: center; }
+.app.is-collapsed .nav-group-toggle { display: none; }
+.app.is-collapsed .nav-group-items { display: block; margin: 0; padding: 0; border: 0; }
+.app.is-collapsed .nav-group + .nav-group { margin-top: var(--s-1); padding-top: var(--s-1); border-top: 1px dashed var(--border); }
 .app.is-collapsed .nav-section { margin-bottom: var(--s-2); padding-bottom: var(--s-2); border-bottom: 1px solid var(--border); }
 
 .app-main { display: flex; flex-direction: column; min-width: 0; }
@@ -280,6 +294,10 @@ kbd { color: var(--text-2); background: var(--surface-1); border: 1px solid var(
   .app.is-nav-open .sidebar-backdrop { display: block; position: fixed; inset: 0; z-index: 1025; background: rgb(10 12 16 / 0.42); animation: fade-in var(--dur) var(--ease); }
   .app.is-collapsed .nav-label, .app.is-collapsed .nav-section-label, .app.is-collapsed .brand-name, .app.is-collapsed .user-chip-text { display: initial; }
   .app.is-collapsed .nav-link-app { justify-content: flex-start; padding: 0 var(--s-2); }
+  .app.is-collapsed .nav-group-toggle { display: flex; }
+  .app.is-collapsed .nav-group-items { display: none; margin: 1px 0 var(--s-1) calc(var(--s-2) + 0.5rem); padding-left: var(--s-2); border-left: 1px solid var(--border); }
+  .app.is-collapsed .nav-group.is-open > .nav-group-items { display: block; }
+  .app.is-collapsed .nav-group + .nav-group { margin-top: 0; padding-top: 0; border-top: 0; }
   .sidebar-collapse { display: none !important; }
   .app-topbar { padding: 0 var(--s-3); }
   .app-content { padding: var(--s-4) var(--s-3) var(--s-8); }

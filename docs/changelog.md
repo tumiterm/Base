@@ -25,6 +25,8 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ### Changed
 
+- The sidebar is shorter: administration links sit in three collapsible groups (Access, Configuration, Activity)
+  that open on the current page and remember how they were left; the icon rail still shows every link.
 - The System, Errors, error details, Roles, role, Messages (log, templates, template), Notifications, notification
   preferences, Audit trail, Import, import results, My exports, Generate a document and Change password screens are
   rebuilt on the design system.

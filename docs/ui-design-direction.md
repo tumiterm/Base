@@ -15,7 +15,10 @@ built from the design system rather than from scratch.
   WCAG contrast for the text on it. Use `var(--accent*)` for anything that should follow the brand.
 - **App shell.** `_Layout` is the sidebar (collapsible to an icon rail, a drawer on phones), a sticky topbar with
   the command palette (Ctrl/Cmd+K), the theme switch and notifications. `_AuthLayout` is the centred card for
-  sign-in pages. `_Sidebar` holds the navigation, with each link gated by `asp-permission`.
+  sign-in pages. `_Sidebar` holds the navigation, with each link gated by `asp-permission`. Daily work
+  stays flat under Workspace; administration sits in collapsible groups (Access, Configuration, Activity) that open
+  on the current page and remember how they were left. A new admin screen joins a group (`nav-group`), not the top
+  level; a group or section with no visible links hides itself.
 - **Icons.** `<icon name="users" />` renders one symbol from the self-hosted Lucide sprite (`/img/icons.svg`). Add a
   symbol to the sprite rather than using another icon set.
 - **Components.** The building blocks are page header + actions, panels, stats, segmented controls, form sections
