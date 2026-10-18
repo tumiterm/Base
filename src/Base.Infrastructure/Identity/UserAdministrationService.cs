@@ -280,7 +280,11 @@ internal sealed partial class UserAdministrationService(
         }
 
         var link = await links.CreateInviteAsync(user, cancellationToken);
-        LogInviteLinkCreated(logger, user.Id, actor.UserId);
+        if (link.IsSuccess)
+        {
+            LogInviteLinkCreated(logger, user.Id, actor.UserId);
+        }
+
         return link;
     }
 

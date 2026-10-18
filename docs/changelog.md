@@ -39,6 +39,9 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ### Fixed
 
+- Invitation links for another organisation's users open that organisation (its verified domain) instead of the
+  platform's address, where they said the link was invalid. An organisation with no verified domain gets a clear
+  message instead of a link that can't work, and welcome emails link to the organisation's own sign-in page.
 - The user page no longer claims that resending an invitation cancels the earlier links; it says how to cancel them.
 - Source folders named `Releases` are no longer ignored by git.
 - Forms that list every validation message no longer trip the content security policy with an inline style.

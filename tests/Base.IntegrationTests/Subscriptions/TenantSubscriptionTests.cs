@@ -16,6 +16,7 @@ using Base.Infrastructure.Identity;
 using Base.Infrastructure.Outbox;
 using Base.IntegrationTests.Infrastructure;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -76,6 +77,42 @@ public sealed partial class TenantSubscriptionTests(SqlServerFixture sql) : IAsy
         });
         platformAdmin.HasClaim(PermissionCatalog.ClaimType, PermissionCodes.Platform.TenantsManage).ShouldBeTrue();
     }
+
+    [Fact]
+    public async Task A_copied_invitation_link_opens_the_users_own_tenant_and_works_there()
+    {
+        var gamma = (await Tenants(t => t.CreateAsync(new CreateTenantRequest("Gamma", "gamma", "gamma.example.com", "owner@gamma.test", "Gia", null)))).GetDataOrThrow();
+        var owner = await UserIdAsync(gamma, "owner@gamma.test");
+
+        var link = (await Tenants(t => t.CreateInviteLinkAsync(gamma, owner))).GetDataOrThrow();
+
+        link.Url.ShouldStartWith($"https://gamma.example.com/account/set-password?kind=invite&userId={owner}");
+        var query = QueryHelpers.ParseQuery(new Uri(link.Url).Query);
+        var accepted = await _app.InScopeAsync(gamma, sp => sp.GetRequiredService<IAccountService>()
+            .SetPasswordAsync(new SetPasswordRequest(owner, query["token"]!, PasswordTokenKind.Invite, "A-long-enough-passphrase", "A-long-enough-passphrase")));
+        accepted.IsSuccess.ShouldBeTrue(accepted.ToString());
+    }
+
+    [Fact]
+    public async Task A_tenant_without_a_verified_address_gets_no_link_until_one_is_verified()
+    {
+        var delta = (await Tenants(t => t.CreateAsync(new CreateTenantRequest("Delta", "delta", null, "owner@delta.test", "Dee", null)))).GetDataOrThrow();
+        var owner = await UserIdAsync(delta, "owner@delta.test");
+
+        var refused = await Tenants(t => t.CreateInviteLinkAsync(delta, owner));
+        refused.ErrorType.ShouldBe(ErrorType.Conflict);
+        refused.Message!.ShouldContain("no verified address");
+
+        (await Tenants(t => t.AddDomainAsync(delta, "delta.example.com"))).IsSuccess.ShouldBeTrue();
+        var domain = (await Tenants(t => t.GetAsync(delta))).GetDataOrThrow().Domains.Single();
+        (await Tenants(t => t.VerifyDomainAsync(delta, domain.Id))).IsSuccess.ShouldBeTrue();
+
+        // Its own address keeps the platform address's scheme and port (https://localhost:7262 here, as in development).
+        (await Tenants(t => t.CreateInviteLinkAsync(delta, owner))).GetDataOrThrow().Url.ShouldStartWith("https://delta.example.com:7262/account/set-password?kind=invite");
+    }
+
+    private Task<Guid> UserIdAsync(Guid tenantId, string email) =>
+        _app.InScopeAsync(tenantId, async sp => (await sp.GetRequiredService<UserManager<ApplicationUser>>().FindByEmailAsync(email))!.Id);
 
     [Fact]
     public async Task A_tenant_administrator_can_still_assign_the_shared_administrator_role_in_their_own_tenant()

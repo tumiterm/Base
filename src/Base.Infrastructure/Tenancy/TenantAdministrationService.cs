@@ -312,8 +312,12 @@ internal sealed partial class TenantAdministrationService(
             }
 
             var link = await services.GetRequiredService<PasswordLinks>().CreateInviteAsync(user, cancellationToken);
-            LogInviteLinkCreated(logger, target.Code, user.Id);
-            return (ValidationResponse<InviteLink>)link;
+            if (link.IsSuccess)
+            {
+                LogInviteLinkCreated(logger, target.Code, user.Id);
+            }
+
+            return link;
         });
     }
 
