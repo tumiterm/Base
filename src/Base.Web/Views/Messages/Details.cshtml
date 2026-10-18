@@ -1,0 +1,145 @@
+@model MessageDetailsViewModel
+@using Base.Domain.Communications
+@{
+    var m = Model.Message;
+    var s = m.Summary;
+    ViewData["Title"] = s.Title;
+    var (label, tone, icon) = MessageDisplay.Broadcast(s.Status);
+    var d = m.Delivery;
+    var deliveries = Model.Deliveries;
+    var filters = new (NotificationStatus? Status, string Label, int Count)[] { (null, "Everyone", d.Total), (NotificationStatus.Sent, "Sent", d.Sent), (NotificationStatus.Queued, "Waiting", d.Queued), (NotificationStatus.Failed, "Failed", d.Failed), (NotificationStatus.Skipped, "Skipped", d.Skipped) };
+}
+<nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-action="Index">Messages</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">@s.Title</span></nav>
+<div class="page-header">
+    <div class="entity">
+        <span class="file-tile file-tile-lg" aria-hidden="true"><icon name="@icon" /></span>
+        <div class="entity-text">
+            <h1 class="page-title">@s.Title <span class="badge text-bg-@tone">@label</span></h1>
+            <p class="page-subtitle">
+                To @s.AudienceLabel ·
+                @foreach (var c in s.Channels) {<span class="message-channel"><icon name="@MessageDisplay.Icon(c)" class="icon-sm" /> @MessageDisplay.Channel(c)</span>}
+                · by @s.SenderName
+            </p>
+        </div>
+    </div>
+    <div class="page-actions">
+        @if (s.Status == BroadcastStatus.Scheduled)
+        {
+            <a class="btn btn-secondary" asp-action="Edit" asp-route-id="@s.Id"><icon name="pencil" class="icon-sm" /> Change</a>
+            <form method="post" asp-action="Cancel" asp-route-id="@s.Id">
+                <button class="btn btn-ghost text-danger" type="submit"><icon name="ban" class="icon-sm" /> Cancel it</button>
+            </form>
+        }
+        <a class="btn btn-secondary" asp-action="Again" asp-route-id="@s.Id"><icon name="copy" class="icon-sm" /> Send again</a>
+    </div>
+</div>
+
+@if (s.Status == BroadcastStatus.Scheduled)
+{
+    <div class="status-callout is-info mb-4">
+        <icon name="clock" />
+        <div>
+            <div class="status-callout-title">@(s.IsScheduled ? "Goes out " : "Going out now")@if (s.IsScheduled) {<local-time value="s.ScheduledFor" format="dddd d MMMM, HH:mm" />}</div>
+            <div class="small text-muted">Until then you can change it or cancel it.</div>
+        </div>
+    </div>
+}
+else if (s.Status == BroadcastStatus.Failed)
+{
+    <div class="status-callout is-alert mb-4">
+        <icon name="circle-alert" />
+        <div><div class="status-callout-title">It wasn't sent</div><div class="small">@m.Error</div></div>
+    </div>
+}
+else if (s.Status == BroadcastStatus.Sending)
+{
+    <div class="status-callout is-warning mb-4">
+        <icon name="send" />
+        <div><div class="status-callout-title">Sending</div><div class="small text-muted">Messages are being queued for each person. Refresh to see progress.</div></div>
+    </div>
+}
+
+@if (s.Status is BroadcastStatus.Sent or BroadcastStatus.Sending)
+{
+    <div class="stat-grid">
+        <div class="panel stat-tile"><span class="file-tile" aria-hidden="true"><icon name="users" /></span><div class="stat"><span class="stat-label">People</span><span class="stat-value">@s.RecipientCount.ToString("N0")</span><span class="stat-sub">after removing duplicates</span></div></div>
+        <div class="panel stat-tile"><span class="file-tile" aria-hidden="true"><icon name="circle-check" /></span><div class="stat"><span class="stat-label">Sent</span><span class="stat-value">@d.Sent.ToString("N0")</span><span class="stat-sub">@(d.Queued > 0 ? $"{d.Queued:N0} still waiting" : "all handed to providers")</span></div></div>
+        <div class="panel stat-tile @(d.Failed > 0 ? "is-alert" : "")"><span class="file-tile" aria-hidden="true"><icon name="circle-x" /></span><div class="stat"><span class="stat-label">Failed</span><span class="stat-value">@d.Failed.ToString("N0")</span><span class="stat-sub">after retries</span></div></div>
+        <div class="panel stat-tile"><span class="file-tile" aria-hidden="true"><icon name="circle-dashed" /></span><div class="stat"><span class="stat-label">Skipped</span><span class="stat-value">@d.Skipped.ToString("N0")</span><span class="stat-sub">no address, or opted out</span></div></div>
+    </div>
+}
+
+<div class="detail-grid">
+    <section class="panel" aria-labelledby="who-title">
+        <div class="panel-header"><h2 class="panel-title" id="who-title">Who got it</h2></div>
+        @if (d.Total == 0)
+        {
+            <div class="panel-body text-muted small">@(s.Status == BroadcastStatus.Scheduled ? "Each person's messages appear here once it goes out." : "No messages were sent.")</div>
+        }
+        else
+        {
+            <div class="panel-body pb-0">
+                <nav class="segmented scroll-x" aria-label="Filter by delivery">
+                    @foreach (var f in filters)
+                    {
+                        var active = f.Status == Model.Status;
+                        <a class="@(active ? "is-active" : "")" aria-current="@(active ? "page" : null)" asp-action="Details" asp-route-id="@s.Id" asp-route-status="@f.Status">@f.Label <span class="count">@f.Count</span></a>
+                    }
+                </nav>
+            </div>
+            <ul class="item-list">
+                @foreach (var r in deliveries.Items)
+                {
+                    var (sl, st) = MessageDisplay.Status(r.Status);
+                    <li>
+                        <span class="file-tile" aria-hidden="true"><icon name="@MessageDisplay.Icon(r.Channel)" /></span>
+                        <div class="item-main">
+                            <div class="item-title">@(r.Name ?? r.Address)</div>
+                            <div class="item-sub">@MessageDisplay.Channel(r.Channel) · @(r.Channel == NotificationChannel.InApp ? "inbox" : r.Address)</div>
+                            @if (r.Error is not null && r.Status is NotificationStatus.Failed or NotificationStatus.Skipped) {<div class="item-sub @(r.Status == NotificationStatus.Failed ? "text-danger" : "")">@r.Error</div>}
+                        </div>
+                        <div class="item-aside text-end"><span class="badge text-bg-@st">@sl</span>@if (r.SentAt is { } at) {<div class="small text-muted mt-1"><local-time value="at" format="d MMM, HH:mm" /></div>}</div>
+                    </li>
+                }
+            </ul>
+            @if (deliveries.TotalPages > 1)
+            {
+                <div class="panel-footer d-flex justify-content-between align-items-center">
+                    <span class="text-muted small">Page @deliveries.Page of @deliveries.TotalPages</span>
+                    <nav class="btn-group btn-group-sm" aria-label="Pages">
+                        <a class="btn btn-outline-secondary @(deliveries.HasPrevious ? "" : "disabled")" asp-route-page="@(deliveries.Page - 1)" asp-route-status="@Model.Status">Previous</a>
+                        <a class="btn btn-outline-secondary @(deliveries.HasNext ? "" : "disabled")" asp-route-page="@(deliveries.Page + 1)" asp-route-status="@Model.Status">Next</a>
+                    </nav>
+                </div>
+            }
+        }
+    </section>
+
+    <aside class="stack">
+        <section class="panel" aria-labelledby="content-title">
+            <div class="panel-header"><h2 class="panel-title" id="content-title">What it says</h2></div>
+            <div class="panel-body stack">
+                @if (m.Draft.Subject is not null || m.HtmlBody is not null)
+                {
+                    <div class="message-preview">
+                        <div class="message-preview-subject">@m.Draft.Subject</div>
+                        <div class="message-preview-body">@Html.Raw(m.HtmlBody)</div>
+                    </div>
+                }
+                @if (m.Draft.SmsBody is { } sms) {<div><div class="form-label mb-1">SMS</div><div class="sms-bubble">@sms</div></div>}
+                @if (m.Draft.WhatsAppTemplateName is { } wa) {<div><div class="form-label mb-1">WhatsApp template</div><div class="font-monospace small">@wa (@m.Draft.WhatsAppLanguage)</div></div>}
+                <div class="small text-muted">Placeholders such as {{FirstName}} were filled in for each person.</div>
+            </div>
+        </section>
+        <section class="panel" aria-labelledby="when-title">
+            <div class="panel-header"><h2 class="panel-title" id="when-title">When</h2></div>
+            <div class="panel-body">
+                <dl class="kv">
+                    <dt>@(s.IsScheduled ? "Scheduled for" : "Sent from")</dt><dd><local-time value="s.ScheduledFor" format="d MMM yyyy, HH:mm" /></dd>
+                    @if (m.StartedAt is { } started) {<dt>Started</dt><dd><local-time value="started" format="d MMM yyyy, HH:mm" /></dd>}
+                    @if (m.CompletedAt is { } done) {<dt>Finished</dt><dd><local-time value="done" format="d MMM yyyy, HH:mm" /></dd>}
+                </dl>
+            </div>
+        </section>
+    </aside>
+</div>

@@ -42,6 +42,7 @@
         </div>
     </div>
     <div class="page-actions">
+        <a class="btn btn-secondary" asp-controller="Messages" asp-action="New" asp-route-audience="people" asp-route-keys="@p.Id" asp-permission="@PermissionCodes.Messages.Send" asp-feature="@FeatureCodes.Messaging"><icon name="send" class="icon-sm" /> Send a message</a>
         @if (canManage)
         {
             <form method="post" asp-action="Status" asp-route-id="@p.Id" class="segmented" role="radiogroup" aria-label="Status">

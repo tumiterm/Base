@@ -506,6 +506,198 @@ document.querySelectorAll('.drop-zone').forEach((zone) => {
     });
 })();
 
+// Message composer and templates: a small formatting editor, placeholders, the people picker, live reach, channel
+// sections and the SMS counter. Everything also works as a plain form post; this only makes it quicker.
+(() => {
+    // Formatting editor: a contenteditable area mirrored into a hidden textarea (cleaned again on the server).
+    document.querySelectorAll('[data-rich-editor]').forEach((editor) => {
+        const content = editor.querySelector('[data-rich-content]');
+        const value = editor.querySelector('[data-rich-value]');
+        const sync = () => { value.value = content.innerHTML.trim() === '<br>' ? '' : content.innerHTML; };
+        content.addEventListener('input', sync);
+        content.addEventListener('paste', (e) => {
+            e.preventDefault();
+            document.execCommand('insertText', false, e.clipboardData?.getData('text/plain') ?? '');
+        });
+        editor.querySelectorAll('[data-cmd]').forEach((button) => button.addEventListener('click', () => {
+            content.focus();
+            const cmd = button.dataset.cmd;
+            if (cmd === 'createLink') {
+                const url = window.prompt('Link address (https://...)', 'https://');
+                if (url && /^(https?:|mailto:|tel:)/i.test(url)) document.execCommand('createLink', false, url);
+            } else {
+                document.execCommand(cmd, false, button.dataset.value ?? null);
+            }
+            sync();
+        }));
+        editor.closest('form')?.addEventListener('submit', sync);
+    });
+
+    // Placeholders go into whichever field was used last (the message by default).
+    let target = document.querySelector('[data-rich-content]') ?? document.querySelector('[data-placeholder-target]');
+    document.querySelectorAll('[data-placeholder-target]').forEach((field) => field.addEventListener('focus', () => { target = field; }));
+    document.querySelectorAll('[data-insert]').forEach((button) => button.addEventListener('click', () => {
+        if (!target) return;
+        const text = button.dataset.insert;
+        target.focus();
+        if (target.isContentEditable) {
+            document.execCommand('insertText', false, text);
+            target.dispatchEvent(new Event('input'));
+        } else {
+            const start = target.selectionStart ?? target.value.length;
+            target.setRangeText(text, start, target.selectionEnd ?? start, 'end');
+            target.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    }));
+
+    // SMS length: 160 characters (153 per part) in the GSM alphabet, otherwise 70 (67).
+    const gsm = /^[@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !"#¤%&'()*+,\-./0-9:;<=>?¡A-ZÄÖÑÜ§¿a-zäöñüà]*$/;
+    document.querySelectorAll('[data-sms-text]').forEach((area) => {
+        const out = area.closest('div')?.parentElement?.querySelector('[data-sms-count]') ?? document.querySelector('[data-sms-count]');
+        const update = () => {
+            const text = area.value;
+            const plain = gsm.test(text);
+            const single = plain ? 160 : 70;
+            const multi = plain ? 153 : 67;
+            const parts = text.length === 0 ? 0 : text.length <= single ? 1 : Math.ceil(text.length / multi);
+            if (out) out.textContent = text.length === 0 ? 'Empty: the message is used as plain text' : `${text.length} characters, ${parts} SMS part${parts === 1 ? '' : 's'}${plain ? '' : ' (special characters make parts shorter)'}`;
+        };
+        area.addEventListener('input', update);
+        update();
+    });
+
+    const form = document.querySelector('form[data-compose]');
+    if (!form) return;
+    const modes = [...form.querySelectorAll('[data-mode]')];
+    const audiences = [...form.querySelectorAll('[data-audience]')];
+    const mode = () => modes.find((m) => m.checked)?.value ?? 'pick';
+    const audience = () => audiences.find((a) => a.checked);
+
+    // Show the panels of the chosen mode and audience; hidden inputs are disabled so they aren't sent.
+    const layout = () => {
+        const m = mode();
+        const code = m === 'list' ? 'list' : audience()?.value;
+        form.querySelectorAll('[data-mode-panel]').forEach((panel) => {
+            const show = panel.dataset.modePanel.split(' ').includes(m);
+            panel.hidden = !show;
+        });
+        form.querySelectorAll('[data-audience-panel]').forEach((panel) => {
+            const show = m === 'everyone' && panel.dataset.audiencePanel === audience()?.value;
+            panel.hidden = !show;
+            panel.querySelectorAll('select').forEach((s) => { s.disabled = !show; });
+        });
+        form.querySelectorAll('[data-placeholder-set]').forEach((set) => { set.hidden = set.dataset.placeholderSet !== code; });
+    };
+
+    // Channel sections: email and in-app share the subject and message; SMS and WhatsApp have their own.
+    const sections = () => {
+        const on = [...form.querySelectorAll('[data-channel]')].filter((c) => c.checked).map((c) => c.value);
+        form.querySelectorAll('[data-channel-section]').forEach((section) => {
+            section.hidden = !section.dataset.channelSection.split(' ').some((c) => on.includes(c));
+        });
+    };
+
+    const whenLater = form.querySelector('[data-when-later]');
+    const sendLabel = form.querySelector('[data-send-label]');
+    const when = () => {
+        const later = form.querySelector('[data-when]:checked')?.value === 'later';
+        if (whenLater) whenLater.hidden = !later;
+        const button = sendLabel?.closest('button');
+        if (sendLabel && button) sendLabel.textContent = later ? button.dataset.sendLabelLater : button.dataset.sendLabelNow;
+    };
+
+    // Reach: how many people the current choice reaches, refreshed as it changes.
+    let timer;
+    const set = (name, value) => { const el = form.querySelector(`[data-reach-${name}]`); if (el) el.textContent = value; };
+    const reach = () => {
+        clearTimeout(timer);
+        timer = setTimeout(async () => {
+            const data = new FormData(form);
+            data.delete('Action');
+            try {
+                const response = await fetch(form.dataset.reachUrl, { method: 'POST', body: data, headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+                const result = await response.json();
+                const problems = form.querySelector('[data-reach-problems]');
+                problems?.replaceChildren();
+                if (result.error) {
+                    set('people', '–'); set('email', '–'); set('phone', '–'); set('account', '–'); set('label', result.error);
+                    return;
+                }
+                set('people', result.people.toLocaleString()); set('email', result.withEmail.toLocaleString());
+                set('phone', result.withPhone.toLocaleString()); set('account', result.withAccount.toLocaleString()); set('label', result.label);
+                (result.problems ?? []).slice(0, 5).forEach((p) => { const li = document.createElement('li'); li.textContent = p; problems?.append(li); });
+                if (mode() === 'list') {
+                    const listSet = form.querySelector('[data-placeholder-set="list"] .placeholder-chips');
+                    listSet?.replaceChildren(...result.fields.map((f) => {
+                        const b = document.createElement('button');
+                        b.type = 'button'; b.className = 'chip'; b.dataset.insert = `{{${f.name}}}`; b.textContent = `+ ${f.label}`;
+                        b.addEventListener('click', () => { if (target) { target.focus(); if (target.isContentEditable) { document.execCommand('insertText', false, b.dataset.insert); target.dispatchEvent(new Event('input')); } else { target.setRangeText(b.dataset.insert, target.selectionStart ?? 0, target.selectionEnd ?? 0, 'end'); } } });
+                        return b;
+                    }));
+                }
+            } catch { /* the server checks again on send */ }
+        }, 350);
+    };
+
+    // Picker: search the chosen audience and add people as chips.
+    const picker = form.querySelector('[data-picker]');
+    const input = picker?.querySelector('[data-picker-input]');
+    const results = picker?.querySelector('[data-picker-results]');
+    const chips = picker?.querySelector('[data-picker-chips]');
+    const chip = (key, name) => {
+        if (chips.querySelector(`[data-key="${CSS.escape(key)}"]`)) return;
+        const span = document.createElement('span');
+        span.className = 'chip picker-chip'; span.dataset.key = key;
+        const hidden = document.createElement('input');
+        hidden.type = 'hidden'; hidden.name = 'Keys'; hidden.value = key;
+        const remove = document.createElement('button');
+        remove.type = 'button'; remove.className = 'picker-remove'; remove.setAttribute('aria-label', `Remove ${name}`); remove.textContent = '×';
+        remove.addEventListener('click', () => { span.remove(); reach(); });
+        span.append(hidden, document.createTextNode(name + ' '), remove);
+        chips.append(span);
+    };
+    chips?.querySelectorAll('[data-picker-remove]').forEach((b) => b.addEventListener('click', () => { b.closest('.picker-chip')?.remove(); reach(); }));
+    let searchTimer;
+    input?.addEventListener('input', () => {
+        clearTimeout(searchTimer);
+        const term = input.value.trim();
+        if (term.length < 2) { results.hidden = true; return; }
+        searchTimer = setTimeout(async () => {
+            const url = `${audience()?.dataset.searchUrl}?term=${encodeURIComponent(term)}`;
+            try {
+                const found = await (await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })).json();
+                results.replaceChildren(...(found.length ? found : [{ key: '', name: 'Nobody matches', detail: '' }]).map((m) => {
+                    const li = document.createElement('li');
+                    li.setAttribute('role', 'option');
+                    if (!m.key) { li.className = 'is-empty'; li.textContent = m.name; return li; }
+                    const name = document.createElement('span'); name.className = 'picker-name'; name.textContent = m.name;
+                    const detail = document.createElement('span'); detail.className = 'picker-detail'; detail.textContent = m.detail;
+                    li.append(name, detail); li.tabIndex = 0;
+                    const pick = () => { chip(m.key, m.name); input.value = ''; results.hidden = true; input.focus(); reach(); };
+                    li.addEventListener('click', pick);
+                    li.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); pick(); } });
+                    return li;
+                }));
+                results.hidden = false;
+            } catch { results.hidden = true; }
+        }, 250);
+    });
+    input?.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault(); if (e.key === 'ArrowDown') results.querySelector('li[tabindex]')?.focus(); });
+
+    form.querySelector('[data-template-pick]')?.addEventListener('change', (e) => {
+        const id = e.target.value;
+        window.location.href = id ? `${e.target.dataset.templateUrl}?template=${encodeURIComponent(id)}` : e.target.dataset.templateUrl;
+    });
+
+    modes.forEach((m) => m.addEventListener('change', () => { layout(); reach(); }));
+    audiences.forEach((a) => a.addEventListener('change', () => { chips?.replaceChildren(); layout(); reach(); }));
+    form.querySelectorAll('[data-filter], [data-reach-input]').forEach((el) => el.addEventListener('change', reach));
+    form.querySelector('#ListText')?.addEventListener('input', reach);
+    form.querySelectorAll('[data-channel]').forEach((c) => c.addEventListener('change', sections));
+    form.querySelectorAll('[data-when]').forEach((w) => w.addEventListener('change', when));
+    layout(); sections(); when(); reach();
+})();
+
 // A drawer or dialog that must open when the page loads (e.g. its form came back with errors).
 (() => {
     document.querySelectorAll('[data-open-on-load="true"]').forEach((el) => {

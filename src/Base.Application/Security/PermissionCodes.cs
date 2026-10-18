@@ -48,6 +48,12 @@ public static class PermissionCodes
         public const string Manage = "Notifications.Manage";
     }
 
+    public static class Messages
+    {
+        public const string Send = "Messages.Send";
+        public const string SendBulk = "Messages.SendBulk";
+    }
+
     public static class Audit
     {
         public const string View = "Audit.View";

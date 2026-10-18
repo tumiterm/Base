@@ -1,0 +1,46 @@
+@model IReadOnlyList<MessageTemplateView>
+@{
+    ViewData["Title"] = "Message templates";
+}
+<nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-action="Index">Messages</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">Templates</span></nav>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Message templates</h1>
+        <p class="page-subtitle">Wording you send often, ready to start a new message from. Placeholders fill in each person's details.</p>
+    </div>
+    <div class="page-actions">
+        <a class="btn btn-primary" asp-action="NewTemplate"><icon name="plus" class="icon-sm" /> New template</a>
+    </div>
+</div>
+
+@if (Model.Count == 0)
+{
+    <div class="empty-state">
+        <icon name="file-text" />
+        <div class="empty-state-title">No templates yet</div>
+        <p class="mb-2">Save the messages you send again and again: payslips are ready, the office is closed, results are out.</p>
+        <a class="btn btn-primary" asp-action="NewTemplate">New template</a>
+    </div>
+}
+else
+{
+    <ul class="panel item-list">
+        @foreach (var t in Model)
+        {
+            <li>
+                <span class="file-tile" aria-hidden="true"><icon name="file-text" /></span>
+                <a class="item-main text-decoration-none" asp-action="Template" asp-route-id="@t.Id">
+                    <div class="item-title">@t.Name</div>
+                    <div class="item-sub">@(t.Subject ?? "No subject")</div>
+                    <div class="item-sub">
+                        @if (t.HtmlBody is not null) {<span class="message-channel"><icon name="mail" class="icon-sm" /> Email &amp; in-app</span>}
+                        @if (t.SmsBody is not null) {<span class="message-channel"><icon name="phone" class="icon-sm" /> SMS</span>}
+                        @if (t.WhatsAppTemplateName is not null) {<span class="message-channel"><icon name="send" class="icon-sm" /> WhatsApp</span>}
+                        <span>· changed <local-time value="t.DateModified" format="d MMM yyyy" /></span>
+                    </div>
+                </a>
+                <a class="btn btn-secondary btn-sm text-nowrap" asp-action="New" asp-route-template="@t.Id"><icon name="send" class="icon-sm" /> Use</a>
+            </li>
+        }
+    </ul>
+}

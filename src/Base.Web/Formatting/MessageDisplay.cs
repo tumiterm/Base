@@ -31,6 +31,15 @@ public static class MessageDisplay
         _ => ("Queued", "info"),
     };
 
+    public static (string Label, string Tone, string Icon) Broadcast(Domain.Communications.BroadcastStatus status) => status switch
+    {
+        Domain.Communications.BroadcastStatus.Scheduled => ("Scheduled", "info", "clock"),
+        Domain.Communications.BroadcastStatus.Sending => ("Sending", "warning", "send"),
+        Domain.Communications.BroadcastStatus.Sent => ("Sent", "success", "circle-check"),
+        Domain.Communications.BroadcastStatus.Cancelled => ("Cancelled", "secondary", "ban"),
+        _ => ("Not sent", "danger", "circle-alert"),
+    };
+
     public static string Template(string code) => NotificationCatalog.Find(code)?.Name ?? code;
 
     /// <summary>"email.subject" → "Email subject", "inapp.body" → "In-app message".</summary>

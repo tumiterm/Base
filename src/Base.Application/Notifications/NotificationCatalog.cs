@@ -41,6 +41,12 @@ public static class NotificationTemplates
         public const string ExportReady = "DataExchange.ExportReady";
         public const string ImportFinished = "DataExchange.ImportFinished";
     }
+
+    public static class Communications
+    {
+        /// <summary>A message a person wrote (Messages > New message); its wording comes with each send.</summary>
+        public const string Message = "Communications.Message";
+    }
 }
 
 /// <summary>What users opt in or out of. Categories whose templates are all mandatory can't be switched off.</summary>
@@ -54,6 +60,9 @@ public static class NotificationCategories
 
     /// <summary>The organisation's plan and billing; sent to its contact address.</summary>
     public const string Billing = "Billing";
+
+    /// <summary>Messages people in the organisation send to others (news, reminders, notices).</summary>
+    public const string Announcements = "Announcements";
 }
 
 /// <summary>A WhatsApp template approved by Meta: its name, language, and the variables that fill {{1}}, {{2}}, ...</summary>
@@ -117,6 +126,9 @@ public static class NotificationCatalog
         new(NotificationTemplates.Subscriptions.StatusChanged, "Subscription status changed", NotificationCategories.Billing,
             "Tells the organisation's contact that the subscription is past due, suspended, cancelled, expired or active again.",
             [NotificationChannel.Email], ["PlanName", "Status", "Reason"], IsMandatory: true),
+        new(NotificationTemplates.Communications.Message, "Message from a person", NotificationCategories.Announcements,
+            "Messages written and sent from Messages, alone or in bulk. Each one brings its own wording; this file is only the fallback.",
+            [NotificationChannel.Email, NotificationChannel.InApp], []),
     ];
 
     private static readonly FrozenDictionary<string, NotificationTemplateDefinition> ByCode =

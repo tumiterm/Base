@@ -1,0 +1,18 @@
+@model (string Name, string? Value, string Label, string Id)
+@inject IRichText RichText
+<div class="rich-editor" data-rich-editor>
+    <div class="rich-toolbar" role="toolbar" aria-label="Formatting">
+        <button type="button" class="icon-btn" data-cmd="bold" title="Bold" aria-label="Bold"><strong>B</strong></button>
+        <button type="button" class="icon-btn" data-cmd="italic" title="Italic" aria-label="Italic"><em>I</em></button>
+        <button type="button" class="icon-btn" data-cmd="underline" title="Underline" aria-label="Underline"><u>U</u></button>
+        <span class="rich-sep" aria-hidden="true"></span>
+        <button type="button" class="icon-btn rich-text-btn" data-cmd="formatBlock" data-value="h2" title="Heading" aria-label="Heading">H</button>
+        <button type="button" class="icon-btn rich-text-btn" data-cmd="formatBlock" data-value="p" title="Normal text" aria-label="Normal text">¶</button>
+        <button type="button" class="icon-btn" data-cmd="insertUnorderedList" title="Bulleted list" aria-label="Bulleted list"><icon name="list" /></button>
+        <button type="button" class="icon-btn" data-cmd="insertOrderedList" title="Numbered list" aria-label="Numbered list"><icon name="list-checks" /></button>
+        <button type="button" class="icon-btn" data-cmd="createLink" title="Link" aria-label="Link"><icon name="link" /></button>
+        <button type="button" class="icon-btn" data-cmd="removeFormat" title="Clear formatting" aria-label="Clear formatting"><icon name="x" /></button>
+    </div>
+    <div class="rich-content" contenteditable="true" role="textbox" aria-multiline="true" aria-label="@Model.Label" id="@Model.Id" data-placeholder-target data-rich-content>@Html.Raw(RichText.Sanitize(Model.Value))</div>
+    <textarea class="visually-hidden" name="@Model.Name" tabindex="-1" aria-hidden="true" data-rich-value>@Model.Value</textarea>
+</div>

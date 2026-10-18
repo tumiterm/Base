@@ -15,6 +15,7 @@
         </div>
     </div>
     <div class="page-actions">
+        <a class="btn btn-secondary" asp-controller="Messages" asp-action="New" asp-route-audience="users" asp-route-keys="@Model.Id" asp-permission="@PermissionCodes.Messages.Send" asp-feature="@FeatureCodes.Messaging"><icon name="send" class="icon-sm" /> Send a message</a>
         <a class="btn btn-secondary" asp-controller="AuditAdmin" asp-action="Index" asp-route-EntityId="@Model.Id" asp-permission="@PermissionCodes.Audit.View"><icon name="history" class="icon-sm" /> History</a>
     </div>
 </div>

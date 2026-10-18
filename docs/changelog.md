@@ -16,6 +16,20 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ### Added
 
+- **Messages**: write to people by email, SMS, WhatsApp or in-app, from Messages in the navigation or "Send a
+  message" on a person's or user's page.
+  - Pick people one by one, send to everyone an audience's filters match (People by department, status or skill;
+    Users by role, the audience for in-app), or paste or upload a CSV list whose columns become placeholders.
+  - A formatting editor with placeholders ({{FirstName}}, {{Department}}...), an SMS text with its part count, and
+    WhatsApp through an approved template. HTML is cleaned on the server.
+  - Live reach (how many people, and how many on each channel), a preview filled in for the first person, and
+    "Send a test to me".
+  - Send now or at a set time; scheduled messages can be changed or cancelled, and any message can be sent again.
+  - Each message's page shows who got it on which channel, and who was skipped and why.
+  - Saved message templates. Duplicate accounts, emails and phone numbers get one message per channel.
+  - Plan module **Messaging** (Send messages, Bulk messages, Messages per month), permissions Send messages and Send
+    bulk messages, the "Announcements" notification preference, and the `scheduled-messages` job.
+  - For projects: register an `IAudienceSource` to make a module's people reachable (ADR 0024).
 - Plans are built from modules. Every feature and limit belongs to a part of the product (Organisation, Documents &
   files, Import & export, Branding, Integrations), arrives with a suggested tier (Standard for every plan, Premium for
   higher plans) and the version it came in. Platform > Plans > **Plans and features** shows every plan side by side
@@ -43,6 +57,7 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ### Changed
 
+- The administration log of sent notifications is now called **Delivery log** in the navigation.
 - The sidebar is shorter: administration links sit in three collapsible groups (Access, Configuration, Activity)
   that open on the current page and remember how they were left; the icon rail still shows every link.
 - The System, Errors, error details, Roles, role, Messages (log, templates, template), Notifications, notification

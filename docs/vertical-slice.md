@@ -14,7 +14,8 @@ People is the base's worked example of a business module. Every file below exist
 | | `People/PersonService.cs` | The use-case service: validate → check lookups (`ILookupService.EnsureValidAsync`) → stage through repositories → one `SaveAsync`; returns `ValidationResponse`. Paging, filtering and sorting run in SQL. Files (the photo) go through `FileService`. |
 | | `People/PersonRecordLabels.cs` | An `IRecordLabelProvider`: documents (and anything else) linked to a person show their name, only to people who may see it. |
 | | `People/PersonDataExchange.cs` | An `Exporter<TRow>` that pages the same search the screen uses, and an `Importer` that applies each row through the service (so the form's rules apply). |
-| | `DependencyInjection.cs` | Registers the service, exporter and importer. |
+| | `People/PersonAudience.cs` | An `IAudienceSource`: people can be messaged by department, status or skill, with their job title and department as placeholders, read through the same search. |
+| | `DependencyInjection.cs` | Registers the service, exporter, importer and audience. |
 | | `Security/PermissionCodes.cs` + `PermissionCatalog.cs` | `People.View` / `People.Manage`. |
 | | `MasterData/LookupCatalog.cs` | The module's lists (`People.Title`, `People.Department`, `People.Skill`) and their starting values. |
 | Infrastructure | `Persistence/Configurations/PeopleConfiguration.cs` | Lengths, enum as string, the primitive collection, indexes that match the list's filters, a filtered unique email index. |
@@ -34,7 +35,8 @@ People is the base's worked example of a business module. Every file below exist
 
 1. Entity in `Base.Domain/<Module>`; rules live in its methods. Mark personal fields `[AuditRedacted]`.
 2. Lists the module needs: constants in `LookupLists` + `LookupCatalog` entries. Store codes; label with `LookupLabels`.
-3. Contracts, validator, service, exporter/importer and record label provider in `Base.Application/<Module>`;
+3. Contracts, validator, service, exporter/importer, record label provider and (for people-like records) an
+   audience in `Base.Application/<Module>`;
    register in DI, and add the module's page to `RecordLinks`.
 4. Permissions in `PermissionCodes` + `PermissionCatalog`. Plan-dependent? A feature in `FeatureCodes` + `[RequiresFeature]`.
 5. Configuration + `DbSet`, then a generated migration and the drift check.

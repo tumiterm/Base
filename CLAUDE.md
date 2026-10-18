@@ -75,6 +75,9 @@ cross-cutting feature or adding a package:
   under `Notifications:Providers` (or, for email, the SMTP server under Settings → Email); nothing is sent on a channel
   until it is switched on. `IEmailSender` is only for
   untemplated operator email.
+- Messages people write go through `IMessagingService` (single, bulk, scheduled). A module whose records are people
+  others may write to registers an `IAudienceSource` (filters, placeholders, members read through its own use cases):
+  never let a screen pick tables or columns to message. Their HTML is cleaned with `IRichText`.
 - User and role changes go through `IUserAdministration`/`IRoleAdministration` (never `UserManager` from Web), which
   enforce `PermissionGuard`: nobody grants or manages access they don't hold. Emails with links are sent from outbox
   handlers (via the sensitive notification templates) and build links from the `General.PublicBaseUrl` setting, never the request host.

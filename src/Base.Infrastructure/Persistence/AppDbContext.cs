@@ -1,5 +1,6 @@
 using Base.Application.Common.Abstractions;
 using Base.Domain.Auditing;
+using Base.Domain.Communications;
 using Base.Domain.DataExchange;
 using Base.Domain.Documents;
 using Base.Domain.Files;
@@ -79,6 +80,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
     public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
 
     public DbSet<NotificationTemplateOverride> NotificationTemplateOverrides => Set<NotificationTemplateOverride>();
+
+    public DbSet<Broadcast> Broadcasts => Set<Broadcast>();
+
+    public DbSet<MessageTemplate> MessageTemplates => Set<MessageTemplate>();
 
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 

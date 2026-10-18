@@ -158,6 +158,39 @@ public sealed partial class WebTests
         (await client.GetStringAsync("/platform/plans", TestContext.Current.CancellationToken)).ShouldContain("Plans and features");
     }
 
+    [Fact]
+    public async Task Messages_can_be_written_previewed_and_sent_from_the_pages()
+    {
+        var client = Client();
+        await SignInAsync(client);
+        var token = await GetMetaTokenAsync(client);
+        foreach (var path in new[] { "/messages", "/messages/new", "/messages/templates", "/messages/templates/new" })
+        {
+            (await client.GetAsync(path, TestContext.Current.CancellationToken)).StatusCode.ShouldBe(HttpStatusCode.OK, path);
+        }
+
+        var list = "Name,Email,Ticket\nAmy Adams,amy@example.com,T-7";
+        var reach = await PostFormAsync(client, "/messages/reach", token, ("Mode", "list"), ("ListText", list));
+        var counts = await reach.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
+        counts.GetProperty("people").GetInt32().ShouldBe(1);
+        counts.GetProperty("fields").EnumerateArray().Select(f => f.GetProperty("name").GetString()).ShouldContain("Ticket");
+
+        var preview = await PostFormAsync(client, "/messages/new", token,
+            ("Mode", "list"), ("ListText", list), ("Channels", "Email"), ("Subject", "Your ticket"), ("HtmlBody", "<p>Ticket {{Ticket}} for {{FirstName}}</p>"), ("When", "now"), ("Action", "preview"));
+        (await preview.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).ShouldContain("Ticket T-7 for Amy");
+
+        var sent = await PostFormAsync(client, "/messages/new", token,
+            ("Mode", "list"), ("ListText", list), ("Channels", "Email"), ("Subject", "Your ticket"), ("HtmlBody", "<p>Ticket {{Ticket}}</p>"), ("When", "now"), ("Action", "send"));
+        sent.StatusCode.ShouldBe(HttpStatusCode.Redirect);
+        var details = await client.GetStringAsync(sent.Headers.Location!.ToString(), TestContext.Current.CancellationToken);
+        details.ShouldContain("Your ticket");
+        details.ShouldContain("A list of 1");
+
+        var template = await PostFormAsync(client, "/messages/templates/new", token, ("Name", "Tickets"), ("Subject", "Your ticket"), ("HtmlBody", "<p>Hi {{FirstName}}</p>"));
+        template.StatusCode.ShouldBe(HttpStatusCode.Redirect);
+        (await client.GetStringAsync("/messages/templates", TestContext.Current.CancellationToken)).ShouldContain("Tickets");
+    }
+
     private static Task<HttpResponseMessage> PostFormAsync(HttpClient client, string path, string token, params (string Key, string Value)[] fields)
     {
         var values = fields.Select(f => new KeyValuePair<string, string>(f.Key, f.Value)).Append(new("__RequestVerificationToken", token));

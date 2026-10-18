@@ -1,0 +1,286 @@
+@model ComposeViewModel
+@{
+    var f = Model.Form;
+    var editing = Model.EditingId is not null;
+    ViewData["Title"] = editing ? "Change message" : "New message";
+    var bulk = Model.Audiences.Count > 0 && Model.Audiences[0].Bulk;
+    var mode = !bulk && f.Mode != ComposeForm.Pick ? ComposeForm.Pick : f.Mode;
+    var selected = Model.Audiences.FirstOrDefault(a => a.Code == f.AudienceCode) ?? Model.Audiences.FirstOrDefault();
+    var channels = Enum.GetValues<NotificationChannel>();
+    bool On(NotificationChannel c) => f.Channels.Contains(c);
+    var later = f.When == "later";
+}
+<nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-action="Index">Messages</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">@ViewData["Title"]</span></nav>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">@ViewData["Title"]</h1>
+        <p class="page-subtitle">Choose who it goes to and how, write it once, and each person gets it with their own details filled in.</p>
+    </div>
+</div>
+
+@if (Model.Audiences.Count == 0)
+{
+    <div class="empty-state">
+        <icon name="users" />
+        <div class="empty-state-title">Nobody you can write to</div>
+        <p class="mb-2">Messages go to people you can see: the people directory or the users list. Ask an administrator for access.</p>
+    </div>
+    return;
+}
+
+@if (!ViewData.ModelState.IsValid)
+{
+    <div asp-validation-summary="All" class="alert alert-danger" role="alert"></div>
+}
+
+<form method="post" enctype="multipart/form-data" class="compose" asp-action="@(editing ? "Edit" : "New")" asp-route-id="@Model.EditingId" data-compose data-reach-url="@Url.Action("Reach")" novalidate>
+    <input type="hidden" name="TemplateId" value="@f.TemplateId" />
+    <div class="compose-grid">
+        <div class="panel">
+            <div class="panel-body">
+                <section class="form-section">
+                    <div>
+                        <h2 class="form-section-title">Who it goes to</h2>
+                        <p class="form-section-desc">Pick people one by one, send to everyone who matches (all of Finance, every administrator), or paste a list.</p>
+                    </div>
+                    <div class="stack">
+                        <div class="segmented" role="radiogroup" aria-label="How to choose people">
+                            <input type="radio" id="mode-pick" name="Mode" value="@ComposeForm.Pick" checked="@(mode == ComposeForm.Pick)" data-mode /><label for="mode-pick"><icon name="user-plus" class="icon-sm" /> Pick people</label>
+                            <input type="radio" id="mode-everyone" name="Mode" value="@ComposeForm.Everyone" checked="@(mode == ComposeForm.Everyone)" disabled="@(!bulk)" data-mode /><label for="mode-everyone"><icon name="users" class="icon-sm" /> Everyone who matches</label>
+                            <input type="radio" id="mode-list" name="Mode" value="@ComposeForm.Paste" checked="@(mode == ComposeForm.Paste)" disabled="@(!bulk)" data-mode /><label for="mode-list"><icon name="file-up" class="icon-sm" /> A list</label>
+                        </div>
+                        @if (!bulk)
+                        {
+                            <div class="form-text">Sending to a whole group or a list needs Bulk messages in your plan and the Send bulk messages permission. You can pick up to 50 people.</div>
+                        }
+
+                        <div class="choice-grid compose-audiences" role="radiogroup" aria-label="Audience" data-mode-panel="@ComposeForm.Pick @ComposeForm.Everyone">
+                            @foreach (var a in Model.Audiences)
+                            {
+                                <label class="choice-card">
+                                    <input type="radio" name="AudienceCode" value="@a.Code" checked="@(a.Code == selected?.Code)" data-audience data-search-url="@Url.Action("Search", new { code = a.Code })" />
+                                    <span class="choice-check"><icon name="check" /></span>
+                                    <span class="choice-title"><icon name="@a.Icon" class="icon-sm" /> @a.Name</span>
+                                    <span class="choice-desc">@a.Description</span>
+                                </label>
+                            }
+                        </div>
+
+                        <div class="stack" data-mode-panel="@ComposeForm.Pick">
+                            <label class="form-label mb-0" for="picker-search">People</label>
+                            <div class="picker" data-picker>
+                                <div class="picker-chips" data-picker-chips>
+                                    @foreach (var m in Model.Chosen)
+                                    {
+                                        <span class="chip picker-chip" data-key="@m.Key"><input type="hidden" name="Keys" value="@m.Key" />@m.Name <button type="button" class="picker-remove" aria-label="Remove @m.Name" data-picker-remove><icon name="x" class="icon-sm" /></button></span>
+                                    }
+                                </div>
+                                <input class="form-control" id="picker-search" type="search" placeholder="Type a name or an email address" autocomplete="off" data-picker-input aria-describedby="picker-help" />
+                                <ul class="picker-results" role="listbox" aria-label="Matches" data-picker-results hidden></ul>
+                            </div>
+                            <div class="form-text" id="picker-help">Up to 50 people. Each one gets their own copy.</div>
+                        </div>
+
+                        <div class="stack" data-mode-panel="@ComposeForm.Everyone">
+                            @foreach (var a in Model.Audiences)
+                            {
+                                <div class="row g-3" data-audience-panel="@a.Code">
+                                    @foreach (var filter in a.Filters)
+                                    {
+                                        var key = a.Code + ":" + filter.Code;
+                                        var id = "filter-" + a.Code + "-" + filter.Code;
+                                        <div class="col-sm-6">
+                                            <label class="form-label" for="@id">@filter.Label</label>
+                                            <select class="form-select" id="@id" name="Filters[@key]" data-filter>
+                                                <option value="">Any @filter.Label.ToLowerInvariant()</option>
+                                                @foreach (var o in filter.Options) {<option value="@o.Value" selected="@(f.Filters.TryGetValue(key, out var v) && v == o.Value)">@o.Label</option>}
+                                            </select>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+
+                        <div class="stack" data-mode-panel="@ComposeForm.Paste">
+                            <label class="form-label mb-0" for="ListText">Paste a list</label>
+                            <textarea class="form-control font-monospace" id="ListText" name="ListText" rows="6" spellcheck="false" placeholder="Name,Email,Phone,Student number&#10;Thandi Nkosi,thandi@example.com,082 555 0101,S-1001" data-reach-input>@f.ListText</textarea>
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <span class="text-muted small">or upload a CSV file</span>
+                                <input class="form-control form-control-sm w-auto" type="file" name="ListFile" accept=".csv,text/csv,text/plain" data-reach-input />
+                            </div>
+                            <div class="form-text">The first row names the columns. Name, Email and Phone are recognised; every other column becomes a placeholder (Student number → {{StudentNumber}}). Up to 5,000 people.</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="form-section">
+                    <div>
+                        <h2 class="form-section-title">How to send it</h2>
+                        <p class="form-section-desc">Each person gets one message on each channel they can be reached on. In-app reaches only people who sign in.</p>
+                    </div>
+                    <div class="chip-group" role="group" aria-label="Channels">
+                        @foreach (var c in channels)
+                        {
+                            var enabled = Model.ChannelsOn.GetValueOrDefault(c);
+                            <label class="chip-check" title="@(enabled ? MessageDisplay.Channel(c) : MessageDisplay.Channel(c) + " is switched off for this organisation")">
+                                <input type="checkbox" name="Channels" value="@c" checked="@(On(c) && enabled)" disabled="@(!enabled)" data-channel />
+                                <span><icon name="@MessageDisplay.Icon(c)" class="icon-sm" /> @MessageDisplay.Channel(c)@(enabled ? "" : " (off)")</span>
+                            </label>
+                        }
+                    </div>
+                </section>
+
+                <section class="form-section">
+                    <div>
+                        <h2 class="form-section-title">The message</h2>
+                        <p class="form-section-desc">Placeholders fill in each person's details, such as their first name.</p>
+                        @if (!editing && Model.Templates.Count > 0)
+                        {
+                            <label class="form-label mt-2" for="template-pick">Start from a template</label>
+                            <select class="form-select" id="template-pick" data-template-pick data-template-url="@Url.Action("New")">
+                                <option value="">Blank message</option>
+                                @foreach (var t in Model.Templates) {<option value="@t.Id" selected="@(f.TemplateId == t.Id)">@t.Name</option>}
+                            </select>
+                        }
+                        <p class="form-section-desc mt-2"><a asp-action="Templates">Manage templates</a></p>
+                    </div>
+                    <div class="stack">
+                        <div>
+                            <label class="form-label" for="Title">Name <span class="text-muted fw-normal">(only you see it)</span></label>
+                            <input class="form-control" id="Title" name="Title" value="@f.Title" maxlength="200" placeholder="June newsletter" />
+                        </div>
+
+                        <div class="stack" data-channel-section="Email InApp">
+                            <div>
+                                <label class="form-label" for="Subject">Subject</label>
+                                <input class="form-control" id="Subject" name="Subject" value="@f.Subject" maxlength="500" data-placeholder-target placeholder="Your payslip for June" />
+                                <span class="text-danger small" data-valmsg-for="Subject">@Html.ValidationMessage("Subject")</span>
+                            </div>
+                            <div>
+                                <label class="form-label" for="message-body">Message</label>
+                                <partial name="_RichEditor" model='("HtmlBody", f.HtmlBody, "Message", "message-body")' />
+                                <span class="text-danger small">@Html.ValidationMessage("HtmlBody")</span>
+                            </div>
+                        </div>
+
+                        <div data-placeholder-sets>
+                            <div class="form-label mb-1">Placeholders</div>
+                            @foreach (var a in Model.Audiences)
+                            {
+                                <div data-placeholder-set="@a.Code"><partial name="_Placeholders" model="a.Fields" /></div>
+                            }
+                            <div data-placeholder-set="list"><partial name="_Placeholders" model="AudienceFields.Common" /><div class="form-text">The list's own columns appear here once it is pasted.</div></div>
+                        </div>
+
+                        <div data-channel-section="Sms">
+                            <label class="form-label" for="SmsBody">SMS text <span class="text-muted fw-normal">(optional)</span></label>
+                            <textarea class="form-control" id="SmsBody" name="SmsBody" rows="3" data-placeholder-target data-sms-text placeholder="Leave empty to send the message as plain text">@f.SmsBody</textarea>
+                            <div class="form-text"><span data-sms-count>0 characters</span>. Placeholders make it longer for long names.</div>
+                        </div>
+
+                        <div class="stack" data-channel-section="WhatsApp">
+                            <div class="status-callout is-info">
+                                <icon name="info" />
+                                <div class="small">WhatsApp only delivers messages a business starts using a template Meta has approved. Enter its name and language, and what goes in each of its numbered gaps.</div>
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-sm-8">
+                                    <label class="form-label" for="WhatsAppTemplateName">Approved template name</label>
+                                    <input class="form-control font-monospace" id="WhatsAppTemplateName" name="WhatsAppTemplateName" value="@f.WhatsAppTemplateName" placeholder="payslip_ready" spellcheck="false" />
+                                </div>
+                                <div class="col-sm-4">
+                                    <label class="form-label" for="WhatsAppLanguage">Language</label>
+                                    <input class="form-control font-monospace" id="WhatsAppLanguage" name="WhatsAppLanguage" value="@f.WhatsAppLanguage" placeholder="en" spellcheck="false" />
+                                </div>
+                            </div>
+                            @for (var i = 0; i < Math.Max(3, f.WhatsAppParameters.Count); i++)
+                            {
+                                var value = i < f.WhatsAppParameters.Count ? f.WhatsAppParameters[i] : null;
+                                <div>
+                                    <label class="form-label" for="wa-@i">{{@(i + 1)}}</label>
+                                    <input class="form-control" id="wa-@i" name="WhatsAppParameters" value="@value" data-placeholder-target placeholder="@(i == 0 ? "{{FirstName}}" : "")" />
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </section>
+
+                <section class="form-section">
+                    <div>
+                        <h2 class="form-section-title">When</h2>
+                        <p class="form-section-desc">Times are in @Model.TimeZoneName. A scheduled message can be changed or cancelled until it goes out.</p>
+                    </div>
+                    <div class="stack">
+                        <div class="segmented" role="radiogroup" aria-label="When to send">
+                            <input type="radio" id="when-now" name="When" value="now" checked="@(!later)" data-when /><label for="when-now"><icon name="send" class="icon-sm" /> Now</label>
+                            <input type="radio" id="when-later" name="When" value="later" checked="@later" data-when /><label for="when-later"><icon name="calendar" class="icon-sm" /> At a set time</label>
+                        </div>
+                        <div data-when-later>
+                            <label class="form-label" for="SendAtLocal">Send at</label>
+                            <input class="form-control w-auto" type="datetime-local" id="SendAtLocal" name="SendAtLocal" value="@f.SendAtLocal?.ToString("yyyy-MM-ddTHH:mm")" />
+                            <span class="text-danger small">@Html.ValidationMessage("SendAtLocal")@Html.ValidationMessage("SendAt")</span>
+                        </div>
+                    </div>
+                </section>
+            </div>
+            <div class="panel-footer compose-footer">
+                <button class="btn btn-ghost" type="submit" name="Action" value="test" title="Sends it to you only, filled in as for the first person"><icon name="mail-check" class="icon-sm" /> Send a test to me</button>
+                <button class="btn btn-secondary" type="submit" name="Action" value="preview"><icon name="eye" class="icon-sm" /> Preview</button>
+                <button class="btn btn-primary" type="submit" name="Action" value="send" data-send-label-now="@(editing ? "Save and send now" : "Send now")" data-send-label-later="@(editing ? "Save" : "Schedule")"><icon name="send" class="icon-sm" /> <span data-send-label>@(later ? (editing ? "Save" : "Schedule") : (editing ? "Save and send now" : "Send now"))</span></button>
+            </div>
+        </div>
+
+        <aside class="stack compose-aside">
+            <section class="panel" aria-labelledby="reach-title" data-reach>
+                <div class="panel-header"><h2 class="panel-title" id="reach-title">Reach</h2></div>
+                <div class="panel-body stack">
+                    <div class="reach-count"><span data-reach-people>@(Model.Reach?.People.ToString("N0") ?? "–")</span> <span class="text-muted">@(Model.Reach?.People == 1 ? "person" : "people")</span></div>
+                    <div class="small text-muted" data-reach-label>@(Model.Reach?.Label ?? "Choose who it goes to.")</div>
+                    <dl class="kv reach-kv">
+                        <dt><icon name="mail" class="icon-sm" /> Email</dt><dd data-reach-email>@(Model.Reach?.WithEmail.ToString("N0") ?? "–")</dd>
+                        <dt><icon name="phone" class="icon-sm" /> SMS &amp; WhatsApp</dt><dd data-reach-phone>@(Model.Reach?.WithPhone.ToString("N0") ?? "–")</dd>
+                        <dt><icon name="bell" class="icon-sm" /> In-app</dt><dd data-reach-account>@(Model.Reach?.WithAccount.ToString("N0") ?? "–")</dd>
+                    </dl>
+                    <ul class="reach-problems small text-danger" data-reach-problems>
+                        @foreach (var p in Model.Reach?.Problems ?? []) {<li>@p</li>}
+                    </ul>
+                    <div class="form-text">People without an address for a channel, or who turned these messages off, are skipped on it; the message page shows who and why.</div>
+                </div>
+            </section>
+
+            @if (Model.Preview is { } preview)
+            {
+                <section class="panel" aria-labelledby="preview-title">
+                    <div class="panel-header"><h2 class="panel-title" id="preview-title">Preview</h2>@if (preview.For is { } who) {<span class="text-muted small">as @who.Name</span>}</div>
+                    <div class="panel-body stack">
+                        @if ((On(NotificationChannel.Email) || On(NotificationChannel.InApp)) && (preview.Subject is not null || preview.Html is not null))
+                        {
+                            <div>
+                                <div class="form-label mb-1"><icon name="mail" class="icon-sm" /> Email</div>
+                                <div class="message-preview">
+                                    <div class="message-preview-subject">@preview.Subject</div>
+                                    <div class="message-preview-body">@Html.Raw(preview.Html)</div>
+                                </div>
+                            </div>
+                        }
+                        @if (On(NotificationChannel.Sms) && preview.Sms is not null)
+                        {
+                            <div>
+                                <div class="form-label mb-1"><icon name="phone" class="icon-sm" /> SMS · @preview.SmsParts part@(preview.SmsParts == 1 ? "" : "s")</div>
+                                <div class="sms-bubble">@preview.Sms</div>
+                            </div>
+                        }
+                        @if (On(NotificationChannel.WhatsApp) && preview.WhatsAppParameters.Any(p => p.Length > 0))
+                        {
+                            <div>
+                                <div class="form-label mb-1"><icon name="send" class="icon-sm" /> WhatsApp template values</div>
+                                <ol class="small mb-0">@foreach (var p in preview.WhatsAppParameters) {<li>@p</li>}</ol>
+                            </div>
+                        }
+                        @if (preview.For is null) {<div class="small text-muted">Choose someone to see it filled in.</div>}
+                    </div>
+                </section>
+            }
+        </aside>
+    </div>
+</form>

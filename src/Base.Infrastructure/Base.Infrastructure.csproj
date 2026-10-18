@@ -16,6 +16,7 @@
     <PackageReference Include="Azure.Storage.Blobs" />
     <PackageReference Include="MailKit" />
     <PackageReference Include="DocumentFormat.OpenXml" />
+    <PackageReference Include="HtmlSanitizer" />
     <PackageReference Include="Hangfire.Core" />
     <PackageReference Include="Hangfire.SqlServer" />
     <PackageReference Include="Hangfire.AspNetCore" />

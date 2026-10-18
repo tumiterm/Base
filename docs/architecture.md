@@ -155,6 +155,20 @@ Business code calls `INotificationService.SendAsync(new Notification(template, r
   Each channel has a default instance, and a tenant setting can pick another. `IEmailSender` (plain, untemplated email,
   e.g. error alerts) uses the Email channel's provider too.
 - **Retention:** `NotificationRetentionService` purges messages older than `Notifications.RetentionDays` (default 365).
+- **Wording from a person.** `Notification.Content` replaces the template file's parts for one send (the template
+  still sets the category), and `Notification.SourceId` links each message to what sent it.
+
+## Messages people write
+
+`IMessagingService` (Messages in the navigation) sends a `Broadcast`: wording, channels, an audience and a time.
+Audiences are `IAudienceSource`s that modules register (People and Users in the Base) or a pasted CSV list; members
+are read as the sender, through the module's own use cases, and duplicate accounts, emails and phones are dropped per
+channel. "Send now" goes through the outbox (`BroadcastDue`); scheduled ones through the `scheduled-messages` job,
+which also resumes an interrupted send (`Broadcast.Processed`). Each recipient becomes `INotificationService` calls
+with `SourceId` = the broadcast, so the delivery log, retries, preferences ("Announcements") and the inbox apply, and
+the message page counts progress from those rows. HTML is cleaned by `IRichText` (HtmlSanitizer). Plan: module
+Messaging (`Feature.Messaging`, `Feature.BulkMessaging`, `Limit.MessagesPerMonth`); permissions `Messages.Send` and
+`Messages.SendBulk` (ADR 0024).
 
 ## Audit trail
 

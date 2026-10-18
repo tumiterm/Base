@@ -1,0 +1,74 @@
+@model MessageListViewModel
+@using Base.Domain.Communications
+@{
+    ViewData["Title"] = "Messages";
+    var results = Model.Messages;
+    var filters = new (BroadcastStatus? Status, string Label)[] { (null, "All"), (BroadcastStatus.Scheduled, "Scheduled"), (BroadcastStatus.Sent, "Sent"), (BroadcastStatus.Failed, "Not sent"), (BroadcastStatus.Cancelled, "Cancelled") };
+}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Messages</h1>
+        <p class="page-subtitle">Write to people by email, SMS, WhatsApp or in-app: one person, a group, or a list, now or at a set time.</p>
+    </div>
+    <div class="page-actions">
+        <a class="btn btn-secondary" asp-action="Templates"><icon name="file-text" class="icon-sm" /> Templates</a>
+        <a class="btn btn-primary" asp-action="New"><icon name="square-pen" class="icon-sm" /> New message</a>
+    </div>
+</div>
+
+<div class="toolbar">
+    <nav class="segmented scroll-x" aria-label="Filter by status">
+        @foreach (var f in filters)
+        {
+            var active = f.Status == Model.Status;
+            <a class="@(active ? "is-active" : "")" aria-current="@(active ? "page" : null)" asp-action="Index" asp-route-status="@f.Status">@f.Label</a>
+        }
+    </nav>
+    <span class="toolbar-spacer"></span>
+    <span class="text-muted small">@results.Total @(results.Total == 1 ? "message" : "messages")</span>
+</div>
+
+@if (results.Total == 0)
+{
+    <div class="empty-state">
+        <icon name="send" />
+        <div class="empty-state-title">@(Model.Status is null ? "No messages yet" : "Nothing here")</div>
+        <p class="mb-2">@(Model.Status is null ? "Write to one person, everyone in a department or role, or a list you paste in." : "Try another filter.")</p>
+        @if (Model.Status is null) {<a class="btn btn-primary" asp-action="New">New message</a>}
+    </div>
+}
+else
+{
+    <ul class="panel item-list message-list">
+        @foreach (var m in results.Items)
+        {
+            var (label, tone, icon) = MessageDisplay.Broadcast(m.Status);
+            <li>
+                <span class="file-tile" aria-hidden="true"><icon name="@icon" /></span>
+                <a class="item-main text-decoration-none" asp-action="Details" asp-route-id="@m.Id">
+                    <div class="item-title">@m.Title</div>
+                    <div class="item-sub">@m.AudienceLabel</div>
+                    <div class="item-sub">
+                        @foreach (var c in m.Channels) {<span class="message-channel" title="@MessageDisplay.Channel(c)"><icon name="@MessageDisplay.Icon(c)" class="icon-sm" /> @MessageDisplay.Channel(c)</span>}
+                        <span> · by @m.SenderName</span>
+                    </div>
+                </a>
+                <div class="item-aside text-end">
+                    <span class="badge text-bg-@tone">@label</span>
+                    <div class="small text-muted mt-1">
+                        @if (m.Status == BroadcastStatus.Scheduled) {<text>for </text><local-time value="m.ScheduledFor" format="d MMM, HH:mm" />}
+                        else if (m.Status == BroadcastStatus.Sent) {<text>@m.RecipientCount.ToString("N0") @(m.RecipientCount == 1 ? "person" : "people") · </text><local-time value="m.ScheduledFor" format="d MMM, HH:mm" />}
+                        else {<local-time value="m.ScheduledFor" format="d MMM, HH:mm" />}
+                    </div>
+                </div>
+            </li>
+        }
+    </ul>
+    <div class="d-flex justify-content-between align-items-center mt-3">
+        <span class="text-muted small">Page @results.Page of @results.TotalPages</span>
+        <nav class="btn-group btn-group-sm" aria-label="Pages">
+            <a class="btn btn-outline-secondary @(results.HasPrevious ? "" : "disabled")" asp-route-page="@(results.Page - 1)" asp-route-status="@Model.Status">Previous</a>
+            <a class="btn btn-outline-secondary @(results.HasNext ? "" : "disabled")" asp-route-page="@(results.Page + 1)" asp-route-status="@Model.Status">Next</a>
+        </nav>
+    </div>
+}

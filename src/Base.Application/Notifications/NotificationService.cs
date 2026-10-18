@@ -31,13 +31,18 @@ internal sealed partial class NotificationService(
     {
         ArgumentNullException.ThrowIfNull(notification);
         var template = NotificationCatalog.Get(notification.Template);
+        if (notification.Content?.WhatsApp is { } whatsApp)
+        {
+            template = template with { WhatsApp = whatsApp };
+        }
+
         var recipient = await recipients.ResolveAsync(notification.Recipient, cancellationToken);
         if (recipient is null)
         {
             return ValidationResponse.NotFound("The recipient was not found.").As<IReadOnlyList<Guid>>();
         }
 
-        var parts = await composer.PartsAsync(template.Code, cancellationToken);
+        var parts = notification.Content?.Parts ?? await composer.PartsAsync(template.Code, cancellationToken);
         var values = await composer.ValuesAsync(template, notification.Data, recipient, cancellationToken);
         var primary = (notification.Channels ?? template.Channels).Distinct().ToList();
         var fallback = (template.Fallback ?? []).Where(c => !primary.Contains(c)).ToList();
@@ -54,6 +59,15 @@ internal sealed partial class NotificationService(
             else
             {
                 await QueueFirstAvailableAsync(composer, template, parts, values, recipient, chain, messages, null, cancellationToken);
+            }
+        }
+
+        if (notification.SourceId is not null || notification.Content?.WhatsApp is not null)
+        {
+            var whatsAppJson = notification.Content?.WhatsApp is { } approved ? JsonSerializer.Serialize(approved, NotificationComposer.Json) : null;
+            foreach (var message in messages)
+            {
+                message.AttachTo(notification.SourceId, message.Channel == NotificationChannel.WhatsApp ? whatsAppJson : null);
             }
         }
 

@@ -15,6 +15,8 @@ public static class FeatureCodes
     public const string DataExchange = "Feature.DataExchange";
     public const string CustomBranding = "Feature.CustomBranding";
     public const string Api = "Feature.Api";
+    public const string Messaging = "Feature.Messaging";
+    public const string BulkMessaging = "Feature.BulkMessaging";
 }
 
 /// <summary>Limits a plan sets. Same rule as features: each one is enforced somewhere.</summary>
@@ -22,6 +24,9 @@ public static class LimitCodes
 {
     public const string Users = "Limit.Users";
     public const string StorageMb = "Limit.StorageMb";
+
+    /// <summary>Messages sent from Messages each calendar month (UTC), counted per channel and recipient.</summary>
+    public const string MessagesPerMonth = "Limit.MessagesPerMonth";
 }
 
 /// <summary>The functional areas plan features belong to, as constants.</summary>
@@ -32,6 +37,7 @@ public static class ModuleCodes
     public const string DataExchange = "Module.DataExchange";
     public const string Branding = "Module.Branding";
     public const string Integrations = "Module.Integrations";
+    public const string Messaging = "Module.Messaging";
 }
 
 public enum EntitlementKind
@@ -94,6 +100,7 @@ public static class EntitlementCatalog
         new(ModuleCodes.Documents, "Documents & files", "Storing, versioning and generating documents.", "file-text"),
         new(ModuleCodes.DataExchange, "Import & export", "Moving lists in and out as Excel or CSV.", "database"),
         new(ModuleCodes.Branding, "Branding", "Making the application look like the organisation's own.", "palette"),
+        new(ModuleCodes.Messaging, "Messaging", "Writing to people by email, SMS, WhatsApp and in-app, one at a time or in bulk.", "send"),
         new(ModuleCodes.Integrations, "Integrations", "Connecting other systems.", "key-round"),
     ];
 
@@ -105,6 +112,9 @@ public static class EntitlementCatalog
         EntitlementDefinition.Limit(LimitCodes.StorageMb, "File storage", ModuleCodes.Documents, 1024, "1.0", "Total size of stored files.", "MB", 1024L * 1024L),
         EntitlementDefinition.Feature(FeatureCodes.DataExchange, "Import & export", ModuleCodes.DataExchange, FeatureTier.Standard, "1.0", "Excel and CSV exports of lists, and file imports."),
         EntitlementDefinition.Feature(FeatureCodes.CustomBranding, "Custom branding", ModuleCodes.Branding, FeatureTier.Premium, "1.0", "Own accent colour, logo and default theme."),
+        EntitlementDefinition.Feature(FeatureCodes.Messaging, "Send messages", ModuleCodes.Messaging, FeatureTier.Standard, "1.1", "Write to chosen people by email, SMS, WhatsApp or in-app, now or at a set time, with saved templates."),
+        EntitlementDefinition.Feature(FeatureCodes.BulkMessaging, "Bulk messages", ModuleCodes.Messaging, FeatureTier.Premium, "1.1", "Send to everyone a filter matches (a department, a role) or to a pasted list."),
+        EntitlementDefinition.Limit(LimitCodes.MessagesPerMonth, "Messages per month", ModuleCodes.Messaging, 1000, "1.1", "Messages sent from Messages each month, one per person per channel."),
         EntitlementDefinition.Feature(FeatureCodes.Api, "API access", ModuleCodes.Integrations, FeatureTier.Premium, "1.0", "Other systems can call the API with API keys."),
     ];
 

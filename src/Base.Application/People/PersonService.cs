@@ -60,7 +60,7 @@ internal sealed class PersonService(
             new PageRequest(query.Page, query.PageSize),
             p => new PersonSummary(
                 p.Id, (p.PreferredName ?? p.FirstName) + " " + p.LastName, p.FirstName, p.LastName, p.Email, p.JobTitle,
-                p.DepartmentCode, p.Status, p.StartDate, p.Skills, p.AvatarFileId != null, p.DateModified),
+                p.DepartmentCode, p.Status, p.StartDate, p.Skills, p.AvatarFileId != null, p.DateModified, p.Phone),
             q => Order(q, query.Sort, query.Descending),
             And(Filter(query), p => status == null || p.Status == status),
             cancellationToken);

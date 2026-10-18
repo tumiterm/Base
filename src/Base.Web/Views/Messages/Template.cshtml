@@ -1,0 +1,97 @@
+@model TemplateForm
+@{
+    var isNew = Model.Id is null;
+    ViewData["Title"] = isNew ? "New template" : Model.Name;
+}
+<nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-action="Index">Messages</a><icon name="chevron-right" class="icon-sm" /><a asp-action="Templates">Templates</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">@ViewData["Title"]</span></nav>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">@ViewData["Title"]</h1>
+        <p class="page-subtitle">Write it once. When you start a message from it, you can still change anything before sending.</p>
+    </div>
+    @if (!isNew)
+    {
+        <div class="page-actions">
+            <a class="btn btn-primary" asp-action="New" asp-route-template="@Model.Id"><icon name="send" class="icon-sm" /> Send a message from it</a>
+        </div>
+    }
+</div>
+
+@if (!ViewData.ModelState.IsValid)
+{
+    <div asp-validation-summary="All" class="alert alert-danger" role="alert"></div>
+}
+
+<form method="post" class="panel" asp-action="@(isNew ? "NewTemplate" : "Template")" asp-route-id="@Model.Id" novalidate>
+    <div class="panel-body">
+        <section class="form-section">
+            <div>
+                <h2 class="form-section-title">Template</h2>
+                <p class="form-section-desc">Only people who send messages see the name.</p>
+            </div>
+            <div>
+                <label class="form-label" for="Name">Name</label>
+                <input class="form-control" id="Name" name="Name" value="@Model.Name" maxlength="200" required autofocus="@isNew" placeholder="Payslips are ready" />
+                <span class="text-danger small">@Html.ValidationMessage("Name")</span>
+            </div>
+        </section>
+        <section class="form-section">
+            <div>
+                <h2 class="form-section-title">Email and in-app</h2>
+                <p class="form-section-desc">Formatting is kept for email; in-app and SMS get the same words as plain text.</p>
+                <div class="form-label mt-3 mb-1">Placeholders</div>
+                <partial name="_Placeholders" model="AudienceFields.Common" />
+                <p class="form-section-desc mt-2">Audiences add their own, such as Department for People.</p>
+            </div>
+            <div class="stack">
+                <div>
+                    <label class="form-label" for="Subject">Subject</label>
+                    <input class="form-control" id="Subject" name="Subject" value="@Model.Subject" maxlength="500" data-placeholder-target placeholder="Your payslip for June" />
+                </div>
+                <div>
+                    <label class="form-label" for="template-body">Message</label>
+                    <partial name="_RichEditor" model='("HtmlBody", Model.HtmlBody, "Message", "template-body")' />
+                    <span class="text-danger small">@Html.ValidationMessage("HtmlBody")</span>
+                </div>
+            </div>
+        </section>
+        <section class="form-section">
+            <div>
+                <h2 class="form-section-title">SMS</h2>
+                <p class="form-section-desc">Optional. Without it, an SMS uses the message as plain text.</p>
+            </div>
+            <div>
+                <textarea class="form-control" id="SmsBody" name="SmsBody" rows="3" data-placeholder-target data-sms-text aria-label="SMS text">@Model.SmsBody</textarea>
+                <div class="form-text"><span data-sms-count>0 characters</span>.</div>
+            </div>
+        </section>
+        <section class="form-section">
+            <div>
+                <h2 class="form-section-title">WhatsApp</h2>
+                <p class="form-section-desc">Optional. The name of a template Meta approved, and what goes in its numbered gaps.</p>
+            </div>
+            <div class="stack">
+                <div class="row g-3">
+                    <div class="col-sm-8"><label class="form-label" for="WhatsAppTemplateName">Approved template name</label><input class="form-control font-monospace" id="WhatsAppTemplateName" name="WhatsAppTemplateName" value="@Model.WhatsAppTemplateName" spellcheck="false" /></div>
+                    <div class="col-sm-4"><label class="form-label" for="WhatsAppLanguage">Language</label><input class="form-control font-monospace" id="WhatsAppLanguage" name="WhatsAppLanguage" value="@Model.WhatsAppLanguage" spellcheck="false" /></div>
+                </div>
+                @for (var i = 0; i < Math.Max(3, Model.WhatsAppParameters.Count); i++)
+                {
+                    <div><label class="form-label" for="wa-@i">{{@(i + 1)}}</label><input class="form-control" id="wa-@i" name="WhatsAppParameters" value="@(i < Model.WhatsAppParameters.Count ? Model.WhatsAppParameters[i] : null)" data-placeholder-target /></div>
+                }
+            </div>
+        </section>
+    </div>
+    <div class="panel-footer d-flex justify-content-between gap-2">
+        <div>
+            @if (!isNew)
+            {
+                <button class="btn btn-ghost text-danger" type="submit" formaction="@Url.Action("DeleteTemplate", new { id = Model.Id })"><icon name="trash-2" class="icon-sm" /> Delete</button>
+            }
+        </div>
+        <div class="d-flex gap-2">
+            <a class="btn btn-ghost" asp-action="Templates">Cancel</a>
+            <button class="btn btn-primary" type="submit"><icon name="save" class="icon-sm" /> Save template</button>
+        </div>
+    </div>
+</form>

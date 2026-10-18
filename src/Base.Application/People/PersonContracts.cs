@@ -35,7 +35,8 @@ public sealed record PersonSummary(
     DateOnly? StartDate,
     IReadOnlyList<string> Skills,
     bool HasAvatar,
-    DateTimeOffset DateModified);
+    DateTimeOffset DateModified,
+    string? Phone = null);
 
 public sealed record PersonDetails(
     Guid Id,

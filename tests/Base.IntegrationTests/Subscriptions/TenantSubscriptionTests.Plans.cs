@@ -27,7 +27,7 @@ public sealed partial class TenantSubscriptionTests
 
         var waiting = (await Plans(p => p.GetAsync(planId))).GetDataOrThrow();
         waiting.Undecided().Select(e => e.Code).ShouldBe(
-            [FeatureCodes.DocumentGeneration, LimitCodes.StorageMb, FeatureCodes.DataExchange, FeatureCodes.CustomBranding, FeatureCodes.Api],
+            [FeatureCodes.DocumentGeneration, LimitCodes.StorageMb, FeatureCodes.DataExchange, FeatureCodes.CustomBranding, FeatureCodes.Messaging, FeatureCodes.BulkMessaging, LimitCodes.MessagesPerMonth, FeatureCodes.Api],
             ignoreOrder: true);
 
         // Until then: Standard features are in, Premium ones out, for the plan and its subscribers alike.

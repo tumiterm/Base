@@ -1,0 +1,7 @@
+@model IReadOnlyList<AudienceField>
+<div class="placeholder-chips" role="group" aria-label="Insert a placeholder">
+    @foreach (var f in Model)
+    {
+        <button type="button" class="chip" data-insert="{{@f.Name}}" title="Insert {{@f.Name}}"><icon name="plus" class="icon-sm" /> @f.Label</button>
+    }
+</div>

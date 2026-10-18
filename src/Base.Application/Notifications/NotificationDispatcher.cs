@@ -39,6 +39,11 @@ internal sealed partial class NotificationDispatcher(
         }
 
         var template = NotificationCatalog.Get(message.TemplateCode);
+        if (message.WhatsAppTemplate is { } whatsApp)
+        {
+            template = template with { WhatsApp = JsonSerializer.Deserialize<WhatsAppTemplate>(whatsApp, NotificationComposer.Json) };
+        }
+
         var provider = await channels.ResolveAsync(message.Channel, cancellationToken);
         if (provider is null)
         {

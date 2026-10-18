@@ -6,7 +6,19 @@ namespace Base.Application.Notifications;
 /// A request to notify someone. <paramref name="Data"/> is an object or dictionary whose members fill the template's
 /// variables. <paramref name="Channels"/> overrides the template's default channels.
 /// </summary>
-public sealed record Notification(string Template, NotificationRecipient Recipient, object? Data = null, IReadOnlyList<NotificationChannel>? Channels = null);
+/// <param name="Content">Wording written by a person, used instead of the template's file (the template still sets the
+/// category, so preferences apply). Placeholders in it are filled from <paramref name="Data"/>.</param>
+/// <param name="SourceId">What this notification belongs to (a broadcast), recorded on each message.</param>
+public sealed record Notification(
+    string Template,
+    NotificationRecipient Recipient,
+    object? Data = null,
+    IReadOnlyList<NotificationChannel>? Channels = null,
+    NotificationContent? Content = null,
+    Guid? SourceId = null);
+
+/// <summary>Ad-hoc wording: template parts by <see cref="TemplateParts"/> name, and the approved WhatsApp template.</summary>
+public sealed record NotificationContent(IReadOnlyDictionary<string, string> Parts, WhatsAppTemplate? WhatsApp = null);
 
 /// <summary>Who to notify: an account (addresses come from the user record) and/or explicit addresses.</summary>
 public sealed record NotificationRecipient(Guid? UserId, string? Email, string? Phone, string? Name)

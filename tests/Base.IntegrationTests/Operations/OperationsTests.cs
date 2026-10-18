@@ -37,7 +37,7 @@ public sealed class OperationsTests(SqlServerFixture sql) : IAsyncLifetime
     {
         var scheduler = Scheduler();
 
-        (await scheduler.RunDueAsync(CancellationToken.None)).ShouldBe(11, "every job is due on first start");
+        (await scheduler.RunDueAsync(CancellationToken.None)).ShouldBe(12, "every job is due on first start");
         (await scheduler.RunDueAsync(CancellationToken.None)).ShouldBe(0, "nothing is due again until its interval passes");
 
         var status = await Jobs(j => j.StatusAsync());
@@ -47,7 +47,7 @@ public sealed class OperationsTests(SqlServerFixture sql) : IAsyncLifetime
         audit.NextRunAt.ShouldBe(_app.Time.GetUtcNow().AddDays(1));
 
         _app.Time.Advance(TimeSpan.FromHours(1));
-        (await scheduler.RunDueAsync(CancellationToken.None)).ShouldBe(4, "the hourly outbox cleanup, subscription lifecycle, idempotency cleanup and the flaky test job");
+        (await scheduler.RunDueAsync(CancellationToken.None)).ShouldBe(5, "the hourly outbox cleanup, subscription lifecycle, idempotency cleanup, scheduled messages (every minute) and the flaky test job");
     }
 
     [Fact]

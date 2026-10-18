@@ -52,6 +52,8 @@ public static class PermissionCatalog
             [PermissionCodes.Documents.View, PermissionCodes.Documents.Create]),
         new(PermissionCodes.Notifications.View, "View notification log", "Notifications", "See every email, SMS, WhatsApp and in-app message sent, skipped or failed.", AdminOnly, []),
         new(PermissionCodes.Notifications.Manage, "Manage notifications", "Notifications", "Resend messages and edit this tenant's notification wording.", AdminOnly, [PermissionCodes.Notifications.View]),
+        new(PermissionCodes.Messages.Send, "Send messages", "Messaging", "Write to chosen people by email, SMS, WhatsApp or in-app, and keep message templates.", AdminOnly, []),
+        new(PermissionCodes.Messages.SendBulk, "Send bulk messages", "Messaging", "Send to everyone an audience's filters match, or to a pasted list.", AdminOnly, [PermissionCodes.Messages.Send]),
         new(PermissionCodes.Audit.View, "View audit trail", "System", "See who changed what, when, with before and after values.", AdminOnly, []),
         new(PermissionCodes.Api.ClientsManage, "Manage API clients", "Settings", "Create API keys for other systems, with permissions you hold, and rotate or revoke them.", AdminOnly, []),
         new(PermissionCodes.MasterData.Manage, "Manage lookup lists", "Settings", "Add, rename, reorder and hide entries in lists such as titles and departments.", AdminOnly, []),

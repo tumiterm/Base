@@ -25,12 +25,16 @@ internal sealed class NotificationMessageConfiguration : IEntityTypeConfiguratio
         builder.Property(m => m.Provider).HasMaxLength(NotificationMessage.ProviderMaxLength);
         builder.Property(m => m.ProviderMessageId).HasMaxLength(NotificationMessage.ProviderMessageIdMaxLength);
         builder.Property(m => m.LastError).HasMaxLength(NotificationMessage.ErrorMaxLength);
+        builder.Property(m => m.WhatsAppTemplate).HasMaxLength(NotificationMessage.WhatsAppTemplateMaxLength);
         builder.Ignore(m => m.Content);
 
         // The inbox (a user's unread in-app messages), the admin log, and retention.
         builder.HasIndex(m => new { m.TenantId, m.RecipientUserId, m.Channel, m.ReadAt });
         builder.HasIndex(m => new { m.TenantId, m.DateCreated });
         builder.HasIndex(m => m.DateCreated);
+
+        // A broadcast's progress.
+        builder.HasIndex(m => new { m.TenantId, m.SourceId, m.Status }).HasFilter("[SourceId] IS NOT NULL");
     }
 }
 

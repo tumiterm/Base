@@ -156,6 +156,9 @@ scripts/new-project.cs  Creates a renamed copy for a new project.
   there are forgot, reset and change password flows. Nobody can grant or manage access they don't hold, the last
   active administrator is protected, and system roles are locked down. Passwords follow NIST SP 800-63B
   (length over composition rules).
+- **Messages:** people write to one person, an audience (People by department, Users by role...) or a pasted list,
+  by email, SMS, WhatsApp or in-app, now or scheduled, with templates, placeholders, a preview and delivery progress
+  (ADR 0024).
 - **Notifications:** one `INotificationService` for **email, SMS, WhatsApp and in-app**. Built-in providers:
   SMTP, SendGrid, Twilio (SMS and WhatsApp), Clickatell, BulkSMS and the Meta WhatsApp Cloud API. Each channel is
   switched on separately; out of the box only email (to the log) and in-app are on. Wording comes from template files,

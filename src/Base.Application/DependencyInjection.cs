@@ -1,6 +1,7 @@
 using Base.Application.Auditing;
 using Base.Application.Branding;
 using Base.Application.Common.Records;
+using Base.Application.Communications;
 using Base.Application.DataExchange;
 using Base.Application.Documents;
 using Base.Application.Documents.Generation;
@@ -15,6 +16,7 @@ using Base.Application.Releases;
 using Base.Application.Settings;
 using Base.Application.Subscriptions;
 using Base.Application.Users;
+using Base.Domain.Communications;
 using Base.Domain.DataExchange;
 using Base.Domain.Integrations;
 using Base.Domain.Notifications;
@@ -96,6 +98,15 @@ public static class DependencyInjection
         services.AddScoped<INotificationLog, NotificationLog>();
         services.AddScoped<INotificationPreferences, NotificationPreferences>();
         services.AddScoped<INotificationTemplateAdmin, NotificationTemplateAdmin>();
+
+        services.AddScoped<AudienceResolver>();
+        services.AddScoped<IAudienceSource, PersonAudience>();
+        services.AddScoped<IAudienceSource, UserAudience>();
+        services.AddScoped<IMessagingService, MessagingService>();
+        services.AddScoped<IMessageTemplateService, MessageTemplateService>();
+        services.AddScoped<BroadcastSender>();
+        services.AddScoped<IDomainEventHandler<BroadcastDue>, BroadcastDueHandler>();
+        services.AddScoped<IScheduledJob, ScheduledMessagesJob>();
         services.TryAddScoped<IStoredFileAccessPolicy, DefaultStoredFileAccessPolicy>();
 
         return services;

@@ -23,6 +23,7 @@ public sealed class NotificationMessage : EntityBase, ITenantOwned
     public const int ProviderMaxLength = 100;
     public const int ProviderMessageIdMaxLength = 200;
     public const int ErrorMaxLength = 2000;
+    public const int WhatsAppTemplateMaxLength = 1000;
 
     private NotificationMessage()
     {
@@ -119,6 +120,19 @@ public sealed class NotificationMessage : EntityBase, ITenantOwned
     /// <summary>In-app only: when the user read it.</summary>
     public DateTimeOffset? ReadAt { get; private set; }
 
+    /// <summary>What sent it, when it belongs to something bigger (a broadcast); its progress is counted from these.</summary>
+    public Guid? SourceId { get; private set; }
+
+    /// <summary>The approved WhatsApp template (JSON) when the content wasn't a catalogue template's.</summary>
+    public string? WhatsAppTemplate { get; private set; }
+
+    /// <summary>Links the message to what sent it and keeps the WhatsApp template its content needs.</summary>
+    public void AttachTo(Guid? sourceId, string? whatsAppTemplate)
+    {
+        SourceId = sourceId;
+        WhatsAppTemplate = whatsAppTemplate is { Length: > WhatsAppTemplateMaxLength } ? throw new ArgumentException("The WhatsApp template is too long.", nameof(whatsAppTemplate)) : whatsAppTemplate;
+    }
+
     public bool IsFinal => Status is NotificationStatus.Sent or NotificationStatus.Failed or NotificationStatus.Skipped;
 
     /// <summary>Queues a message for delivery by the outbox after commit.</summary>
@@ -169,8 +183,10 @@ public sealed class NotificationMessage : EntityBase, ITenantOwned
         }
 
         // No fallback chain on a resend: the administrator chose this channel.
-        return Queue(TemplateCode, Category, Channel, new NotificationRecipientSnapshot(RecipientUserId, RecipientName, null, null), RecipientAddress, Content,
+        var copy = Queue(TemplateCode, Category, Channel, new NotificationRecipientSnapshot(RecipientUserId, RecipientName, null, null), RecipientAddress, Content,
             new NotificationReplay(DataJson, RecipientJson, null));
+        copy.AttachTo(SourceId, WhatsAppTemplate);
+        return copy;
     }
 
     public RenderedContent Content => new(Subject, Body, HtmlBody, TemplateParameters);
