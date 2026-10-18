@@ -63,6 +63,9 @@ public sealed class PlanEditViewModel
 
     public IList<string> Unlimited { get; set; } = [];
 
+    /// <summary>Features and limits added since the plan was last saved; shown as "New" with their suggestion.</summary>
+    public IReadOnlyList<string> Undecided { get; set; } = [];
+
     public static PlanEditViewModel From(PlanSummary plan) => new()
     {
         Id = plan.Id,
@@ -79,6 +82,7 @@ public sealed class PlanEditViewModel
         Features = EntitlementCatalog.Features.Where(f => plan.ValueOf(f.Code) == 1).Select(f => f.Code).ToList(),
         Limits = EntitlementCatalog.Limits.ToDictionary(l => l.Code, l => plan.ValueOf(l.Code), StringComparer.Ordinal),
         Unlimited = EntitlementCatalog.Limits.Where(l => plan.ValueOf(l.Code) is null).Select(l => l.Code).ToList(),
+        Undecided = plan.Undecided().Select(e => e.Code).ToList(),
     };
 
     public static PlanEditViewModel New() => new()
@@ -105,3 +109,16 @@ public sealed class PlanEditViewModel
 }
 
 public sealed record SubscriptionPageViewModel(MySubscription Mine, TenantAccess Access);
+
+/// <summary>Plans side by side. Offered plans come first; retired ones keep their subscribers and stay editable.</summary>
+public sealed record PlanMatrixViewModel(IReadOnlyList<PlanSummary> Plans)
+{
+    public IReadOnlyList<PlanSummary> Ordered { get; } = [.. Plans.OrderByDescending(p => p.IsActive)];
+
+    /// <summary>Features and limits at least one offered plan hasn't decided on, each with the plans still to decide.</summary>
+    public IReadOnlyList<(EntitlementDefinition Item, IReadOnlyList<PlanSummary> Plans)> Undecided { get; } =
+        [.. EntitlementCatalog.All
+            .Select(e => (Item: e, Plans: (IReadOnlyList<PlanSummary>)Plans.Where(p => p.IsActive && !p.HasDecided(e.Code)).ToList()))
+            .Where(x => x.Plans.Count > 0)];
+}
+

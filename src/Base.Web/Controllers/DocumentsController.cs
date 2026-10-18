@@ -157,11 +157,13 @@ public sealed class DocumentsController(IDocumentService documents, IDocumentGen
     }
 
     [HttpGet("generate")]
+    [RequiresFeature(FeatureCodes.DocumentGeneration)]
     public IActionResult Generate(string? template) =>
         View(Model(DocumentTemplateCatalog.Find(template), new Dictionary<string, string?>(StringComparer.Ordinal), null, DefaultFormat(), finalize: false));
 
     /// <summary>Generates and stores the document, or with <c>preview</c> just downloads the rendered file.</summary>
     [HttpPost("generate")]
+    [RequiresFeature(FeatureCodes.DocumentGeneration)]
     public async Task<IActionResult> Generate(string template, string format, string? title, bool finalize, bool preview, [FromForm] IDictionary<string, string?> values, CancellationToken cancellationToken)
     {
         var definition = DocumentTemplateCatalog.Find(template);

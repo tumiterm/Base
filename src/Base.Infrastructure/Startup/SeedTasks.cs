@@ -222,6 +222,7 @@ internal sealed class SamplePlansSeedTask(AppDbContext db, IOptions<SeedOptions>
         var plan = new Plan(code, name, "ZAR", monthly, annual, trialDays);
         plan.Update(name, description, "ZAR", monthly, annual, trialDays, order);
         plan.SetEntitlement(FeatureCodes.Documents, 1);
+        plan.SetEntitlement(FeatureCodes.DocumentGeneration, branding ? 1 : 0);
         plan.SetEntitlement(FeatureCodes.DataExchange, dataExchange ? 1 : 0);
         plan.SetEntitlement(FeatureCodes.CustomBranding, branding ? 1 : 0);
         plan.SetEntitlement(FeatureCodes.Api, branding ? 1 : 0);

@@ -38,7 +38,8 @@ cross-cutting feature or adding a package:
   Permissions that act across tenants or on shared data (roles) are `IsPlatform`: only the platform (default)
   tenant's users get them.
 - Plan-dependent behaviour: new feature/limit = constant in `FeatureCodes`/`LimitCodes` + `EntitlementCatalog` entry
-  and enforcement (`[RequiresFeature]` + `asp-feature`, or `ITenantEntitlements.EnsureWithinLimitAsync` before the
+  (its `ModuleCodes` module, `Since` version and, for a feature, suggested `FeatureTier`; a new module also gets a
+  `Modules` entry) and enforcement (`[RequiresFeature]` + `asp-feature`, or `ITenantEntitlements.EnsureWithinLimitAsync` before the
   action). Never check plan codes or prices in code. Tenants are created through `ITenantAdministration`,
   subscriptions changed through `ISubscriptionService` (payments come from outside; no gateway in the base).
 - New setting = constant in `SettingCodes` + `SettingCatalog` entry (no migration); it appears on Administration →

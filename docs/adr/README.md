@@ -27,3 +27,4 @@ otherwise have to reverse-engineer. Format: context → decision → consequence
 | [0020](0020-secret-settings-and-email-from-settings.md) | A settings screen, encrypted secret settings, email set up from settings |
 | [0021](0021-document-previews-and-record-labels.md) | Sandboxed in-browser previews and named record links |
 | [0022](0022-tenant-release-adoption.md) | Tenants adopt releases at their own pace: gated features, choices and a support window |
+| [0023](0023-plan-modules-tiers-and-decisions.md) | Plans built from modules, with suggested Standard/Premium tiers and recorded decisions |

@@ -213,6 +213,61 @@ public sealed class PlatformPlansController(IPlanAdministration plans) : Control
         this.Flash(await plans.SetOfferedAsync(id, offered, cancellationToken));
         return RedirectToAction(nameof(Edit), new { id });
     }
+
+    /// <summary>Every plan side by side: which features each includes and its limits, grouped by module.</summary>
+    [HttpGet("features")]
+    public async Task<IActionResult> Features(CancellationToken cancellationToken) =>
+        View(new PlanMatrixViewModel(await plans.ListAsync(includeRetired: true, cancellationToken)));
+
+    /// <summary>
+    /// Saves the grid. Every cell shown is posted (<c>cell</c> = "planId|code"), so a switch left off is saved as
+    /// not included and every plan has then decided on every feature shown.
+    /// </summary>
+    [HttpPost("features")]
+    public async Task<IActionResult> Features(IFormCollection form, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(form);
+        var changes = new List<PlanEntitlementChange>();
+        foreach (var cell in form["cell"])
+        {
+            var parts = (cell ?? string.Empty).Split('|');
+            if (parts.Length != 2 || !Guid.TryParse(parts[0], out var planId) || EntitlementCatalog.Find(parts[1]) is not { } definition)
+            {
+                continue;
+            }
+
+            long? value;
+            if (definition.Kind == EntitlementKind.Feature)
+            {
+                value = form.ContainsKey("on:" + cell) ? 1 : 0;
+            }
+            else if (form.ContainsKey("unlimited:" + cell))
+            {
+                value = null;
+            }
+            else if (long.TryParse(form["limit:" + cell], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var limit))
+            {
+                value = limit;
+            }
+            else
+            {
+                this.Flash(ValidationResponse.Failure($"Enter a number for {definition.Name}, or tick Unlimited."));
+                return RedirectToAction(nameof(Features));
+            }
+
+            changes.Add(new PlanEntitlementChange(planId, definition.Code, value));
+        }
+
+        this.Flash(await plans.SetEntitlementsAsync(changes, cancellationToken));
+        return RedirectToAction(nameof(Features));
+    }
+
+    [HttpPost("features/accept")]
+    public async Task<IActionResult> AcceptSuggestions(CancellationToken cancellationToken)
+    {
+        this.Flash(await plans.AcceptSuggestionsAsync(cancellationToken));
+        return RedirectToAction(nameof(Features));
+    }
 }
 
 /// <summary>This organisation's own plan, status and usage. Open to every signed-in user so a suspended tenant can see why.</summary>

@@ -21,6 +21,12 @@ public interface IPlanAdministration
 
     /// <summary>Stops offering the plan to new subscriptions; current subscribers keep it.</summary>
     Task<ValidationResponse> SetOfferedAsync(Guid planId, bool offered, CancellationToken cancellationToken = default);
+
+    /// <summary>Saves the plans-and-features grid: each change sets one feature or limit of one plan, all in one save.</summary>
+    Task<ValidationResponse> SetEntitlementsAsync(IReadOnlyList<PlanEntitlementChange> changes, CancellationToken cancellationToken = default);
+
+    /// <summary>Every plan takes the suggestion (Standard in, Premium out, a limit's default) for what it hasn't decided yet.</summary>
+    Task<ValidationResponse> AcceptSuggestionsAsync(CancellationToken cancellationToken = default);
 }
 
 internal sealed class PlanAdministration(
@@ -118,6 +124,79 @@ internal sealed class PlanAdministration(
 
         await unitOfWork.SaveAsync(cancellationToken);
         return ValidationResponse.Success(offered ? $"{plan.Name} is offered again." : $"{plan.Name} is no longer offered to new subscriptions.");
+    }
+
+    public async Task<ValidationResponse> SetEntitlementsAsync(IReadOnlyList<PlanEntitlementChange> changes, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(changes);
+        foreach (var change in changes)
+        {
+            var definition = EntitlementCatalog.Find(change.Code);
+            if (definition is null)
+            {
+                return ValidationResponse.Failure($"{change.Code} isn't a feature or limit.");
+            }
+
+            if (definition.Kind == EntitlementKind.Feature ? change.Value is not (0 or 1) : change.Value < 0)
+            {
+                return ValidationResponse.Failure(definition.Kind == EntitlementKind.Feature
+                    ? $"{definition.Name} is either included or not."
+                    : $"{definition.Name} can't be negative.");
+            }
+        }
+
+        var planIds = changes.Select(c => c.PlanId).Distinct().ToList();
+        var plans = await unitOfWork.Repository<Plan>().GetAllAsync(p => planIds.Contains(p.Id), [p => p.Entitlements], cancellationToken: cancellationToken);
+        if (plans.Count != planIds.Count)
+        {
+            return ValidationResponse.NotFound("Plan not found.");
+        }
+
+        var changed = new HashSet<Guid>();
+        foreach (var change in changes)
+        {
+            var plan = plans.Single(p => p.Id == change.PlanId);
+            var current = plan.Entitlements.FirstOrDefault(e => string.Equals(e.Code, change.Code, StringComparison.Ordinal));
+            if (current is null || current.Value != change.Value)
+            {
+                plan.SetEntitlement(change.Code, change.Value);
+                changed.Add(plan.Id);
+            }
+        }
+
+        if (changed.Count == 0)
+        {
+            return ValidationResponse.Success("Nothing changed.");
+        }
+
+        await unitOfWork.SaveAsync(cancellationToken);
+        await entitlements.InvalidateAsync(cancellationToken);
+        return ValidationResponse.Success(changed.Count == 1
+            ? $"{plans.Single(p => changed.Contains(p.Id)).Name} saved. Its subscribers have the change now."
+            : $"{changed.Count} plans saved. Their subscribers have the changes now.");
+    }
+
+    public async Task<ValidationResponse> AcceptSuggestionsAsync(CancellationToken cancellationToken = default)
+    {
+        var plans = await unitOfWork.Repository<Plan>().GetAllAsync(null, [p => p.Entitlements], cancellationToken: cancellationToken);
+        var decided = 0;
+        foreach (var plan in plans)
+        {
+            foreach (var definition in EntitlementCatalog.All.Where(d => !plan.Entitlements.Any(e => string.Equals(e.Code, d.Code, StringComparison.Ordinal))))
+            {
+                plan.SetEntitlement(definition.Code, definition.DefaultValue);
+                decided++;
+            }
+        }
+
+        if (decided == 0)
+        {
+            return ValidationResponse.Success("Every plan has already decided on every feature.");
+        }
+
+        await unitOfWork.SaveAsync(cancellationToken);
+        await entitlements.InvalidateAsync(cancellationToken);
+        return ValidationResponse.Success("Suggestions accepted: Standard features are in every plan, Premium ones are left out until you add them.");
     }
 
     internal static PlanSummary ToSummary(Plan plan, int subscribers) => new(

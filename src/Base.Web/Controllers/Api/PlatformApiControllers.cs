@@ -114,9 +114,13 @@ public sealed class PlansApiController(IPlanAdministration plans) : ControllerBa
     public async Task<IActionResult> Update(Guid id, SavePlanRequest request, CancellationToken cancellationToken) =>
         (await plans.UpdateAsync(id, request, cancellationToken)).ToActionResult(this);
 
-    /// <summary>The features and limits a plan can set.</summary>
+    /// <summary>The features and limits a plan can set, each with its module, suggested tier and the version it arrived in.</summary>
     [HttpGet("entitlements")]
     public IReadOnlyList<EntitlementDefinition> Entitlements() => EntitlementCatalog.All;
+
+    /// <summary>The modules (parts of the product) features and limits are grouped in.</summary>
+    [HttpGet("modules")]
+    public IReadOnlyList<PlanModule> Modules() => EntitlementCatalog.Modules;
 }
 
 [ApiController]

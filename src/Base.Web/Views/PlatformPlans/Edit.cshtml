@@ -7,7 +7,7 @@
 <div class="page-header">
     <div>
         <h1 class="page-title">@(isNew ? "New plan" : Model.Name) @if (!isNew && !Model.IsActive) {<span class="badge text-bg-secondary">Retired</span>}</h1>
-        <p class="page-subtitle">@(isNew ? "Prices, trial, and what the plan includes." : $"{Model.SubscriberCount} subscriber(s). Changes apply to them immediately.")</p>
+        <p class="page-subtitle">@(isNew ? "Prices, trial, and what the plan includes." : $"{Model.SubscriberCount} {(Model.SubscriberCount == 1 ? "subscriber" : "subscribers")}. Changes apply to them straight away.")</p>
     </div>
     @if (!isNew)
     {
@@ -93,39 +93,51 @@
 
         <section class="form-section">
             <div>
-                <h2 class="form-section-title">Features</h2>
-                <p class="form-section-desc">Modules a subscriber can use. Switched-off modules disappear from their navigation.</p>
+                <h2 class="form-section-title">What's included</h2>
+                <p class="form-section-desc">Grouped by part of the product. <span class="chip chip-standard">Standard</span> features are suggested for every plan, <span class="chip chip-premium">Premium</span> ones for higher plans; the choice is yours. Switched-off features disappear from a subscriber's screens.</p>
+                <p class="form-section-desc"><a asp-action="Features">Compare every plan side by side</a></p>
             </div>
             <div class="stack">
-                @foreach (var feature in EntitlementCatalog.Features)
+                @foreach (var module in EntitlementCatalog.Modules)
                 {
-                    var id = "f-" + feature.Code.Replace('.', '-');
-                    <div class="form-check form-switch m-0">
-                        <input class="form-check-input" type="checkbox" role="switch" id="@id" name="Features" value="@feature.Code" checked="@Model.Features.Contains(feature.Code)" />
-                        <label class="form-check-label" for="@id"><span class="fw-medium">@feature.Name</span> <span class="d-block text-muted small">@feature.Description</span></label>
-                    </div>
-                }
-            </div>
-        </section>
-
-        <section class="form-section">
-            <div>
-                <h2 class="form-section-title">Limits</h2>
-                <p class="form-section-desc">Checked when people are invited and files are uploaded. Existing data over a new limit stays.</p>
-            </div>
-            <div class="row g-3">
-                @foreach (var limit in EntitlementCatalog.Limits)
-                {
-                    var id = "l-" + limit.Code.Replace('.', '-');
-                    var unlimited = Model.Unlimited.Contains(limit.Code);
-                    <div class="col-md-6">
-                        <label class="form-label" for="@id">@limit.Name @if (limit.Unit is not null) {<span class="text-muted fw-normal">(@limit.Unit)</span>}</label>
-                        <input class="form-control tabular" type="number" min="0" id="@id" name="Limits[@limit.Code]" value="@(Model.Limits.TryGetValue(limit.Code, out var v) ? v : null)" />
-                        <div class="form-check mt-2">
-                            <input class="form-check-input" type="checkbox" id="@id-u" name="Unlimited" value="@limit.Code" checked="@unlimited" data-unlimited-for="#@id" />
-                            <label class="form-check-label small" for="@id-u">Unlimited</label>
-                        </div>
-                        <div class="form-text">@limit.Description</div>
+                    var items = EntitlementCatalog.In(module.Code).ToList();
+                    if (items.Count == 0) { continue; }
+                    var headId = "m-" + module.Code.Replace('.', '-');
+                    <div class="plan-module" role="group" aria-labelledby="@headId">
+                        <div class="plan-module-head"><span class="file-tile" aria-hidden="true"><icon name="@module.Icon" /></span><span><span class="plan-module-name" id="@headId">@module.Name</span><span class="plan-module-desc">@module.Description</span></span></div>
+                        @foreach (var item in items)
+                        {
+                            var id = (item.Kind == EntitlementKind.Feature ? "f-" : "l-") + item.Code.Replace('.', '-');
+                            var isNewHere = Model.Undecided.Contains(item.Code);
+                            <div class="plan-item @(isNewHere ? "is-new" : "")">
+                                @if (item.Kind == EntitlementKind.Feature)
+                                {
+                                    <div class="form-check form-switch m-0">
+                                        <input class="form-check-input" type="checkbox" role="switch" id="@id" name="Features" value="@item.Code" checked="@Model.Features.Contains(item.Code)" />
+                                        <label class="form-check-label" for="@id">
+                                            <span class="fw-medium">@item.Name</span>
+                                            <partial name="_EntitlementBadges" model="(item, isNewHere)" />
+                                            <span class="d-block text-muted small">@item.Description</span>
+                                        </label>
+                                    </div>
+                                }
+                                else
+                                {
+                                    var unlimited = Model.Unlimited.Contains(item.Code);
+                                    <div class="plan-limit">
+                                        <label class="form-label mb-1" for="@id"><span class="fw-medium">@item.Name</span> @if (item.Unit is not null) {<span class="text-muted fw-normal">(@item.Unit)</span>} <partial name="_EntitlementBadges" model="(item, isNewHere)" /></label>
+                                        <div class="d-flex align-items-center gap-3 flex-wrap">
+                                            <input class="form-control tabular plan-limit-input" type="number" min="0" id="@id" name="Limits[@item.Code]" value="@(Model.Limits.TryGetValue(item.Code, out var v) ? v : null)" />
+                                            <div class="form-check m-0">
+                                                <input class="form-check-input" type="checkbox" id="@id-u" name="Unlimited" value="@item.Code" checked="@unlimited" data-unlimited-for="#@id" />
+                                                <label class="form-check-label small" for="@id-u">Unlimited</label>
+                                            </div>
+                                        </div>
+                                        <div class="form-text">@item.Description Checked when people are invited and files are uploaded; existing data over a new limit stays.</div>
+                                    </div>
+                                }
+                            </div>
+                        }
                     </div>
                 }
             </div>

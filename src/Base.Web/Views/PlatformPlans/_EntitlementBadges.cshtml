@@ -1,0 +1,9 @@
+@model (Base.Application.Subscriptions.EntitlementDefinition Item, bool IsNew)
+@if (Model.Item.Tier is { } tier)
+{
+    <span class="chip @(tier == FeatureTier.Standard ? "chip-standard" : "chip-premium")" title="@(tier == FeatureTier.Standard ? "Suggested for every plan" : "Suggested for higher plans")">@tier</span>
+}
+@if (Model.IsNew)
+{
+    <span class="chip chip-new" title="Added in @Model.Item.Since. Until you save this plan it follows the suggestion.">Needs a decision</span>
+}

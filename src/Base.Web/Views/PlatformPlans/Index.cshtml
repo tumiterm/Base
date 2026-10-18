@@ -1,14 +1,19 @@
 @model IReadOnlyList<Base.Application.Subscriptions.PlanSummary>
 @{
     ViewData["Title"] = "Plans";
+    var undecided = EntitlementCatalog.All.Where(e => Model.Any(p => p.IsActive && !p.HasDecided(e.Code))).ToList();
 }
 <nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-controller="PlatformTenants" asp-action="Index">Tenants</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">Plans</span></nav>
 <div class="page-header">
     <div>
         <h1 class="page-title">Plans</h1>
-        <p class="page-subtitle">What tenants subscribe to. Changes apply to current subscribers straight away.</p>
+        <p class="page-subtitle">What organisations subscribe to: price, trial, and what each plan includes. Changes apply to subscribers straight away.</p>
     </div>
     <div class="page-actions">
+        @if (Model.Count > 0)
+        {
+            <a class="btn btn-secondary" asp-action="Features"><icon name="grid-2x2" class="icon-sm" /> Plans and features</a>
+        }
         <a class="btn btn-primary" asp-action="New"><icon name="plus" class="icon-sm" /> New plan</a>
     </div>
 </div>
@@ -18,45 +23,45 @@
     <div class="empty-state">
         <icon name="layers" />
         <div class="empty-state-title">No plans yet</div>
-        <p class="mb-2">Without plans, every tenant is unrestricted. Create one to start trials and set limits.</p>
+        <p class="mb-2">Without plans, every organisation has every feature and no limits. Create one to offer trials and choose what it includes.</p>
         <a class="btn btn-primary" asp-action="New">New plan</a>
     </div>
+    return;
 }
-else
+
+@if (undecided.Count > 0)
 {
-    <table class="table align-middle">
-        <thead>
-            <tr>
-                <th>Plan</th><th class="text-end">Monthly</th><th class="text-end">Annual</th><th>Trial</th>
-                @foreach (var limit in EntitlementCatalog.Limits) {<th>@limit.Name</th>}
-                <th>Features</th><th class="text-end">Subscribers</th><th></th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var plan in Model)
-            {
-                <tr>
-                    <td>
-                        <a class="entity text-decoration-none" asp-action="Edit" asp-route-id="@plan.Id">
-                            <span class="entity-text">
-                                <span class="entity-name">@plan.Name @if (!plan.IsActive) {<span class="badge text-bg-secondary ms-1">Retired</span>}</span>
-                                <span class="entity-sub font-monospace">@plan.Code</span>
-                            </span>
-                        </a>
-                    </td>
-                    <td class="text-end tabular">@Display.Money(plan.MonthlyPrice, plan.Currency)</td>
-                    <td class="text-end tabular">@Display.Money(plan.AnnualPrice, plan.Currency)</td>
-                    <td>@(plan.TrialDays == 0 ? "None" : $"{plan.TrialDays} days")</td>
-                    @foreach (var limit in EntitlementCatalog.Limits) {<td class="tabular">@Display.Limit(limit.Code, plan.ValueOf(limit.Code))</td>}
-                    <td>
-                        <div class="d-flex flex-wrap gap-1">
-                            @foreach (var feature in EntitlementCatalog.Features.Where(f => plan.ValueOf(f.Code) == 1)) {<span class="chip">@feature.Name</span>}
-                        </div>
-                    </td>
-                    <td class="text-end tabular">@plan.SubscriberCount</td>
-                    <td class="text-end"><a class="btn btn-ghost btn-sm" asp-action="Edit" asp-route-id="@plan.Id" aria-label="Edit @plan.Name"><icon name="pencil" class="icon-sm" /></a></td>
-                </tr>
-            }
-        </tbody>
-    </table>
+    <a class="status-callout is-warning mb-4 text-decoration-none" asp-action="Features">
+        <icon name="sparkles" />
+        <div class="flex-grow-1">
+            <div class="status-callout-title">@undecided.Count new @(undecided.Count == 1 ? "feature needs" : "features need") a decision</div>
+            <div class="small text-muted">@string.Join(", ", undecided.Select(u => u.Name)) arrived with the product. Choose which plans include @(undecided.Count == 1 ? "it" : "them"); until then @(undecided.Count == 1 ? "it follows its" : "they follow their") suggestion.</div>
+        </div>
+        <span class="btn btn-secondary btn-sm text-nowrap">Decide now <icon name="chevron-right" class="icon-sm" /></span>
+    </a>
 }
+
+<div class="plan-cards">
+    @foreach (var plan in Model.OrderByDescending(p => p.IsActive))
+    {
+        var included = EntitlementCatalog.Features.Count(f => plan.ValueOf(f.Code) == 1);
+        var newHere = plan.Undecided().Count;
+        <a class="panel plan-card text-decoration-none @(plan.IsActive ? "" : "is-retired")" asp-action="Edit" asp-route-id="@plan.Id">
+            <div class="plan-card-head">
+                <div>
+                    <div class="plan-card-name">@plan.Name @if (!plan.IsActive) {<span class="badge text-bg-secondary ms-1">Retired</span>}</div>
+                    @if (plan.Description is not null) {<div class="plan-card-desc">@plan.Description</div>}
+                </div>
+                <icon name="pencil" class="icon-sm text-muted" />
+            </div>
+            <div class="plan-card-price"><span class="tabular">@Display.Money(plan.MonthlyPrice, plan.Currency)</span> <span class="text-muted">/ month</span></div>
+            <div class="plan-card-sub">@Display.Money(plan.AnnualPrice, plan.Currency) a year · @(plan.TrialDays == 0 ? "no free trial" : $"{plan.TrialDays}-day free trial")</div>
+            <partial name="_PlanFeatures" model="plan" />
+            <div class="plan-card-foot">
+                <span>@plan.SubscriberCount @(plan.SubscriberCount == 1 ? "subscriber" : "subscribers")</span>
+                <span>@included of @EntitlementCatalog.Features.Count() features</span>
+                @if (newHere > 0) {<span class="chip chip-new">@newHere new to decide</span>}
+            </div>
+        </a>
+    }
+</div>

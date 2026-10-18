@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Base.Application.Settings;
+using Base.Application.Subscriptions;
 
 namespace Base.IntegrationTests.Web;
 
@@ -114,6 +115,47 @@ public sealed partial class WebTests
         var version = await client.GetFromJsonAsync<JsonElement>("/api/system/version", TestContext.Current.CancellationToken);
         version.GetProperty("baseVersion").GetString()!.ShouldMatch(@"^\d+\.\d+\.\d+$");
         (await client.GetStringAsync("/admin/system", TestContext.Current.CancellationToken)).ShouldContain("Version " + version.GetProperty("version").GetString());
+    }
+
+    [Fact]
+    public async Task Plans_and_features_can_be_compared_and_saved_on_one_page()
+    {
+        var client = Client();
+        await SignInAsync(client);
+        var token = await GetMetaTokenAsync(client);
+        using var create = new HttpRequestMessage(HttpMethod.Post, "/api/platform/plans")
+        {
+            Content = JsonContent.Create(new
+            {
+                code = "grid",
+                name = "Grid",
+                currency = "ZAR",
+                monthlyPrice = 100,
+                annualPrice = 1000,
+                trialDays = 0,
+                sortOrder = 0,
+                entitlements = new Dictionary<string, long?> { [FeatureCodes.Documents] = 1 },
+            }),
+        };
+        create.Headers.Add("X-CSRF-TOKEN", token);
+        var created = await client.SendAsync(create, TestContext.Current.CancellationToken);
+        created.StatusCode.ShouldBe(HttpStatusCode.Created, await created.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        var id = (await created.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken)).GetProperty("id").GetString();
+
+        var grid = await client.GetStringAsync("/platform/plans/features", TestContext.Current.CancellationToken);
+        grid.ShouldContain("Documents from templates");
+        grid.ShouldContain("Premium");
+        grid.ShouldContain($"{id}|{FeatureCodes.DocumentGeneration}");
+
+        var saved = await PostFormAsync(client, "/platform/plans/features", token,
+            ("cell", $"{id}|{FeatureCodes.DocumentGeneration}"), ($"on:{id}|{FeatureCodes.DocumentGeneration}", "1"),
+            ("cell", $"{id}|{LimitCodes.Users}"), ($"limit:{id}|{LimitCodes.Users}", "12"));
+        saved.StatusCode.ShouldBe(HttpStatusCode.Redirect);
+
+        var plan = await client.GetFromJsonAsync<JsonElement>($"/api/platform/plans/{id}", TestContext.Current.CancellationToken);
+        plan.GetProperty("entitlements").GetProperty(FeatureCodes.DocumentGeneration).GetInt64().ShouldBe(1);
+        plan.GetProperty("entitlements").GetProperty(LimitCodes.Users).GetInt64().ShouldBe(12);
+        (await client.GetStringAsync("/platform/plans", TestContext.Current.CancellationToken)).ShouldContain("Plans and features");
     }
 
     private static Task<HttpResponseMessage> PostFormAsync(HttpClient client, string path, string token, params (string Key, string Value)[] fields)

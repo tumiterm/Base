@@ -95,7 +95,11 @@ invitation, sent as the new tenant so its links use the tenant's domain).
   limit (invites, uploads), and `SubscriptionGateMiddleware` for tenants without access.
 - No subscription = unrestricted. Payments arrive through `ISubscriptionService.RecordPaymentAsync` (screen or API);
   billing integrations react to `SubscriptionStatusChanged`.
-- A new feature or limit: a constant in `FeatureCodes`/`LimitCodes` + an `EntitlementCatalog` entry + the check.
+- A new feature or limit: a constant in `FeatureCodes`/`LimitCodes` + an `EntitlementCatalog` entry (module, `Since`,
+  suggested `FeatureTier`) + the check. Plans that were saved before it existed haven't *decided* on it (no
+  `PlanEntitlement` row): they follow the suggestion and the plans screens ask for a decision. Platform > Plans >
+  Plans and features (`IPlanAdministration.SetEntitlementsAsync`, `AcceptSuggestionsAsync`) decides for every plan at
+  once (ADR 0023).
 
 ## Authorization
 

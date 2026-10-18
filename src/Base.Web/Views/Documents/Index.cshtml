@@ -28,7 +28,7 @@
         <partial name="_ExportButtons" model='new ExportButtonsViewModel("documents", PermissionCodes.Documents.Create)' />
         @if (Model.CanCreate)
         {
-            <a class="btn btn-secondary" asp-action="Generate"><icon name="sparkles" class="icon-sm" /> From a template</a>
+            <a class="btn btn-secondary" asp-action="Generate" asp-feature="@FeatureCodes.DocumentGeneration"><icon name="sparkles" class="icon-sm" /> From a template</a>
             <button class="btn btn-primary" type="button" data-bs-toggle="offcanvas" data-bs-target="#upload-document" aria-controls="upload-document"><icon name="upload" class="icon-sm" /> Upload</button>
         }
     </div>

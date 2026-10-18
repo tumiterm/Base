@@ -487,6 +487,25 @@ document.querySelectorAll('.drop-zone').forEach((zone) => {
     }));
 })();
 
+// Plans and features grid: "Include in / Leave out of every plan" per module, and a warning before leaving with
+// unsaved changes.
+(() => {
+    document.querySelectorAll('form[data-plan-matrix]').forEach((form) => {
+        const footer = form.querySelector('.matrix-footer');
+        let dirty = false;
+        const markDirty = () => { dirty = true; footer?.classList.add('is-dirty'); };
+        form.addEventListener('change', markDirty);
+        form.addEventListener('input', markDirty);
+        form.addEventListener('submit', () => { dirty = false; });
+        window.addEventListener('beforeunload', (e) => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+        form.querySelectorAll('[data-matrix-set]').forEach((button) => button.addEventListener('click', () => {
+            const on = button.dataset.matrixSet === 'on';
+            button.closest('[data-matrix-module]')?.querySelectorAll('[data-matrix-feature]').forEach((box) => { box.checked = on; });
+            markDirty();
+        }));
+    });
+})();
+
 // A drawer or dialog that must open when the page loads (e.g. its form came back with errors).
 (() => {
     document.querySelectorAll('[data-open-on-load="true"]').forEach((el) => {

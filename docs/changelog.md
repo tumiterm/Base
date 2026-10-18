@@ -16,6 +16,16 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ### Added
 
+- Plans are built from modules. Every feature and limit belongs to a part of the product (Organisation, Documents &
+  files, Import & export, Branding, Integrations), arrives with a suggested tier (Standard for every plan, Premium for
+  higher plans) and the version it came in. Platform > Plans > **Plans and features** shows every plan side by side
+  with its price, lets a module be included in or left out of every plan at once, and saves everything together.
+  Features added since a plan was saved are marked "Needs a decision" (they follow their suggestion until then), the
+  plans list counts them, and "Accept the suggestions" decides them all. The plans list shows each plan as a card.
+- New premium feature **Documents from templates** (`Feature.DocumentGeneration`): generating documents from
+  templates, on the page and through the API, is now a plan feature of its own. Plans saved before it ask for a
+  decision; until then they leave it out.
+- `GET api/platform/plans/modules`, and the module, version and tier of each entry in `api/platform/plans/entitlements`.
 - Organisations work on your own machine: Development runs multi-tenant, `localhost` opens the platform (new
   `Tenancy:DefaultTenantHosts`), and a domain such as `mtn.dev.localhost` opens its organisation at
   `https://mtn.dev.localhost:7262` with no hosts-file entry or certificate warning. The tenant screens explain this,

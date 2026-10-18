@@ -1,0 +1,139 @@
+@model PlanMatrixViewModel
+@inject Base.Application.Releases.IReleaseCatalog Releases
+@{
+    ViewData["Title"] = "Plans and features";
+    var plans = Model.Ordered;
+    var newCount = Model.Undecided.Count;
+}
+<nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-controller="PlatformTenants" asp-action="Index">Tenants</a><icon name="chevron-right" class="icon-sm" /><a asp-action="Index">Plans</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">Plans and features</span></nav>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Plans and features</h1>
+        <p class="page-subtitle">What each plan includes, side by side. Prices, trials and names are set on each plan.</p>
+    </div>
+    <div class="page-actions">
+        <a class="btn btn-secondary" asp-action="New"><icon name="plus" class="icon-sm" /> New plan</a>
+    </div>
+</div>
+
+<ol class="how-it-works" aria-label="How plans and features work">
+    <li><span class="how-step">1</span><div><div class="how-title">Features come with the product</div><div class="how-desc">Each belongs to a part of the product and arrives marked <span class="chip chip-standard">Standard</span> (for every plan) or <span class="chip chip-premium">Premium</span> (for higher plans), as a suggestion.</div></div></li>
+    <li><span class="how-step">2</span><div><div class="how-title">You decide for each plan</div><div class="how-desc">Switch a feature on for the plans that include it, and set limits such as users and storage.</div></div></li>
+    <li><span class="how-step">3</span><div><div class="how-title">Subscribers get it straight away</div><div class="how-desc">Saving applies to everyone on the plan. Switched-off features disappear from their screens; their data stays.</div></div></li>
+</ol>
+
+@if (plans.Count == 0)
+{
+    <div class="empty-state">
+        <icon name="layers" />
+        <div class="empty-state-title">No plans yet</div>
+        <p class="mb-2">Without plans, every organisation has every feature. Create one to choose what it includes.</p>
+        <a class="btn btn-primary" asp-action="New">New plan</a>
+    </div>
+    return;
+}
+
+@if (newCount > 0)
+{
+    <section class="status-callout is-warning mb-4" aria-labelledby="new-title">
+        <icon name="sparkles" />
+        <div class="flex-grow-1">
+            <div class="status-callout-title" id="new-title">@newCount new @(newCount == 1 ? "feature needs" : "features need") a decision</div>
+            <ul class="new-features">
+                @foreach (var (item, waiting) in Model.Undecided)
+                {
+                    <li><span class="fw-medium">@item.Name</span> <partial name="_EntitlementBadges" model="(item, false)" /> <span class="text-muted">added in @item.Since · not decided for @string.Join(", ", waiting.Select(p => p.Name))</span></li>
+                }
+            </ul>
+            <div class="small text-muted">Until you decide, they follow the suggestion. Check the cells marked <span class="matrix-new-dot" aria-hidden="true"></span> Decide below and save, or take every suggestion at once.</div>
+            <form method="post" asp-action="AcceptSuggestions" class="mt-2">
+                <button class="btn btn-secondary btn-sm" type="submit"><icon name="check" class="icon-sm" /> Accept the suggestions</button>
+            </form>
+        </div>
+    </section>
+}
+
+<form method="post" asp-action="Features" class="panel plan-matrix-panel" data-plan-matrix>
+    <div class="scroll-x plan-matrix-scroll">
+        <table class="plan-matrix">
+            <thead>
+                <tr>
+                    <th scope="col" class="matrix-feature-col">Feature</th>
+                    @foreach (var plan in plans)
+                    {
+                        <th scope="col" class="matrix-plan @(plan.IsActive ? "" : "is-retired")">
+                            <a class="matrix-plan-name" asp-action="Edit" asp-route-id="@plan.Id">@plan.Name</a>
+                            <span class="matrix-plan-price">@Display.Money(plan.MonthlyPrice, plan.Currency) <span class="text-muted">/ month</span></span>
+                            <span class="matrix-plan-sub">@plan.SubscriberCount @(plan.SubscriberCount == 1 ? "subscriber" : "subscribers")@(plan.IsActive ? "" : " · retired")</span>
+                        </th>
+                    }
+                </tr>
+            </thead>
+            @foreach (var module in EntitlementCatalog.Modules)
+            {
+                var items = EntitlementCatalog.In(module.Code).ToList();
+                if (items.Count == 0) { continue; }
+                var hasFeatures = items.Exists(i => i.Kind == EntitlementKind.Feature);
+                <tbody data-matrix-module="@module.Code">
+                    <tr class="matrix-module">
+                        <th scope="rowgroup" colspan="@(plans.Count + 1)">
+                            <div class="matrix-module-head">
+                                <span class="file-tile" aria-hidden="true"><icon name="@module.Icon" /></span>
+                                <div class="flex-grow-1"><div class="matrix-module-name">@module.Name</div><div class="matrix-module-desc">@module.Description</div></div>
+                                @if (hasFeatures)
+                                {
+                                    <div class="matrix-module-actions">
+                                        <button class="btn btn-ghost btn-sm" type="button" data-matrix-set="on">Include in every plan</button>
+                                        <button class="btn btn-ghost btn-sm" type="button" data-matrix-set="off">Leave out of every plan</button>
+                                    </div>
+                                }
+                            </div>
+                        </th>
+                    </tr>
+                    @foreach (var item in items)
+                    {
+                        var rolling = Releases.Features.Any(f => f.PlanFeature == item.Code && f.Retired is null);
+                        <tr>
+                            <th scope="row" class="matrix-feature-col">
+                                <span class="matrix-feature-name">@item.Name @if (item.Unit is not null) {<span class="text-muted fw-normal">(@item.Unit)</span>}</span>
+                                <partial name="_EntitlementBadges" model="(item, false)" />
+                                @if (rolling) {<span class="chip" title="Organisations also get it when they take its release">By release</span>}
+                                <span class="matrix-feature-desc">@item.Description</span>
+                            </th>
+                            @foreach (var plan in plans)
+                            {
+                                var cell = $"{plan.Id}|{item.Code}";
+                                var decided = plan.HasDecided(item.Code);
+                                var value = plan.ValueOf(item.Code);
+                                var label = $"{item.Name} in {plan.Name}";
+                                <td class="matrix-cell @(decided ? "" : "is-new") @(plan.IsActive ? "" : "is-retired")">
+                                    <input type="hidden" name="cell" value="@cell" />
+                                    @if (item.Kind == EntitlementKind.Feature)
+                                    {
+                                        <div class="form-check form-switch m-0 d-inline-flex">
+                                            <input class="form-check-input" type="checkbox" role="switch" name="on:@cell" value="1" checked="@(value == 1)" aria-label="@label" data-matrix-feature />
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        var id = "u-" + plan.Id.ToString("N") + "-" + item.Code.Replace('.', '-');
+                                        <input class="form-control form-control-sm tabular matrix-limit" type="number" min="0" id="@id-v" name="limit:@cell" value="@value" aria-label="@label" />
+                                        <div class="form-check matrix-unlimited">
+                                            <input class="form-check-input" type="checkbox" id="@id" name="unlimited:@cell" value="1" checked="@(value is null)" data-unlimited-for="#@id-v" />
+                                            <label class="form-check-label small" for="@id">Unlimited</label>
+                                        </div>
+                                    }
+                                    @if (!decided) {<span class="matrix-new"><span class="matrix-new-dot" aria-hidden="true"></span> Decide</span>}
+                                </td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            }
+        </table>
+    </div>
+    <div class="panel-footer matrix-footer">
+        <span class="text-muted small"><span class="matrix-dirty">Unsaved changes. </span>Saving applies to every subscriber of these plans straight away.</span>
+        <button class="btn btn-primary" type="submit"><icon name="save" class="icon-sm" /> Save changes</button>
+    </div>
+</form>

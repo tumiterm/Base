@@ -18,7 +18,16 @@ public sealed record PlanSummary(
 {
     public long? ValueOf(string code) =>
         Entitlements.TryGetValue(code, out var value) ? value : EntitlementCatalog.Get(code).DefaultValue;
+
+    /// <summary>False for a feature or limit added since the plan was last saved: it follows its suggestion until then.</summary>
+    public bool HasDecided(string code) => Entitlements.ContainsKey(code);
+
+    /// <summary>Catalogued features and limits this plan hasn't decided on yet.</summary>
+    public IReadOnlyList<EntitlementDefinition> Undecided() => EntitlementCatalog.All.Where(e => !HasDecided(e.Code)).ToList();
 }
+
+/// <summary>One cell of the plans-and-features grid: a feature (1/0) or limit (maximum, null for unlimited) of a plan.</summary>
+public sealed record PlanEntitlementChange(Guid PlanId, string Code, long? Value);
 
 /// <param name="Entitlements">Every catalogued entitlement: features 1/0, limits a maximum or null for unlimited.</param>
 public sealed record SavePlanRequest(
