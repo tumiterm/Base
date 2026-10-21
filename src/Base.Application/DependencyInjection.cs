@@ -72,6 +72,12 @@ public static class DependencyInjection
         services.AddScoped<IScheduledJob, SubscriptionLifecycleJob>();
         services.AddScoped<IPaymentService, PaymentService>();
         services.AddScoped<IDomainEventHandler<PaymentSucceeded>, PaymentSucceededHandler>();
+        services.AddScoped<RecurringPayments>();
+        services.AddScoped<RecurringPaymentLifecycle>();
+        services.AddScoped<IDomainEventHandler<RecurringPaymentActivated>>(sp => sp.GetRequiredService<RecurringPaymentLifecycle>());
+        services.AddScoped<IDomainEventHandler<PaymentSucceeded>>(sp => sp.GetRequiredService<RecurringPaymentLifecycle>());
+        services.AddScoped<IDomainEventHandler<SubscriptionStatusChanged>>(sp => sp.GetRequiredService<RecurringPaymentLifecycle>());
+        services.AddScoped<IDomainEventHandler<RecurringPaymentStoppedByGateway>>(sp => sp.GetRequiredService<RecurringPaymentLifecycle>());
         services.AddScoped<IScheduledJob, PaymentExpiryJob>();
         services.AddScoped<SubscriptionNotices>();
         services.AddScoped<IDomainEventHandler<SubscriptionStatusChanged>>(sp => sp.GetRequiredService<SubscriptionNotices>());

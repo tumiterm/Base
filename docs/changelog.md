@@ -27,6 +27,10 @@ Add a line under **Unreleased** with every change. A release moves those lines u
   - **Payfast** gateway (`Payments:Gateways:Payfast`): card, Instant EFT, QR codes, Apple Pay, Samsung Pay and the
     rest of the merchant account's methods on Payfast's page; ITNs verified by signature, source, amount and
     Payfast's confirmation. Sandbox or live. Setup in `docs/payments.md`.
+  - **Automatic renewal**: "Renew automatically" when paying (Payfast Subscriptions, and the Test gateway). The gateway
+    charges every month or year; each charge renews the subscription and sends a receipt. Subscription shows the
+    renewal with Update card and Turn off; it stops by itself when the plan changes or the subscription ends, and the
+    organisation is emailed if the gateway stops it.
 - **Feature flags**: switch code on or off without a deployment, from Platform → Feature flags.
   - Off, everyone, or some organisations: the platform's own staff, chosen organisations and/or a stable percentage
     (growing it keeps those already in).

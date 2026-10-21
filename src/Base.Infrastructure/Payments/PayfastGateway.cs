@@ -117,6 +117,22 @@ public static class PayfastSignature
     public static string ForNotification(string parameters, string? passphrase) =>
         Md5(string.IsNullOrEmpty(passphrase) ? parameters : parameters + "&passphrase=" + Encode(passphrase));
 
+    /// <summary>
+    /// The API's signature: headers and body values with the passphrase, sorted alphabetically by name (unlike the
+    /// checkout, which keeps the documented order), encoded and hashed.
+    /// </summary>
+    public static string ForApi(IReadOnlyDictionary<string, string> values, string? passphrase)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        var all = new SortedDictionary<string, string>(values.ToDictionary(v => v.Key, v => v.Value, StringComparer.Ordinal), StringComparer.Ordinal);
+        if (!string.IsNullOrEmpty(passphrase))
+        {
+            all["passphrase"] = passphrase;
+        }
+
+        return Md5(string.Join('&', all.Select(v => Encode(v.Key) + "=" + Encode(v.Value))));
+    }
+
     private static string Decode(string value) => WebUtility.UrlDecode(value);
 
     private static string Md5(string text) =>
@@ -130,7 +146,7 @@ public static class PayfastSignature
 /// switched on): a signed form the browser posts to Payfast, and the ITN Payfast posts back, checked four ways as
 /// Payfast requires (signature, source, amount, server confirmation).
 /// </summary>
-internal sealed partial class PayfastGateway(IOptions<PayfastOptions> options, IHttpClientFactory httpClients, ILogger<PayfastGateway> logger) : IPaymentGateway
+internal sealed partial class PayfastGateway(IOptions<PayfastOptions> options, IHttpClientFactory httpClients, TimeProvider time, ILogger<PayfastGateway> logger) : IPaymentGateway
 {
     public const string GatewayCode = "Payfast";
     public const string HttpClientName = "payfast";
@@ -151,12 +167,22 @@ internal sealed partial class PayfastGateway(IOptions<PayfastOptions> options, I
 
     public IReadOnlyList<string> Currencies { get; } = ["ZAR"];
 
+    /// <summary>Payfast Subscriptions: Payfast charges the card every month or year until stopped.</summary>
+    public bool SupportsRecurring => true;
+
+    public bool SupportsCardUpdate => true;
+
     public Task<CheckoutStart> StartCheckoutAsync(CheckoutRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         if (request.Amount < MinimumAmount)
         {
             return Task.FromResult(CheckoutStart.Failed("Payfast can't take payments under R5.00."));
+        }
+
+        if (request.RenewEvery is not null && string.IsNullOrEmpty(_options.Passphrase))
+        {
+            return Task.FromResult(CheckoutStart.Failed("Automatic renewal through Payfast needs the merchant passphrase to be configured."));
         }
 
         var fields = CheckoutFields(_options, request);
@@ -212,7 +238,54 @@ internal sealed partial class PayfastGateway(IOptions<PayfastOptions> options, I
             payfastId,
             kind,
             amount,
-            kind == GatewayNotificationKind.Failed ? "Payfast reported the payment as failed." : $"Payfast {status}{(string.IsNullOrEmpty(fee) ? string.Empty : ", fee " + fee)}");
+            kind == GatewayNotificationKind.Failed ? "Payfast reported the payment as failed." : $"Payfast {status}{(string.IsNullOrEmpty(fee) ? string.Empty : ", fee " + fee)}",
+            f.GetValueOrDefault("token") is { Length: > 0 } token ? token : null);
+    }
+
+    /// <summary>
+    /// Cancels a Payfast subscription through Payfast's API: <c>PUT /subscriptions/{token}/cancel</c>, signed with the
+    /// merchant ID, version and timestamp headers (<c>?testing=true</c> against the sandbox).
+    /// </summary>
+    public async Task<GatewayResult> CancelRecurringAsync(string token, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(token);
+        var headers = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["merchant-id"] = _options.MerchantId,
+            ["version"] = "v1",
+            ["timestamp"] = time.GetUtcNow().ToString("yyyy-MM-dd'T'HH:mm:sszzz", CultureInfo.InvariantCulture),
+        };
+        using var request = new HttpRequestMessage(HttpMethod.Put, new Uri($"https://api.payfast.co.za/subscriptions/{Uri.EscapeDataString(token)}/cancel{(_options.Sandbox ? "?testing=true" : string.Empty)}"));
+        foreach (var header in headers)
+        {
+            request.Headers.TryAddWithoutValidation(header.Key, header.Value);
+        }
+
+        request.Headers.TryAddWithoutValidation("signature", PayfastSignature.ForApi(headers, _options.Passphrase));
+        try
+        {
+            using var response = await httpClients.CreateClient(HttpClientName).SendAsync(request, cancellationToken);
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            if (response.IsSuccessStatusCode && body.Contains("\"success\"", StringComparison.OrdinalIgnoreCase))
+            {
+                return GatewayResult.Ok();
+            }
+
+            LogCancelRefused(logger, (int)response.StatusCode, body.Length > 300 ? body[..300] : body);
+            return GatewayResult.Failed($"Payfast answered {(int)response.StatusCode}.");
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            LogCancelUnreachable(logger, ex);
+            return GatewayResult.Failed("Payfast couldn't be reached.");
+        }
+    }
+
+    /// <summary>Payfast's page where the payer changes the card a subscription charges, then comes back.</summary>
+    public Uri? UpdateCardUrl(string token, Uri returnUrl)
+    {
+        ArgumentNullException.ThrowIfNull(returnUrl);
+        return new Uri($"https://{_options.Host}/eng/recurring/update/{Uri.EscapeDataString(token)}?return={PayfastSignature.Encode(returnUrl.AbsoluteUri)}");
     }
 
     /// <summary>The checkout fields, in the order Payfast's documentation lists them (the signature depends on it).</summary>
@@ -228,6 +301,12 @@ internal sealed partial class PayfastGateway(IOptions<PayfastOptions> options, I
         new("amount", request.Amount.ToString("0.00", CultureInfo.InvariantCulture)),
         new("item_name", Limit(request.Description, 100)),
         new("payment_method", options.PaymentMethod?.Trim() ?? string.Empty),
+
+        // Subscriptions (recurring billing): charged every month or year from today, until cancelled.
+        new("subscription_type", request.RenewEvery is null ? string.Empty : "1"),
+        new("recurring_amount", request.RenewEvery is null ? string.Empty : request.Amount.ToString("0.00", CultureInfo.InvariantCulture)),
+        new("frequency", request.RenewEvery switch { null => string.Empty, Domain.Subscriptions.BillingCycle.Annual => "6", _ => "3" }),
+        new("cycles", request.RenewEvery is null ? string.Empty : "0"),
     ];
 
     private async Task<bool> IsPayfastAddressAsync(string? remoteIp, CancellationToken cancellationToken)
@@ -295,6 +374,12 @@ internal sealed partial class PayfastGateway(IOptions<PayfastOptions> options, I
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Couldn't reach Payfast to confirm an ITN; it will be retried")]
     private static partial void LogConfirmationFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Payfast refused to cancel a subscription: {Status} {Body}")]
+    private static partial void LogCancelRefused(ILogger logger, int status, string body);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Couldn't reach Payfast to cancel a subscription")]
+    private static partial void LogCancelUnreachable(ILogger logger, Exception exception);
 }
 
 /// <summary>Payfast's site answers. Degraded, not unhealthy: only online payments wait for it.</summary>

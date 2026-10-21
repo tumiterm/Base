@@ -98,6 +98,50 @@ public sealed class PayfastTests
         (await Gateway(checkedSource, "VALID").ReadNotificationAsync(Itn(ItnBody, "198.51.100.1"), CancellationToken.None)).Detail!.ShouldContain("isn't Payfast's");
     }
 
+    [Fact]
+    public async Task Automatic_renewal_adds_payfasts_subscription_fields_signed_like_its_php_sample_and_needs_the_passphrase()
+    {
+        var renewing = Checkout with { RenewEvery = Base.Domain.Subscriptions.BillingCycle.Annual };
+        var fields = PayfastGateway.CheckoutFields(Options().Value, renewing);
+        PayfastSignature.ForCheckout(fields, Passphrase).ShouldBe("fadc331897181919bfb121855e65cafd");
+
+        var form = (await Gateway(Options(), "VALID").StartCheckoutAsync(renewing, CancellationToken.None)).Redirect!.FormFields!;
+        form["subscription_type"].ShouldBe("1");
+        form["frequency"].ShouldBe("6", "annual");
+        form["cycles"].ShouldBe("0", "until cancelled");
+        form["recurring_amount"].ShouldBe("3000.00");
+        (await Gateway(Options(passphrase: string.Empty), "VALID").StartCheckoutAsync(renewing, CancellationToken.None)).Error!.ShouldContain("passphrase");
+
+        PayfastGateway.CheckoutFields(Options().Value, Checkout with { RenewEvery = Base.Domain.Subscriptions.BillingCycle.Monthly })
+            .Single(f => f.Key == "frequency").Value.ShouldBe("3", "monthly");
+    }
+
+    [Fact]
+    public async Task A_renewal_itn_carries_its_token_and_cancelling_calls_payfasts_api_signed_alphabetically()
+    {
+        var withToken = ItnBody.Replace("&signature=f44ee63ed097b7c35218f577712492cb", string.Empty, StringComparison.Ordinal) + "&token=dc0521d3-55fe-269b-fa00-b647310d760f";
+        var signed = withToken + "&signature=" + PayfastSignature.ForNotification(PayfastSignature.NotificationParameters(withToken), Passphrase);
+        (await Gateway(Options(), "VALID").ReadNotificationAsync(Itn(signed), CancellationToken.None)).RecurringToken.ShouldBe("dc0521d3-55fe-269b-fa00-b647310d760f");
+
+        PayfastSignature.ForApi(new Dictionary<string, string>(StringComparer.Ordinal) { ["version"] = "v1", ["merchant-id"] = "10000100", ["timestamp"] = "2026-01-15T08:00:00+00:00" }, Passphrase)
+            .ShouldBe("88979cb6250ce58b1c5d932585033d2d", "PHP: ksort + http_build_query with the passphrase");
+
+        var clients = new AnsweringClients("""{"code":200,"status":"success","data":{"response":true}}""");
+        (await Gateway(Options(sandbox: true), "", clients).CancelRecurringAsync("dc0521d3-55fe-269b-fa00-b647310d760f", CancellationToken.None)).Succeeded.ShouldBeTrue();
+        var sent = clients.Last!;
+        sent.Method.ShouldBe(HttpMethod.Put);
+        sent.RequestUri!.AbsoluteUri.ShouldBe("https://api.payfast.co.za/subscriptions/dc0521d3-55fe-269b-fa00-b647310d760f/cancel?testing=true");
+        sent.Headers.GetValues("merchant-id").ShouldBe(["10000100"]);
+        sent.Headers.GetValues("timestamp").ShouldBe(["2026-01-15T08:00:00+00:00"]);
+        sent.Headers.GetValues("signature").ShouldBe(["88979cb6250ce58b1c5d932585033d2d"]);
+
+        var refused = new AnsweringClients("""{"code":404,"status":"failed"}""", HttpStatusCode.NotFound);
+        (await Gateway(Options(), "", refused).CancelRecurringAsync("nope", CancellationToken.None)).Error.ShouldBe("Payfast answered 404.");
+
+        Gateway(Options(sandbox: true), "VALID").UpdateCardUrl("dc0521d3-55fe-269b-fa00-b647310d760f", new Uri("https://acme.example.com/subscription"))!.AbsoluteUri
+            .ShouldBe("https://sandbox.payfast.co.za/eng/recurring/update/dc0521d3-55fe-269b-fa00-b647310d760f?return=https%3A%2F%2Facme.example.com%2Fsubscription");
+    }
+
     private static InboundNotification Itn(string body, string? remoteIp = "203.0.113.9") =>
         new(
             body,
@@ -117,19 +161,27 @@ public sealed class PayfastTests
             AllowedSourceAddresses = allowed ?? [],
         });
 
-    private static PayfastGateway Gateway(IOptions<PayfastOptions> options, string answer) =>
-        new(options, new AnsweringClients(answer), NullLogger<PayfastGateway>.Instance);
+    private static PayfastGateway Gateway(IOptions<PayfastOptions> options, string answer, AnsweringClients? clients = null) =>
+        new(options, clients ?? new AnsweringClients(answer), new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 1, 15, 8, 0, 0, TimeSpan.Zero)), NullLogger<PayfastGateway>.Instance);
 
-    /// <summary>Stands in for Payfast's /eng/query/validate, answering every request the same.</summary>
-    private sealed class AnsweringClients(string answer) : IHttpClientFactory
+    /// <summary>Stands in for Payfast's servers, answering every request the same and remembering the last one.</summary>
+    private sealed class AnsweringClients(string answer, HttpStatusCode status = HttpStatusCode.OK) : IHttpClientFactory
     {
-        public HttpClient CreateClient(string name) => new(new Answer(answer));
+        public HttpRequestMessage? Last { get; private set; }
 
-        private sealed class Answer(string body) : HttpMessageHandler
+        public HttpClient CreateClient(string name) => new(new Answer(this));
+
+        private sealed class Answer(AnsweringClients owner) : HttpMessageHandler
         {
-            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
-                Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body) });
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                owner.Last = request;
+                return Task.FromResult(new HttpResponseMessage(owner._status) { Content = new StringContent(owner._answer) });
+            }
         }
+
+        private readonly string _answer = answer;
+        private readonly HttpStatusCode _status = status;
     }
 }
 

@@ -14,6 +14,10 @@
             <div class="text-muted small">@c.Description</div>
             <div class="test-checkout-amount">@Display.Money(c.Amount, c.Currency)</div>
             <div class="small text-muted">Reference <span class="mono">@c.Reference</span></div>
+            @if (c.Recurring)
+            {
+                <div class="small mt-2"><icon name="refresh-cw" class="icon-sm" /> Also sets up automatic renewal: this amount every period until turned off.</div>
+            }
         </div>
         <form method="post" asp-action="Answer" class="d-flex flex-wrap gap-2">
             <input type="hidden" name="token" value="@Model.Token" />

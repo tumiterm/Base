@@ -115,7 +115,8 @@ public sealed record SubscriptionPageViewModel(
     TenantAccess Access,
     IReadOnlyList<Base.Application.Payments.PaymentGatewayView> Gateways,
     IReadOnlyList<Base.Application.Payments.PaymentView> Payments,
-    bool CanPay);
+    bool CanPay,
+    Base.Application.Payments.RecurringPaymentView? Recurring = null);
 
 /// <summary>The pay form as posted from the subscription page.</summary>
 public sealed class PayForm
@@ -125,6 +126,8 @@ public sealed class PayForm
     public BillingCycle BillingCycle { get; set; }
 
     public string Gateway { get; set; } = string.Empty;
+
+    public bool RenewAutomatically { get; set; }
 }
 
 public sealed record PlatformPaymentsViewModel(

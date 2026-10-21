@@ -88,6 +88,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
     public DbSet<FeatureFlagState> FeatureFlags => Set<FeatureFlagState>();
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<PaymentNotification> PaymentNotifications => Set<PaymentNotification>();
+    public DbSet<RecurringPayment> RecurringPayments => Set<RecurringPayment>();
 
     public DbSet<MessageTemplate> MessageTemplates => Set<MessageTemplate>();
 

@@ -36,8 +36,15 @@ application in PCI DSS scope.
 - **Payfast** is the first real gateway: a signed form posted to Payfast's checkout, and ITNs accepted only after the
   four checks Payfast requires (signature, source address, amount, server confirmation). Its signature code is
   tested against Payfast's own PHP samples. Setup is in `docs/payments.md`.
-- **Not yet:** automatic renewal by a saved card (Payfast tokenisation), refunds and invoices. Renewal is a "Pay"
-  each period; the lifecycle job moves unpaid subscriptions to past due and suspended as before.
+- **Automatic renewal is the gateway's.** A `RecurringPayment` records the agreement (plan, cycle, amount, the
+  gateway's token) set up by a first payment with "Renew automatically"; the gateway charges each cycle by itself
+  (Payfast Subscriptions) and each charge's notification becomes a renewal `Payment`, applied like any other. We keep
+  no card details and run no charging schedule. One renewal per organisation: a newer one, a one-off payment for
+  another plan or cycle, the subscription ending, or the organisation turning it off stops it at the gateway first
+  (`IPaymentGateway.CancelRecurringAsync`); a stop the gateway refused stays visible with its reason. Gateways
+  without recurring billing simply don't offer it.
+- **Not yet:** refunds and invoices. Without automatic renewal, renewal is a "Pay" each period; the lifecycle job
+  moves unpaid subscriptions to past due and suspended as before.
 
 **Consequences.**
 - Adding a provider is one adapter and its configuration; subscription, screens and tests don't change.

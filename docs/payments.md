@@ -81,7 +81,34 @@ configured Payfast host automatically.
 Switch to live credentials, set `Sandbox` to `false`, check `General.PublicBaseUrl`, and make one small real payment
 (Payfast's minimum is R5.00; its fees on test payments aren't refunded).
 
+## Automatic renewal
+
+When the chosen gateway can charge by itself (Payfast, and the Test gateway), the pay form offers **Renew
+automatically** (on by default). The first payment sets up the renewal; after that the gateway charges the same amount
+every month or year and each charge arrives as a notification: it is recorded as a renewal payment, moves the
+subscription on a period and emails a receipt. Subscription shows the renewal with **Update card** (Payfast's card
+page) and **Turn off**.
+
+There is at most one renewal per organisation, for the plan it pays for. It is stopped, at the gateway first:
+
+- when the organisation turns it off;
+- when a newer renewal is set up, or a one-off payment is made for another plan or period (one for the same plan
+  and period just pays ahead);
+- when the subscription is cancelled or expires.
+
+If the gateway stops it by itself (the payer cancels at Payfast...), the organisation's contact is emailed. If the
+gateway can't be reached to stop it, the renewal stays on with the reason on the Subscription page: try again, or
+cancel it in the gateway's dashboard. A charge that still arrives is recorded, since the money was taken.
+
+**Payfast** uses its Subscriptions (recurring billing): `subscription_type=1`, `frequency` 3 (monthly) or 6 (annual),
+`cycles=0` (until cancelled), and the ITN's `token`. It needs the passphrase. Turning a renewal off calls Payfast's
+API (`PUT https://api.payfast.co.za/subscriptions/{token}/cancel`, `?testing=true` against the sandbox, signed with
+the merchant ID, version and timestamp headers sorted alphabetically). Check the cancel once against your sandbox
+before going live; if Payfast changes it, the renewal shows why it couldn't be stopped.
+
+**Test gateway**: the renewal panel has **Simulate the next charge**, which sends the notification a real gateway
+would at the end of the period.
+
 ## Not yet
 
-Automatic renewal (Payfast subscriptions or tokenisation), refunds and invoices. Until then, organisations pay each
-period from Subscription; unpaid subscriptions go past due and are suspended by the lifecycle job as before.
+Refunds, invoices and Yoco.

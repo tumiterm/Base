@@ -102,6 +102,34 @@ public sealed class Payment : EntityBase, ITenantOwned
 
     public bool IsFinal => Status is PaymentStatus.Succeeded or PaymentStatus.Failed or PaymentStatus.Cancelled;
 
+    /// <summary>The automatic renewal this payment set up (the first payment) or was charged under (a renewal).</summary>
+    public Guid? RecurringPaymentId { get; private set; }
+
+    /// <summary>Charged by the gateway under an automatic renewal, not started by a person.</summary>
+    public bool IsRenewal { get; private set; }
+
+    /// <summary>The first payment of an automatic renewal.</summary>
+    public void SetsUp(RecurringPayment recurring)
+    {
+        ArgumentNullException.ThrowIfNull(recurring);
+        RecurringPaymentId = recurring.Id;
+    }
+
+    /// <summary>A charge the gateway made by itself under an automatic renewal: already paid when it is recorded.</summary>
+    public static Payment Renewal(RecurringPayment recurring, string description, string? gatewayReference, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(recurring);
+        var payment = new Payment(
+            recurring.TenantId, recurring.Gateway, recurring.Amount, recurring.Currency, description, recurring.PlanId, recurring.BillingCycle,
+            null, "Automatic renewal", now, TimeSpan.Zero)
+        {
+            RecurringPaymentId = recurring.Id,
+            IsRenewal = true,
+        };
+        payment.Succeed(gatewayReference, now);
+        return payment;
+    }
+
     public void Started(string? gatewayReference)
     {
         if (!string.IsNullOrWhiteSpace(gatewayReference))

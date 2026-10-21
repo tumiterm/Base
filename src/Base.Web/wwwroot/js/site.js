@@ -796,3 +796,18 @@ document.querySelectorAll('input[type="file"][data-fill-title]').forEach((input)
     const seconds = Number(document.querySelector('[data-reload-in]')?.dataset.reloadIn);
     if (seconds > 0) setTimeout(() => window.location.reload(), seconds * 1000);
 })();
+
+// Subscription: "Renew automatically" shows only for a payment provider that can.
+(() => {
+    const option = document.querySelector('[data-renew-option]');
+    if (!option) return;
+    const radios = [...document.querySelectorAll('input[name="Gateway"][data-recurring]')];
+    const layout = () => {
+        const chosen = radios.find((r) => r.checked);
+        const can = chosen?.dataset.recurring === 'true';
+        option.hidden = !can;
+        option.querySelector('input').disabled = !can;
+    };
+    radios.forEach((r) => r.addEventListener('change', layout));
+    layout();
+})();

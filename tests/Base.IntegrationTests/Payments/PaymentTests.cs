@@ -122,7 +122,7 @@ public sealed class PaymentTests(SqlServerFixture sql) : IAsyncLifetime
         var waiting = await PendingReferenceAsync("Scripted");
         _app.Time.Advance(TimeSpan.FromHours(3));
         var result = await _app.InScopeAsync(null, sp => sp.GetServices<IScheduledJob>().Single(j => j.Code == "payment-expiry").RunAsync(CancellationToken.None));
-        result.ShouldBe("Expired 1 payment(s)");
+        result.ShouldBe("Expired 1 payment(s) and 0 unfinished automatic renewal(s)");
         (await StatusAsync(waiting)).ShouldBe(PaymentStatus.Expired);
     }
 
@@ -143,6 +143,104 @@ public sealed class PaymentTests(SqlServerFixture sql) : IAsyncLifetime
         var all = (await _app.InScopeAsync(_app.DefaultTenantId, sp => sp.GetRequiredService<IPaymentService>().ListAllAsync(new PaymentQuery()))).GetDataOrThrow();
         all.Items.ShouldHaveSingleItem().TenantName.ShouldBe("Acme");
     }
+
+    [Fact]
+    public async Task An_automatic_renewal_charges_each_period_by_itself_and_each_charge_counts_once()
+    {
+        var first = await PaidRenewingAsync(_pro, BillingCycle.Annual, "evt-1");
+        var renewal = (await Payments(p => p.RecurringMineAsync())).GetDataOrThrow().ShouldNotBeNull();
+        renewal.ShouldSatisfyAllConditions(
+            r => r.Status.ShouldBe(RecurringPaymentStatus.Active),
+            r => r.Charges.ShouldBe(1),
+            r => r.Amount.ShouldBe(3000m),
+            r => r.FirstReference.ShouldBe(first));
+        (await SubscriptionAsync()).CurrentPeriodEnd.ShouldBe(_app.Time.GetUtcNow().AddYears(1));
+
+        _app.Time.Advance(TimeSpan.FromDays(365));
+        var charge = Test(t => t.RenewalNotice(first, 3000m, "ZAR")).ToDictionary(StringComparer.Ordinal);
+        (await ReceiveAsync("test", charge)).StatusCode.ShouldBe(200);
+        (await ReceiveAsync("test", charge)).StatusCode.ShouldBe(200, "a repeated charge notice is acknowledged once");
+        await DeliverAsync();
+
+        (await SubscriptionAsync()).ShouldSatisfyAllConditions(
+            s => s.Status.ShouldBe(SubscriptionStatus.Active),
+            s => s.CurrentPeriodEnd.ShouldBe(_app.Time.GetUtcNow().AddYears(1)));
+        var history = (await Payments(p => p.ListMineAsync(new PaymentQuery()))).GetDataOrThrow().Items;
+        history.Count(p => p.IsRenewal && p.Status == PaymentStatus.Succeeded).ShouldBe(1);
+        history.Single(p => p.Reference == first).SetsUpRenewal.ShouldBeTrue();
+        (await Payments(p => p.RecurringMineAsync())).GetDataOrThrow()!.Charges.ShouldBe(2);
+        _app.Sent.On(NotificationChannel.Email).Count(m => m.Subject!.StartsWith("Payment received", StringComparison.Ordinal)).ShouldBe(2, "a receipt for each charge");
+    }
+
+    [Fact]
+    public async Task One_renewal_at_a_time_and_it_stops_when_the_plan_changes_the_subscription_ends_or_someone_turns_it_off()
+    {
+        await PaidRenewingAsync(_pro, BillingCycle.Annual, "evt-a");
+        await PaidRenewingAsync(_starter, BillingCycle.Monthly, "evt-b");
+        (await RenewalsAsync()).ShouldBe(["STARTER Monthly Active", "PRO Annual Cancelled: Replaced by a newer automatic renewal."], ignoreOrder: true);
+
+        // A one-off payment for the same plan pays ahead and keeps it; for another plan it replaces it.
+        await PaidAsync(new PayRequest(_starter, BillingCycle.Monthly, "Test"), "evt-c");
+        (await RenewalsAsync()).ShouldContain("STARTER Monthly Active");
+        await PaidAsync(new PayRequest(_pro, BillingCycle.Monthly, "Test"), "evt-d");
+        (await RenewalsAsync()).ShouldContain("STARTER Monthly Cancelled: Replaced by a payment for another plan or period.");
+
+        await PaidRenewingAsync(_pro, BillingCycle.Monthly, "evt-e");
+        var id = (await Payments(p => p.RecurringMineAsync())).GetDataOrThrow()!.Id;
+        (await Payments(p => p.StopRecurringAsync(id))).Message!.ShouldStartWith("Automatic renewal is off.");
+        (await Payments(p => p.RecurringMineAsync())).GetDataOrThrow().ShouldBeNull();
+
+        await PaidRenewingAsync(_pro, BillingCycle.Monthly, "evt-f");
+        (await _app.InScopeAsync(_app.DefaultTenantId, sp => sp.GetRequiredService<ISubscriptionService>().CancelAsync(_tenant, atPeriodEnd: false))).IsSuccess.ShouldBeTrue();
+        await DeliverAsync();
+        (await RenewalsAsync()).ShouldAllBe(r => !r.Contains("Active", StringComparison.Ordinal), "nothing is charged after the subscription ends");
+    }
+
+    [Fact]
+    public async Task The_gateway_stopping_a_renewal_tells_the_organisation_and_a_failed_stop_is_shown_until_it_works()
+    {
+        var first = await PaidRenewingAsync(_pro, BillingCycle.Monthly, "evt-1");
+        var stopped = Test(t => t.RenewalNotice(first, 300m, "ZAR")).ToDictionary(StringComparer.Ordinal);
+        stopped["outcome"] = "cancel";
+        await ReceiveAsync("test", stopped);
+        await DeliverAsync();
+        (await RenewalsAsync()).ShouldBe(["PRO Monthly Cancelled: Stopped at Test payments."]);
+        _app.Sent.On(NotificationChannel.Email).ShouldContain(m => m.To == "owner@acme.test" && m.Subject == "Automatic renewal stopped for PRO");
+
+        // A gateway that can't be reached: the renewal stays on, with the reason, so it can be stopped another way.
+        var scripted = (await Pay(new PayRequest(_pro, BillingCycle.Monthly, "Scripted", RenewAutomatically: true))).GetDataOrThrow().FormFields!["reference"];
+        await ReceiveAsync("scripted", Form(scripted, "paid", "s-1", token: "SCR-TOKEN"));
+        await DeliverAsync();
+        var live = (await Payments(p => p.RecurringMineAsync())).GetDataOrThrow()!;
+        var refused = await Payments(p => p.StopRecurringAsync(live.Id));
+        refused.IsError.ShouldBeTrue();
+        refused.Message!.ShouldContain("cancel it in the Scripted dashboard");
+        (await Payments(p => p.RecurringMineAsync())).GetDataOrThrow()!.StopError.ShouldNotBeNull();
+    }
+
+    private async Task<string> PaidRenewingAsync(Guid plan, BillingCycle cycle, string eventId) =>
+        await PaidAsync(new PayRequest(plan, cycle, "Test", RenewAutomatically: true), eventId);
+
+    private async Task<string> PaidAsync(PayRequest request, string eventId)
+    {
+        var redirect = (await Pay(request)).GetDataOrThrow();
+        var token = Uri.UnescapeDataString(redirect.Url.Query[(redirect.Url.Query.IndexOf('=', StringComparison.Ordinal) + 1)..]);
+        (await ReceiveAsync("test", TestForm(token, "pay", eventId))).StatusCode.ShouldBe(200);
+        await DeliverAsync();
+        return Test(t => t.Read(token))!.Reference;
+    }
+
+    private Task<List<string>> RenewalsAsync() =>
+        _app.InScopeAsync(null, async sp =>
+        {
+            var db = sp.GetRequiredService<AppDbContext>();
+            return await db.RecurringPayments.IgnoreQueryFilters().Where(r => r.TenantId == _tenant)
+                .Join(db.Plans, r => r.PlanId, p => p.Id, (r, p) => new { p.Name, r.BillingCycle, r.Status, r.CancelReason })
+                .Select(r => r.Name + " " + r.BillingCycle + " " + r.Status + (r.CancelReason == null ? "" : ": " + r.CancelReason))
+                .ToListAsync();
+        });
+
+    private T Test<T>(Func<ITestCheckout, T> read) => read(_app.Services.CreateScope().ServiceProvider.GetRequiredService<ITestCheckout>());
 
     private async Task<string> PendingReferenceAsync(string gateway)
     {
@@ -181,7 +279,7 @@ public sealed class PaymentTests(SqlServerFixture sql) : IAsyncLifetime
     private static Dictionary<string, string> TestForm(string token, string outcome, string eventId) =>
         new(StringComparer.Ordinal) { ["token"] = token, ["outcome"] = outcome, ["event"] = eventId };
 
-    private static Dictionary<string, string> Form(string reference, string status, string eventId, bool verified = true, string? amount = null) =>
+    private static Dictionary<string, string> Form(string reference, string status, string eventId, bool verified = true, string? amount = null, string? token = null) =>
         new(StringComparer.Ordinal)
         {
             ["reference"] = reference,
@@ -189,6 +287,7 @@ public sealed class PaymentTests(SqlServerFixture sql) : IAsyncLifetime
             ["event"] = eventId,
             ["verified"] = verified ? "yes" : "no",
             ["amount"] = amount ?? "300.00",
+            ["token"] = token ?? string.Empty,
         };
 
     /// <summary>A gateway whose notifications say whatever the test posts, including that they aren't verified.</summary>
@@ -202,6 +301,10 @@ public sealed class PaymentTests(SqlServerFixture sql) : IAsyncLifetime
 
         public IReadOnlyList<string> Currencies { get; } = ["ZAR"];
 
+        public bool SupportsRecurring => true;
+
+        public Task<GatewayResult> CancelRecurringAsync(string token, CancellationToken cancellationToken) => Task.FromResult(GatewayResult.Failed("Unreachable."));
+
         public Task<CheckoutStart> StartCheckoutAsync(CheckoutRequest request, CancellationToken cancellationToken) =>
             Task.FromResult(CheckoutStart.Go(new CheckoutRedirect(new Uri("https://scripted.example.com/pay"), new Dictionary<string, string>(StringComparer.Ordinal) { ["reference"] = request.Reference })));
 
@@ -214,7 +317,9 @@ public sealed class PaymentTests(SqlServerFixture sql) : IAsyncLifetime
             }
 
             var kind = f["status"] == "paid" ? GatewayNotificationKind.Paid : GatewayNotificationKind.Failed;
-            return Task.FromResult(new GatewayNotification(true, f["event"], f["reference"], "SCR-" + f["event"], kind, decimal.Parse(f["amount"], CultureInfo.InvariantCulture), kind == GatewayNotificationKind.Failed ? "Card declined." : null));
+            return Task.FromResult(new GatewayNotification(
+                true, f["event"], f["reference"], "SCR-" + f["event"], kind, decimal.Parse(f["amount"], CultureInfo.InvariantCulture),
+                kind == GatewayNotificationKind.Failed ? "Card declined." : null, f.GetValueOrDefault("token") is { Length: > 0 } t ? t : null));
         }
     }
 }

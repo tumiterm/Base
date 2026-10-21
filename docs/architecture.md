@@ -101,6 +101,9 @@ invitation, sent as the new tenant so its links use the tenant's domain).
   subscription once (same plan extends; another plan or cycle starts a fresh period) and sends the receipt. Gateways
   are registered from `Payments:Gateways:{Code}`: `Payfast` (setup in `docs/payments.md`) and `Test`, a pretend
   gateway for development and tests. Configured gateways' checkout hosts join the CSP `form-action`.
+- Automatic renewal: a `RecurringPayment` (set up by the first payment, activated by the gateway's token) has the
+  gateway charge each cycle; each charge's notification becomes a renewal `Payment`. `RecurringPaymentLifecycle`
+  keeps one per organisation and stops it at the gateway on replacement, plan change or subscription end.
 - A new feature or limit: a constant in `FeatureCodes`/`LimitCodes` + an `EntitlementCatalog` entry (module, `Since`,
   suggested `FeatureTier`) + the check. Plans that were saved before it existed haven't *decided* on it (no
   `PlanEntitlement` row): they follow the suggestion and the plans screens ask for a decision. Platform > Plans >

@@ -31,15 +31,16 @@ public sealed class SubscriptionController(
     {
         var mine = await subscriptions.GetMineAsync(cancellationToken);
         var currency = mine.Subscription?.Currency ?? (mine.Plans.Count > 0 ? mine.Plans[0].Currency : null);
-        var history = currentUser.HasPermission(PermissionCodes.Subscription.View)
-            ? (await payments.ListMineAsync(new PaymentQuery(PageSize: 10), cancellationToken)).Data?.Items ?? []
-            : [];
+        var canView = currentUser.HasPermission(PermissionCodes.Subscription.View);
+        var history = canView ? (await payments.ListMineAsync(new PaymentQuery(PageSize: 10), cancellationToken)).Data?.Items ?? [] : [];
+        var recurring = canView ? (await payments.RecurringMineAsync(cancellationToken)).Data : null;
         return View(new SubscriptionPageViewModel(
             mine,
             await entitlements.GetAsync(cancellationToken),
             payments.Gateways(currency),
             history,
-            currentUser.HasPermission(PermissionCodes.Subscription.Pay)));
+            currentUser.HasPermission(PermissionCodes.Subscription.Pay),
+            recurring));
     }
 
     /// <summary>Starts paying: to the gateway's page, by redirect or a form the browser posts by itself.</summary>
@@ -48,7 +49,7 @@ public sealed class SubscriptionController(
     public async Task<IActionResult> Pay(PayForm form, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(form);
-        var started = await payments.StartAsync(new PayRequest(form.PlanId, form.BillingCycle, form.Gateway), await UrlsAsync(cancellationToken), cancellationToken);
+        var started = await payments.StartAsync(new PayRequest(form.PlanId, form.BillingCycle, form.Gateway, form.RenewAutomatically), await UrlsAsync(cancellationToken), cancellationToken);
         if (started.IsError)
         {
             if (started.ErrorType is Application.Common.Results.ErrorType.Forbidden)
@@ -62,6 +63,30 @@ public sealed class SubscriptionController(
 
         var redirect = started.Data!;
         return redirect.IsFormPost ? View("GatewayRedirect", redirect) : Redirect(redirect.Url.AbsoluteUri);
+    }
+
+    /// <summary>Turns automatic renewal off, at the gateway too.</summary>
+    [HttpPost("renewal/{id:guid}/stop")]
+    [HasPermission(PermissionCodes.Subscription.Pay)]
+    public async Task<IActionResult> StopRenewal(Guid id, CancellationToken cancellationToken)
+    {
+        this.Flash(await payments.StopRecurringAsync(id, cancellationToken));
+        return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>To the gateway's page for changing the card the renewal charges; it sends the person back here.</summary>
+    [HttpPost("renewal/{id:guid}/card")]
+    [HasPermission(PermissionCodes.Subscription.Pay)]
+    public async Task<IActionResult> UpdateCard(Guid id, CancellationToken cancellationToken)
+    {
+        var url = await payments.UpdateCardAsync(id, new Uri($"{Request.Scheme}://{Request.Host}{Request.PathBase}/subscription"), cancellationToken);
+        if (url.IsError)
+        {
+            this.Flash(Application.Common.Results.ValidationResponse.Failure(url.Message ?? "The card can't be changed online."));
+            return RedirectToAction(nameof(Index));
+        }
+
+        return Redirect(url.Data!.AbsoluteUri);
     }
 
     /// <summary>Where the gateway sends the person back to; the gateway's own notification decides the outcome.</summary>
@@ -144,16 +169,17 @@ internal sealed class RawBodyAttribute(int maxBytes) : Attribute, IResourceFilte
 
 /// <summary>The built-in Test gateway's checkout page (only when <c>Payments:Gateways:Test:Enabled</c>).</summary>
 [Route("payments/test")]
-[AllowAnonymous]
 public sealed class TestCheckoutController(IPaymentService payments, IServiceProvider services) : Controller
 {
     [HttpGet("")]
+    [AllowAnonymous]
     public IActionResult Index(string token) =>
         services.GetService<ITestCheckout>()?.Read(token ?? string.Empty) is { } checkout
             ? View(new TestCheckoutViewModel(token!, checkout, Guid.NewGuid().ToString("N")))
             : NotFound();
 
     [HttpPost("")]
+    [AllowAnonymous]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Answer(string token, string outcome, string @event, CancellationToken cancellationToken)
     {
@@ -165,6 +191,23 @@ public sealed class TestCheckoutController(IPaymentService payments, IServicePro
         var form = new Dictionary<string, string>(StringComparer.Ordinal) { ["token"] = token!, ["outcome"] = outcome ?? string.Empty, ["event"] = @event ?? string.Empty };
         await payments.ReceiveAsync("Test", new InboundNotification(string.Empty, form, new Dictionary<string, string>(StringComparer.Ordinal), null), cancellationToken);
         return Redirect((string.Equals(outcome, "cancel", StringComparison.Ordinal) ? checkout.CancelUrl : checkout.ReturnUrl).AbsoluteUri);
+    }
+
+    /// <summary>Has the Test gateway charge the next renewal now, as a real gateway would at the end of the period.</summary>
+    [HttpPost("renew")]
+    [ValidateAntiForgeryToken]
+    [HasPermission(PermissionCodes.Subscription.Pay)]
+    public async Task<IActionResult> Renew(CancellationToken cancellationToken)
+    {
+        var recurring = (await payments.RecurringMineAsync(cancellationToken)).Data;
+        if (services.GetService<ITestCheckout>() is not { } test || recurring is not { Gateway: "Test", Status: Domain.Payments.RecurringPaymentStatus.Active, FirstReference: { } first })
+        {
+            return NotFound();
+        }
+
+        var form = test.RenewalNotice(first, recurring.Amount, recurring.Currency);
+        await payments.ReceiveAsync("Test", new InboundNotification(string.Empty, form, new Dictionary<string, string>(StringComparer.Ordinal), null), cancellationToken);
+        return Redirect("/subscription");
     }
 }
 

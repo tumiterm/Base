@@ -24,6 +24,7 @@ internal sealed class TestPaymentGateway(IDataProtectionProvider protection) : I
     public const string TokenField = "token";
     public const string OutcomeField = "outcome";
     public const string EventField = "event";
+    public const string RenewalField = "renewal";
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private readonly IDataProtector _protector = protection.CreateProtector("Base.Payments.TestGateway");
@@ -36,10 +37,14 @@ internal sealed class TestPaymentGateway(IDataProtectionProvider protection) : I
 
     public IReadOnlyList<string> Currencies { get; } = ["ZAR", "USD", "EUR", "GBP"];
 
+    public bool SupportsRecurring => true;
+
+    public Task<GatewayResult> CancelRecurringAsync(string token, CancellationToken cancellationToken) => Task.FromResult(GatewayResult.Ok());
+
     public Task<CheckoutStart> StartCheckoutAsync(CheckoutRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var view = new TestCheckoutView(request.Reference, request.Amount, request.Currency, request.Description, request.ReturnUrl, request.CancelUrl);
+        var view = new TestCheckoutView(request.Reference, request.Amount, request.Currency, request.Description, request.ReturnUrl, request.CancelUrl, request.RenewEvery is not null);
         var token = _protector.Protect(JsonSerializer.Serialize(view, Json));
         var page = new Uri(request.ReturnUrl, "/payments/test?" + TokenField + "=" + Uri.EscapeDataString(token));
         return Task.FromResult(CheckoutStart.Go(new CheckoutRedirect(page), "TEST-" + request.Reference));
@@ -60,14 +65,29 @@ internal sealed class TestPaymentGateway(IDataProtectionProvider protection) : I
             "cancel" => GatewayNotificationKind.Cancelled,
             _ => GatewayNotificationKind.Other,
         };
+        var eventId = notification.Form.GetValueOrDefault(EventField);
+        var renewal = notification.Form.ContainsKey(RenewalField);
         return Task.FromResult(new GatewayNotification(
             true,
-            notification.Form.GetValueOrDefault(EventField),
+            eventId,
             checkout.Reference,
-            "TEST-" + checkout.Reference,
+            renewal ? "TEST-" + eventId : "TEST-" + checkout.Reference,
             kind,
             checkout.Amount,
-            kind == GatewayNotificationKind.Failed ? "Declined on the test checkout page." : null));
+            kind == GatewayNotificationKind.Failed ? "Declined on the test checkout page." : null,
+            checkout.Recurring ? "TEST-TOKEN-" + checkout.Reference : null));
+    }
+
+    public IReadOnlyDictionary<string, string> RenewalNotice(string firstReference, decimal amount, string currency)
+    {
+        var view = new TestCheckoutView(firstReference, amount, currency, "Renewal", new Uri("https://example.invalid/"), new Uri("https://example.invalid/"), Recurring: true);
+        return new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [TokenField] = _protector.Protect(JsonSerializer.Serialize(view, Json)),
+            [OutcomeField] = "pay",
+            [EventField] = Guid.NewGuid().ToString("N"),
+            [RenewalField] = "1",
+        };
     }
 
     public TestCheckoutView? Read(string token)

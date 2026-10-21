@@ -17,6 +17,7 @@
     <div class="panel stat-tile"><span class="file-tile is-code" aria-hidden="true"><icon name="receipt" /></span><div class="stat"><span class="stat-label">Received this month</span><span class="stat-value">@(t.Currency is null ? (t.SucceededThisMonth == 0 ? "0" : "Mixed") : Display.Money(t.ReceivedThisMonth, t.Currency))</span><span class="stat-sub">@t.SucceededThisMonth paid</span></div></div>
     <div class="panel stat-tile @(t.FailedThisMonth > 0 ? "is-warning" : "")"><span class="file-tile" aria-hidden="true"><icon name="circle-x" /></span><div class="stat"><span class="stat-label">Declined</span><span class="stat-value">@t.FailedThisMonth</span><span class="stat-sub">This month</span></div></div>
     <div class="panel stat-tile"><span class="file-tile" aria-hidden="true"><icon name="clock" /></span><div class="stat"><span class="stat-label">Waiting</span><span class="stat-value">@t.Pending</span><span class="stat-sub">For the provider to confirm</span></div></div>
+    <div class="panel stat-tile"><span class="file-tile" aria-hidden="true"><icon name="refresh-cw" /></span><div class="stat"><span class="stat-label">Automatic renewals</span><span class="stat-value">@t.AutomaticRenewals</span><span class="stat-sub">Charged by the provider each period</span></div></div>
     <div class="panel stat-tile @(Model.Gateways.Count == 0 ? "is-warning" : "")"><span class="file-tile" aria-hidden="true"><icon name="credit-card" /></span><div class="stat"><span class="stat-label">Ways to pay</span><span class="stat-value">@Model.Gateways.Count</span><span class="stat-sub">@(Model.Gateways.Count == 0 ? "None configured" : string.Join(", ", Model.Gateways.Select(g => g.Name)))</span></div></div>
 </div>
 
@@ -49,7 +50,7 @@ else
                 <span class="file-tile" aria-hidden="true"><icon name="receipt" /></span>
                 <div class="item-main">
                     <div class="item-title">@(p.TenantName ?? "Unknown organisation") · @p.Description</div>
-                    <div class="item-sub"><span class="mono">@p.Reference</span> · @p.GatewayName · by @p.RequestedByName@(p.FailureReason is not null && p.Status != PaymentStatus.Succeeded ? " · " + p.FailureReason : "")</div>
+                    <div class="item-sub"><span class="mono">@p.Reference</span> · @p.GatewayName · @(p.IsRenewal ? "automatic renewal" : "by " + p.RequestedByName)@(p.SetsUpRenewal ? " · set up automatic renewal" : "")@(p.FailureReason is not null && p.Status != PaymentStatus.Succeeded ? " · " + p.FailureReason : "")</div>
                 </div>
                 <div class="item-aside text-end">
                     <div class="fw-semibold">@Display.Money(p.Amount, p.Currency)</div>

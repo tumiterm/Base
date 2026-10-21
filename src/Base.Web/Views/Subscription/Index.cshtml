@@ -69,6 +69,51 @@ else
                 </div>
             </section>
 
+            @if (Model.Recurring is { } r)
+            {
+                var active = r.Status == Base.Domain.Payments.RecurringPaymentStatus.Active;
+                <section class="panel" id="renewal" aria-labelledby="renewal-title">
+                    <div class="panel-header">
+                        <h2 class="panel-title" id="renewal-title"><icon name="refresh-cw" class="icon-sm" /> Automatic renewal</h2>
+                        <span class="badge text-bg-@(active ? "success" : "info")">@(active ? "On" : "Starting")</span>
+                    </div>
+                    <div class="panel-body stack">
+                        <p class="mb-0">
+                            @if (active)
+                            {
+                                <text><strong>@Display.Money(r.Amount, r.Currency)</strong> every @(r.BillingCycle == BillingCycle.Annual ? "year" : "month") for @r.PlanName, charged by @r.GatewayName until you turn it off.</text>
+                            }
+                            else
+                            {
+                                <text>Automatic renewal through @r.GatewayName starts once your first payment is confirmed.</text>
+                            }
+                        </p>
+                        @if (r.StopError is not null)
+                        {
+                            <div class="status-callout is-warning"><icon name="triangle-alert" /><div class="small">@r.StopError</div></div>
+                        }
+                        <dl class="kv mb-0">
+                            <dt>Set up by</dt><dd>@r.StartedByName, <local-time value="r.StartedAt" format="d MMMM yyyy" /></dd>
+                            @if (r.LastChargedAt is { } last) {<dt>Last charged</dt><dd><local-time value="last" format="d MMMM yyyy" /> (@r.Charges payment@(r.Charges == 1 ? "" : "s"))</dd>}
+                        </dl>
+                    </div>
+                    @if (Model.CanPay && active)
+                    {
+                        <div class="panel-footer d-flex flex-wrap gap-2">
+                            @if (r.CanUpdateCard)
+                            {
+                                <form method="post" asp-action="UpdateCard" asp-route-id="@r.Id"><button type="submit" class="btn btn-secondary"><icon name="credit-card" class="icon-sm" /> Update card</button></form>
+                            }
+                            @if (r.Gateway == "Test")
+                            {
+                                <form method="post" asp-controller="TestCheckout" asp-action="Renew"><button type="submit" class="btn btn-secondary"><icon name="refresh-cw" class="icon-sm" /> Simulate the next charge</button></form>
+                            }
+                            <form method="post" asp-action="StopRenewal" asp-route-id="@r.Id" class="ms-auto"><button type="submit" class="btn btn-outline-danger">Turn off automatic renewal</button></form>
+                        </div>
+                    }
+                </section>
+            }
+
             @if (payable)
             {
                 <section class="panel" id="pay" aria-labelledby="pay-title">
@@ -109,7 +154,7 @@ else
                                 {
                                     var g = Model.Gateways[i];
                                     <label class="choice-card">
-                                        <input type="radio" name="Gateway" value="@g.Code" checked="@(i == 0)" />
+                                        <input type="radio" name="Gateway" value="@g.Code" checked="@(i == 0)" data-recurring="@(g.SupportsRecurring ? "true" : "false")" />
                                         <span class="choice-check"><icon name="check" /></span>
                                         <span class="choice-title"><icon name="credit-card" class="icon-sm" /> @g.Name</span>
                                         <span class="chip-group">@foreach (var m in g.Methods) {<span class="chip">@m</span>}</span>
@@ -117,7 +162,11 @@ else
                                 }
                             </div>
                         </div>
-                        <p class="text-muted small mb-0">The same plan and period adds time after your current period. Another plan or period switches to it today and starts a fresh period. Your organisation is emailed a receipt.</p>
+                        <label class="form-check form-switch mb-0" data-renew-option hidden="@(!Model.Gateways.Any(g => g.SupportsRecurring))">
+                            <input class="form-check-input" type="checkbox" role="switch" name="RenewAutomatically" value="true" checked />
+                            <span class="form-check-label"><strong>Renew automatically.</strong> The payment provider charges this amount every month or year, until you turn it off here.</span>
+                        </label>
+                        <p class="text-muted small mb-0">The same plan and period adds time after your current period. Another plan or period switches to it today and starts a fresh period@(Model.Recurring is not null ? ", and replaces your automatic renewal" : ""). Your organisation is emailed a receipt.</p>
                         <div><button type="submit" class="btn btn-primary"><icon name="lock" class="icon-sm" /> Continue to payment</button></div>
                     </form>
                 </section>
@@ -153,7 +202,7 @@ else
                                 <span class="file-tile" aria-hidden="true"><icon name="receipt" /></span>
                                 <a class="item-main text-decoration-none" asp-action="Payment" asp-route-reference="@p.Reference">
                                     <div class="item-title">@p.Description</div>
-                                    <div class="item-sub"><span class="mono">@p.Reference</span> · @p.GatewayName · by @p.RequestedByName</div>
+                                    <div class="item-sub"><span class="mono">@p.Reference</span> · @p.GatewayName · @(p.IsRenewal ? "automatic renewal" : "by " + p.RequestedByName)@(p.SetsUpRenewal ? " · set up automatic renewal" : "")</div>
                                 </a>
                                 <div class="item-aside text-end">
                                     <div class="fw-semibold">@Display.Money(p.Amount, p.Currency)</div>
