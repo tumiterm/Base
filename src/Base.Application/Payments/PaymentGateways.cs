@@ -99,3 +99,12 @@ public interface ITestCheckout
 }
 
 public sealed record TestCheckoutView(string Reference, decimal Amount, string Currency, string Description, Uri ReturnUrl, Uri CancelUrl);
+
+/// <summary>
+/// Origins the browser is sent to, by form post or a redirect after one, for the configured gateways. The web layer
+/// adds them to the CSP's <c>form-action</c>.
+/// </summary>
+public sealed record PaymentCheckoutOrigins(IReadOnlyList<string> Origins)
+{
+    public static PaymentCheckoutOrigins None { get; } = new([]);
+}

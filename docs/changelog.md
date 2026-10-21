@@ -24,6 +24,9 @@ Add a line under **Unreleased** with every change. A release moves those lines u
   - Payments and their status on Subscription and in Platform → Payments. Suspended organisations can still pay.
   - `IPaymentGateway` for providers, configured under `Payments:Gateways`, and a **Test** gateway (on in Development)
     with a pretend checkout page. Permission **Pay for the subscription**. Job `payment-expiry`.
+  - **Payfast** gateway (`Payments:Gateways:Payfast`): card, Instant EFT, QR codes, Apple Pay, Samsung Pay and the
+    rest of the merchant account's methods on Payfast's page; ITNs verified by signature, source, amount and
+    Payfast's confirmation. Sandbox or live. Setup in `docs/payments.md`.
 - **Feature flags**: switch code on or off without a deployment, from Platform → Feature flags.
   - Off, everyone, or some organisations: the platform's own staff, chosen organisations and/or a stable percentage
     (growing it keeps those already in).

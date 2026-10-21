@@ -33,6 +33,9 @@ application in PCI DSS scope.
 - **A Test gateway.** `Payments:Gateways:Test:Enabled` (on in Development) adds a pretend checkout page in the
   application that reports back through the same notification path, protected with Data Protection, so the flow can
   be tried and tested without a provider account. Never enable it in production.
+- **Payfast** is the first real gateway: a signed form posted to Payfast's checkout, and ITNs accepted only after the
+  four checks Payfast requires (signature, source address, amount, server confirmation). Its signature code is
+  tested against Payfast's own PHP samples. Setup is in `docs/payments.md`.
 - **Not yet:** automatic renewal by a saved card (Payfast tokenisation), refunds and invoices. Renewal is a "Pay"
   each period; the lifecycle job moves unpaid subscriptions to past due and suspended as before.
 

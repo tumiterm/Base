@@ -8,6 +8,7 @@ cross-cutting feature or adding a package:
 - [docs/ui-design-direction.md](docs/ui-design-direction.md): the minimum bar for every screen (read before any UI work)
 - [docs/vertical-slice.md](docs/vertical-slice.md): a new module copies the People sample, file by file
 - [docs/api.md](docs/api.md): API keys, idempotency, limits, versions and CORS
+- [docs/payments.md](docs/payments.md): setting up payment gateways (Payfast, the Test gateway) and what is verified
 - [docs/changelog.md](docs/changelog.md): what changed in each Base version (add to Unreleased with every change)
 
 ## Commands

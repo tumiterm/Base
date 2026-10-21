@@ -9,6 +9,8 @@ using Base.Web.Security;
 using Base.Web.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Filters;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace Base.Web.Controllers;
 
@@ -72,11 +74,11 @@ public sealed class SubscriptionController(
 
     private async Task<PaymentUrls> UrlsAsync(CancellationToken cancellationToken)
     {
-        // The person comes back to the address they are on (a verified tenant host); gateways post to the platform's
-        // public address, which doesn't depend on any tenant's domain.
+        // The person comes back to the address they are on (a verified tenant host). Gateways post to the public
+        // address (General.PublicBaseUrl as it applies to this organisation), never one taken from the request.
         var here = $"{Request.Scheme}://{Request.Host}{Request.PathBase}";
-        var platform = await settings.GetAsync(SettingCodes.General.PublicBaseUrl, cancellationToken);
-        var notifyBase = Uri.TryCreate(platform, UriKind.Absolute, out var configured) ? configured.AbsoluteUri.TrimEnd('/') : here;
+        var configuredBase = await settings.GetAsync(SettingCodes.General.PublicBaseUrl, cancellationToken);
+        var notifyBase = Uri.TryCreate(configuredBase, UriKind.Absolute, out var configured) ? configured.AbsoluteUri.TrimEnd('/') : here;
         return new PaymentUrls(new Uri(here + "/subscription/payments"), new Uri(notifyBase + "/payments/notify"));
     }
 }
@@ -94,9 +96,10 @@ public sealed class PaymentNotifyController(IPaymentService payments) : Controll
 
     [HttpPost("{gateway}")]
     [RequestSizeLimit(MaxBodyBytes)]
-    public async Task<IActionResult> Receive(string gateway, CancellationToken cancellationToken)
+    [RawBody(MaxBodyBytes)]
+    public async Task<IActionResult> Receive([FromRoute] string gateway, CancellationToken cancellationToken)
     {
-        Request.EnableBuffering(MaxBodyBytes);
+        Request.Body.Position = 0;
         string body;
         using (var reader = new StreamReader(Request.Body, leaveOpen: true))
         {
@@ -110,6 +113,32 @@ public sealed class PaymentNotifyController(IPaymentService payments) : Controll
         var headers = Request.Headers.ToDictionary(h => h.Key, h => h.Value.ToString(), StringComparer.OrdinalIgnoreCase);
         var reply = await payments.ReceiveAsync(gateway, new InboundNotification(body, form, headers, HttpContext.Connection.RemoteIpAddress?.ToString()), cancellationToken);
         return new ContentResult { StatusCode = reply.StatusCode, Content = reply.Body, ContentType = "text/plain" };
+    }
+}
+
+/// <summary>
+/// Keeps the request body for the action as it arrived: buffered, and not read by form model binding first. Gateways
+/// sign the raw body, so it has to be read exactly as sent.
+/// </summary>
+[AttributeUsage(AttributeTargets.Method)]
+internal sealed class RawBodyAttribute(int maxBytes) : Attribute, IResourceFilter
+{
+    public void OnResourceExecuting(ResourceExecutingContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        context.HttpContext.Request.EnableBuffering(maxBytes);
+        var factories = context.ValueProviderFactories;
+        for (var i = factories.Count - 1; i >= 0; i--)
+        {
+            if (factories[i] is FormValueProviderFactory or FormFileValueProviderFactory or JQueryFormValueProviderFactory)
+            {
+                factories.RemoveAt(i);
+            }
+        }
+    }
+
+    public void OnResourceExecuted(ResourceExecutedContext context)
+    {
     }
 }
 

@@ -182,8 +182,9 @@ scripts/new-project.cs  Creates a renamed copy for a new project.
   Plans and features compares and edits every plan at once, asking for a decision on anything new (ADR 0023). The lifecycle (trial, active, past due, suspended, cancelled or expired) is advanced
   by a job, with trial reminders and status emails. Organisations pay online from their Subscription page through a
   hosted gateway (pay for the current plan, or switch plan by paying for another), with receipts and Platform >
-  Payments; operators can still record a payment by hand (ADR 0026). Limits are enforced on invites and uploads; features gate modules and their
-  navigation. Suspended tenants see only `/subscription`. A tenant without a plan is unrestricted. Development seeds
+  Payments; operators can still record a payment by hand. Payfast (card, Instant EFT, QR codes, Apple Pay, Samsung Pay)
+  is built in; setup is in [`docs/payments.md`](docs/payments.md) (ADR 0026). Limits are enforced on invites and
+  uploads; features gate modules and their navigation. Suspended tenants see only `/subscription` and its payments. A tenant without a plan is unrestricted. Development seeds
   three example plans.
 - **Settings:** a typed, validated catalogue; tenant → platform → default resolution; HybridCache with tag
   invalidation; a seeder that never overwrites an administrator's value.

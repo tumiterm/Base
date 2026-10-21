@@ -99,7 +99,8 @@ invitation, sent as the new tenant so its links use the tenant's domain).
   hosted checkout. Gateways post to `payments/notify/{gateway}` (anonymous); the adapter verifies the notification,
   the service drops repeats (`PaymentNotification`) and checks the amount, and `PaymentSucceeded` applies it to the
   subscription once (same plan extends; another plan or cycle starts a fresh period) and sends the receipt. Gateways
-  are registered from `Payments:Gateways:{Code}`; `Test` is a pretend gateway for development and tests.
+  are registered from `Payments:Gateways:{Code}`: `Payfast` (setup in `docs/payments.md`) and `Test`, a pretend
+  gateway for development and tests. Configured gateways' checkout hosts join the CSP `form-action`.
 - A new feature or limit: a constant in `FeatureCodes`/`LimitCodes` + an `EntitlementCatalog` entry (module, `Since`,
   suggested `FeatureTier`) + the check. Plans that were saved before it existed haven't *decided* on it (no
   `PlanEntitlement` row): they follow the suggestion and the plans screens ask for a decision. Platform > Plans >

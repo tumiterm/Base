@@ -22,7 +22,11 @@ public sealed class WebAppFactory(string connectionString) : WebApplicationFacto
         builder.UseSetting("Seed:AdminEmail", AdminEmail);
         builder.UseSetting("Seed:AdminPassword", AdminPassword);
         builder.UseSetting("FileStorage:LocalDisk:RootPath", Path.Combine(Path.GetTempPath(), "base-tests", Guid.NewGuid().ToString("N")));
-        builder.ConfigureServices(services => services.AddControllers().AddApplicationPart(typeof(ThrowingController).Assembly));
+        builder.ConfigureServices(services =>
+        {
+            services.AddControllers().AddApplicationPart(typeof(ThrowingController).Assembly);
+            services.AddScoped<Application.Payments.IPaymentGateway, RawBodyGateway>();
+        });
     }
 }
 
@@ -35,4 +39,27 @@ public sealed class ThrowingController : ControllerBase
     [Microsoft.AspNetCore.Authorization.AllowAnonymous]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822", Justification = "MVC actions must be instance methods.")]
     public IActionResult Get() => throw new InvalidOperationException("Deliberate failure with secret=hunter2");
+}
+
+/// <summary>
+/// A gateway that trusts a notification only if its raw body and its parsed form both reached it intact, as a
+/// signature check over the raw body needs.
+/// </summary>
+internal sealed class RawBodyGateway : Application.Payments.IPaymentGateway
+{
+    public string Code => "RawBody";
+
+    public string Name => "Raw body";
+
+    public IReadOnlyList<string> Methods { get; } = [];
+
+    public IReadOnlyList<string> Currencies { get; } = [];
+
+    public Task<Application.Payments.CheckoutStart> StartCheckoutAsync(Application.Payments.CheckoutRequest request, CancellationToken cancellationToken) =>
+        Task.FromResult(Application.Payments.CheckoutStart.Failed("Not for checkouts."));
+
+    public Task<Application.Payments.GatewayNotification> ReadNotificationAsync(Application.Payments.InboundNotification notification, CancellationToken cancellationToken) =>
+        Task.FromResult(string.Equals(notification.Body, "reference=PNOBODY12345&note=a+b%26c", StringComparison.Ordinal) && notification.Form.GetValueOrDefault("note") == "a b&c"
+            ? new Application.Payments.GatewayNotification(true, "raw-1", "PNOBODY12345", null, Application.Payments.GatewayNotificationKind.Paid, null, null)
+            : Application.Payments.GatewayNotification.Rejected($"Body was '{notification.Body}'."));
 }

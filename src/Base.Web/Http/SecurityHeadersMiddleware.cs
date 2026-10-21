@@ -1,11 +1,17 @@
+using Base.Application.Payments;
+
 namespace Base.Web.Http;
 
-/// <summary>Baseline browser security headers. The CSP allows only same-origin scripts and styles (no inline script).</summary>
-internal sealed class SecurityHeadersMiddleware(RequestDelegate next)
+/// <summary>
+/// Baseline browser security headers. The CSP allows only same-origin scripts and styles (no inline script); forms may
+/// post only here and to the configured payment gateways' checkouts.
+/// </summary>
+internal sealed class SecurityHeadersMiddleware(RequestDelegate next, PaymentCheckoutOrigins checkoutOrigins)
 {
-    private const string ContentSecurityPolicy =
+    private readonly string _contentSecurityPolicy =
         "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; " +
-        "connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self'; object-src 'none'";
+        "connect-src 'self'; frame-ancestors 'none'; form-action " + string.Join(' ', ["'self'", .. checkoutOrigins.Origins]) +
+        "; base-uri 'self'; object-src 'none'";
 
     // A file previewed inside one of our pages: framed by us only, and (except PDFs, which browsers won't render in
     // a sandbox) in a sandbox with no scripts, forms or same-origin access.
@@ -37,7 +43,7 @@ internal sealed class SecurityHeadersMiddleware(RequestDelegate next)
             // The API reference UI (development only) loads its own assets; everything else gets the strict policy.
             if (!context.Request.Path.StartsWithSegments("/scalar", StringComparison.OrdinalIgnoreCase))
             {
-                headers.ContentSecurityPolicy = ContentSecurityPolicy;
+                headers.ContentSecurityPolicy = _contentSecurityPolicy;
             }
 
             return Task.CompletedTask;

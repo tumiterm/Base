@@ -261,12 +261,25 @@ public static class DependencyInjection
     private static void AddPaymentGateways(IServiceCollection services, IConfiguration configuration)
     {
         services.AddOptions<Application.Payments.PaymentOptions>().BindConfiguration(Application.Payments.PaymentOptions.SectionName);
+        var origins = new List<string>();
         if (configuration.GetSection(Payments.TestGatewayOptions.SectionName).Get<Payments.TestGatewayOptions>() is { Enabled: true })
         {
             services.AddScoped<Payments.TestPaymentGateway>();
             services.AddScoped<Application.Payments.IPaymentGateway>(sp => sp.GetRequiredService<Payments.TestPaymentGateway>());
             services.AddScoped<Application.Payments.ITestCheckout>(sp => sp.GetRequiredService<Payments.TestPaymentGateway>());
         }
+
+        if (configuration.GetSection(Payments.PayfastOptions.SectionName).Get<Payments.PayfastOptions>() is { Enabled: true } payfast)
+        {
+            services.AddOptions<Payments.PayfastOptions>().BindConfiguration(Payments.PayfastOptions.SectionName)
+                .Validate(o => !string.IsNullOrWhiteSpace(o.MerchantId) && !string.IsNullOrWhiteSpace(o.MerchantKey), "Payments:Gateways:Payfast needs MerchantId and MerchantKey.")
+                .ValidateOnStart();
+            services.AddHttpClient(Payments.PayfastGateway.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(20));
+            services.AddScoped<Application.Payments.IPaymentGateway, Payments.PayfastGateway>();
+            origins.Add("https://" + payfast.Host);
+        }
+
+        services.AddSingleton(new Application.Payments.PaymentCheckoutOrigins(origins));
     }
 
     private static void AddRunAs(IServiceCollection services)
@@ -302,6 +315,11 @@ public static class DependencyInjection
         if (configuration.GetSection(GotenbergOptions.SectionName).Get<GotenbergOptions>()?.BaseUrl is not null)
         {
             checks.AddCheck<GotenbergHealthCheck>("gotenberg", tags: dependency, timeout: timeout);
+        }
+
+        if (configuration.GetSection(Payments.PayfastOptions.SectionName).Get<Payments.PayfastOptions>() is { Enabled: true })
+        {
+            checks.AddCheck<Payments.PayfastHealthCheck>("payfast", tags: dependency, timeout: timeout);
         }
 
         if (!string.IsNullOrWhiteSpace(configuration[ClamAvOptions.SectionName + ":" + nameof(ClamAvOptions.Host)]))
