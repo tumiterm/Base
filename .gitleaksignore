@@ -4,3 +4,5 @@
 a511449fdb3f98d08d356b72af27450fec41a153:src/Base.Application/Files/IFileStorageProvider.cs:generic-api-key:6
 # 2. generic-api-key on the first version of this file, which quoted that doc comment.
 0f98f51110a57e3cd839b089a6c486c63212339b:.gitleaksignore:generic-api-key:2
+# 3. generic-api-key on the sample subscription token from Payfast's public documentation, used as test data (replaced in b8c1022).
+fbc80a874c63015c3ea4278a6b6249ab90df68f4:tests/Base.IntegrationTests/Payments/PayfastTests.cs:generic-api-key:122
