@@ -119,18 +119,18 @@ public sealed class PayfastTests
     [Fact]
     public async Task A_renewal_itn_carries_its_token_and_cancelling_calls_payfasts_api_signed_alphabetically()
     {
-        var withToken = ItnBody.Replace("&signature=f44ee63ed097b7c35218f577712492cb", string.Empty, StringComparison.Ordinal) + "&token=dc0521d3-55fe-269b-fa00-b647310d760f";
+        var withToken = ItnBody.Replace("&signature=f44ee63ed097b7c35218f577712492cb", string.Empty, StringComparison.Ordinal) + "&token=00000000-0000-4000-8000-000000000001";
         var signed = withToken + "&signature=" + PayfastSignature.ForNotification(PayfastSignature.NotificationParameters(withToken), Passphrase);
-        (await Gateway(Options(), "VALID").ReadNotificationAsync(Itn(signed), CancellationToken.None)).RecurringToken.ShouldBe("dc0521d3-55fe-269b-fa00-b647310d760f");
+        (await Gateway(Options(), "VALID").ReadNotificationAsync(Itn(signed), CancellationToken.None)).RecurringToken.ShouldBe("00000000-0000-4000-8000-000000000001");
 
         PayfastSignature.ForApi(new Dictionary<string, string>(StringComparer.Ordinal) { ["version"] = "v1", ["merchant-id"] = "10000100", ["timestamp"] = "2026-01-15T08:00:00+00:00" }, Passphrase)
             .ShouldBe("88979cb6250ce58b1c5d932585033d2d", "PHP: ksort + http_build_query with the passphrase");
 
         var clients = new AnsweringClients("""{"code":200,"status":"success","data":{"response":true}}""");
-        (await Gateway(Options(sandbox: true), "", clients).CancelRecurringAsync("dc0521d3-55fe-269b-fa00-b647310d760f", CancellationToken.None)).Succeeded.ShouldBeTrue();
+        (await Gateway(Options(sandbox: true), "", clients).CancelRecurringAsync("00000000-0000-4000-8000-000000000001", CancellationToken.None)).Succeeded.ShouldBeTrue();
         var sent = clients.Last!;
         sent.Method.ShouldBe(HttpMethod.Put);
-        sent.RequestUri!.AbsoluteUri.ShouldBe("https://api.payfast.co.za/subscriptions/dc0521d3-55fe-269b-fa00-b647310d760f/cancel?testing=true");
+        sent.RequestUri!.AbsoluteUri.ShouldBe("https://api.payfast.co.za/subscriptions/00000000-0000-4000-8000-000000000001/cancel?testing=true");
         sent.Headers.GetValues("merchant-id").ShouldBe(["10000100"]);
         sent.Headers.GetValues("timestamp").ShouldBe(["2026-01-15T08:00:00+00:00"]);
         sent.Headers.GetValues("signature").ShouldBe(["88979cb6250ce58b1c5d932585033d2d"]);
@@ -138,8 +138,8 @@ public sealed class PayfastTests
         var refused = new AnsweringClients("""{"code":404,"status":"failed"}""", HttpStatusCode.NotFound);
         (await Gateway(Options(), "", refused).CancelRecurringAsync("nope", CancellationToken.None)).Error.ShouldBe("Payfast answered 404.");
 
-        Gateway(Options(sandbox: true), "VALID").UpdateCardUrl("dc0521d3-55fe-269b-fa00-b647310d760f", new Uri("https://acme.example.com/subscription"))!.AbsoluteUri
-            .ShouldBe("https://sandbox.payfast.co.za/eng/recurring/update/dc0521d3-55fe-269b-fa00-b647310d760f?return=https%3A%2F%2Facme.example.com%2Fsubscription");
+        Gateway(Options(sandbox: true), "VALID").UpdateCardUrl("00000000-0000-4000-8000-000000000001", new Uri("https://acme.example.com/subscription"))!.AbsoluteUri
+            .ShouldBe("https://sandbox.payfast.co.za/eng/recurring/update/00000000-0000-4000-8000-000000000001?return=https%3A%2F%2Facme.example.com%2Fsubscription");
     }
 
     private static InboundNotification Itn(string body, string? remoteIp = "203.0.113.9") =>
