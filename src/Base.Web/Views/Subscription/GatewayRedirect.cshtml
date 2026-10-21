@@ -1,0 +1,16 @@
+@model Base.Application.Payments.CheckoutRedirect
+@{
+    ViewData["Title"] = "Taking you to payment";
+}
+<div class="empty-state">
+    <icon name="lock" />
+    <div class="empty-state-title">Taking you to the secure payment page…</div>
+    <p class="mb-3">If nothing happens in a few seconds, continue yourself.</p>
+    <form method="post" action="@Model.Url.AbsoluteUri" data-submit-on-load>
+        @foreach (var field in Model.FormFields!)
+        {
+            <input type="hidden" name="@field.Key" value="@field.Value" />
+        }
+        <button type="submit" class="btn btn-primary"><icon name="lock" class="icon-sm" /> Continue to payment</button>
+    </form>
+</div>

@@ -78,6 +78,8 @@ public static class PermissionCodes
     public static class Subscription
     {
         public const string View = "Subscription.View";
+
+        public const string Pay = "Subscription.Pay";
     }
 
     /// <summary>Running the platform itself. Effective only for users of the platform (default) tenant.</summary>

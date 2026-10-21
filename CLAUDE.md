@@ -41,7 +41,9 @@ cross-cutting feature or adding a package:
   (its `ModuleCodes` module, `Since` version and, for a feature, suggested `FeatureTier`; a new module also gets a
   `Modules` entry) and enforcement (`[RequiresFeature]` + `asp-feature`, or `ITenantEntitlements.EnsureWithinLimitAsync` before the
   action). Never check plan codes or prices in code. Tenants are created through `ITenantAdministration`,
-  subscriptions changed through `ISubscriptionService` (payments come from outside; no gateway in the base).
+  subscriptions changed through `ISubscriptionService`. Online payments go through `IPaymentService` and a hosted
+  `IPaymentGateway` (adapter + `Payments:Gateways:{Code}` config; credentials are deployment secrets). Card data never
+  touches the app; only the gateway's verified notification marks a payment paid, never the return page (ADR 0026).
 - New setting = constant in `SettingCodes` + `SettingCatalog` entry (no migration); it appears on Administration →
   Settings by itself. A switch is a `Boolean` setting read with `GetBoolAsync` in the service that does the work.
   Platform-scope settings change only from the platform tenant. Deployment secrets (connection strings, signing and
@@ -50,7 +52,8 @@ cross-cutting feature or adding a package:
 - API controllers are `[ApiController]` under `api/...`, gated by `[HasPermission]` (API clients carry permissions
   too), return problem details through `ToActionResult`, and are version 1.0 unless marked `[ApiVersion]`. Never read a
   key or token from the query string, never add per-endpoint auth: callers are a person (cookie) or an `ApiClient`
-  (key). `Idempotency-Key` retries are handled by middleware; endpoints need nothing for it.
+  (key). The one exception is `payments/notify/{gateway}`, verified by the gateway adapter. `Idempotency-Key`
+  retries are handled by middleware; endpoints need nothing for it.
 - Pick-lists (titles, departments, reasons...) are lookup lists: constant in `LookupLists` + `LookupCatalog` entry with
   defaults. Records store the code; validate with `ILookupService.EnsureValidAsync`, render with `asp-lookup` /
   `data-combobox` / `_LookupChips`, label with `LookupLabels`. Never a table or enum per list, never ids in code.

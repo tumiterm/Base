@@ -1,5 +1,6 @@
 using System.Globalization;
 using Base.Application.Subscriptions;
+using Base.Domain.Payments;
 using Base.Domain.Subscriptions;
 
 namespace Base.Web.Formatting;
@@ -24,6 +25,23 @@ public static class Display
     };
 
     public static string Status(SubscriptionStatus? status) => status is { } s ? SubscriptionStatusText.Describe(s) : "No plan";
+
+    public static string Tone(PaymentStatus status) => status switch
+    {
+        PaymentStatus.Succeeded => "success",
+        PaymentStatus.Pending => "info",
+        PaymentStatus.Failed => "danger",
+        _ => "secondary",
+    };
+
+    public static string Status(PaymentStatus status) => status switch
+    {
+        PaymentStatus.Succeeded => "Paid",
+        PaymentStatus.Pending => "Waiting",
+        PaymentStatus.Failed => "Declined",
+        PaymentStatus.Cancelled => "Cancelled",
+        _ => "Expired",
+    };
 
     public static string Limit(string code, long? value) => EntitlementCatalog.Get(code).Format(value);
 

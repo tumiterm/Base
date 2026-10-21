@@ -4,6 +4,7 @@
     ViewData["Title"] = "Subscription";
     var s = Model.Mine.Subscription;
     var canView = CurrentUser.HasPermission(PermissionCodes.Subscription.View);
+    var payable = Model.CanPay && Model.Gateways.Count > 0 && Model.Mine.Plans.Count > 0;
 }
 <div class="page-header">
     <div>
@@ -18,7 +19,7 @@
         <icon name="circle-alert" />
         <div>
             <strong>Access is paused: the subscription is @Display.Status(s.Status).ToLowerInvariant().</strong>
-            <div>@(s.StatusReason ?? "Contact us to restore access.") Your data is kept and access returns as soon as the subscription is active.</div>
+            <div>@(s.StatusReason ?? "Contact us to restore access.") Your data is kept and access returns as soon as the subscription is active@(Model.CanPay && Model.Gateways.Count > 0 ? ": pay below to restore it now" : "").</div>
         </div>
     </div>
 }
@@ -68,7 +69,60 @@ else
                 </div>
             </section>
 
-            @if (Model.Mine.Plans.Count > 0)
+            @if (payable)
+            {
+                <section class="panel" id="pay" aria-labelledby="pay-title">
+                    <div class="panel-header">
+                        <h2 class="panel-title" id="pay-title">@(s.Status is SubscriptionStatus.Active ? "Pay ahead or change plan" : "Pay online")</h2>
+                        <span class="text-muted small"><icon name="lock" class="icon-sm" /> On the payment provider's secure page</span>
+                    </div>
+                    <form method="post" asp-action="Pay" class="panel-body stack">
+                        <div>
+                            <div class="form-label">Plan</div>
+                            <div class="choice-grid" role="radiogroup" aria-label="Plan">
+                                @foreach (var plan in Model.Mine.Plans)
+                                {
+                                    var current = plan.Id == s.PlanId;
+                                    <label class="choice-card @(current ? "is-current" : "")">
+                                        <input type="radio" name="PlanId" value="@plan.Id" checked="@current" />
+                                        <span class="choice-check"><icon name="check" /></span>
+                                        <span class="choice-title">@plan.Name @if (current) {<span class="badge text-bg-primary ms-1">Your plan</span>}</span>
+                                        <span class="choice-price">@Display.Money(plan.MonthlyPrice, plan.Currency) <small>/month</small></span>
+                                        <span class="choice-desc">or @Display.Money(plan.AnnualPrice, plan.Currency) /year</span>
+                                        @if (plan.Description is not null) {<span class="choice-desc">@plan.Description</span>}
+                                        <partial name="_PlanFeatures" model="plan" />
+                                    </label>
+                                }
+                            </div>
+                        </div>
+                        <div>
+                            <div class="form-label">Pay for</div>
+                            <div class="segmented" role="radiogroup" aria-label="Billing cycle">
+                                <input type="radio" name="BillingCycle" id="pay-monthly" value="Monthly" checked="@(s.BillingCycle == BillingCycle.Monthly)" /><label for="pay-monthly">A month</label>
+                                <input type="radio" name="BillingCycle" id="pay-annual" value="Annual" checked="@(s.BillingCycle == BillingCycle.Annual)" /><label for="pay-annual">A year</label>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="form-label">Pay with</div>
+                            <div class="choice-grid" role="radiogroup" aria-label="Payment provider">
+                                @for (var i = 0; i < Model.Gateways.Count; i++)
+                                {
+                                    var g = Model.Gateways[i];
+                                    <label class="choice-card">
+                                        <input type="radio" name="Gateway" value="@g.Code" checked="@(i == 0)" />
+                                        <span class="choice-check"><icon name="check" /></span>
+                                        <span class="choice-title"><icon name="credit-card" class="icon-sm" /> @g.Name</span>
+                                        <span class="chip-group">@foreach (var m in g.Methods) {<span class="chip">@m</span>}</span>
+                                    </label>
+                                }
+                            </div>
+                        </div>
+                        <p class="text-muted small mb-0">The same plan and period adds time after your current period. Another plan or period switches to it today and starts a fresh period. Your organisation is emailed a receipt.</p>
+                        <div><button type="submit" class="btn btn-primary"><icon name="lock" class="icon-sm" /> Continue to payment</button></div>
+                    </form>
+                </section>
+            }
+            else if (Model.Mine.Plans.Count > 0)
             {
                 <section aria-labelledby="compare-title">
                     <h2 class="h5 mb-3" id="compare-title">Plans</h2>
@@ -84,7 +138,31 @@ else
                             </div>
                         }
                     </div>
-                    <p class="text-muted small mt-3 mb-0">To change plan, contact us; the change applies as soon as it's made.</p>
+                    <p class="text-muted small mt-3 mb-0">@(Model.CanPay ? "Online payment isn't set up yet. To pay or change plan, contact us." : "To change plan, contact us; the change applies as soon as it's made.")</p>
+                </section>
+            }
+
+            @if (Model.Payments.Count > 0)
+            {
+                <section class="panel" aria-labelledby="payments-title">
+                    <div class="panel-header"><h2 class="panel-title" id="payments-title">Payments</h2></div>
+                    <ul class="item-list">
+                        @foreach (var p in Model.Payments)
+                        {
+                            <li>
+                                <span class="file-tile" aria-hidden="true"><icon name="receipt" /></span>
+                                <a class="item-main text-decoration-none" asp-action="Payment" asp-route-reference="@p.Reference">
+                                    <div class="item-title">@p.Description</div>
+                                    <div class="item-sub"><span class="mono">@p.Reference</span> · @p.GatewayName · by @p.RequestedByName</div>
+                                </a>
+                                <div class="item-aside text-end">
+                                    <div class="fw-semibold">@Display.Money(p.Amount, p.Currency)</div>
+                                    <span class="badge text-bg-@Display.Tone(p.Status)">@Display.Status(p.Status)</span>
+                                    <div class="small text-muted mt-1"><local-time value="p.CreatedAt" format="d MMM yyyy" /></div>
+                                </div>
+                            </li>
+                        }
+                    </ul>
                 </section>
             }
         </div>

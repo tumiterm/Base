@@ -1,0 +1,15 @@
+--- email.subject
+Payment received: {{Amount}} for {{PlanName}}
+--- email.html
+<p>Hello,</p>
+<p>Thank you: we received <strong>{{Amount}}</strong> through {{Gateway}} for your organisation's {{PlanName}} subscription.</p>
+<p>It is paid up to <strong>{{PaidUntil}}</strong>. Your payment reference is <strong>{{Reference}}</strong>.</p>
+<p>See your subscription and payments at <a href="{{PublicBaseUrl}}/subscription">{{PublicBaseUrl}}/subscription</a>.</p>
+--- email.text
+Hello,
+
+Thank you: we received {{Amount}} through {{Gateway}} for your organisation's {{PlanName}} subscription.
+
+It is paid up to {{PaidUntil}}. Your payment reference is {{Reference}}.
+
+Your subscription and payments: {{PublicBaseUrl}}/subscription

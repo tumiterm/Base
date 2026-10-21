@@ -9,7 +9,7 @@ namespace Base.Web.Subscriptions;
 /// </summary>
 internal sealed class SubscriptionGateMiddleware(RequestDelegate next)
 {
-    private static readonly string[] OpenPaths = ["/subscription", "/account", "/error", "/health", "/theme.css", "/branding", "/css", "/js", "/lib", "/img", "/favicon.ico"];
+    private static readonly string[] OpenPaths = ["/subscription", "/payments", "/account", "/error", "/health", "/theme.css", "/branding", "/css", "/js", "/lib", "/img", "/favicon.ico"];
 
     public async Task InvokeAsync(HttpContext context, ITenantEntitlements entitlements)
     {

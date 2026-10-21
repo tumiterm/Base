@@ -30,3 +30,4 @@ otherwise have to reverse-engineer. Format: context → decision → consequence
 | [0023](0023-plan-modules-tiers-and-decisions.md) | Plans built from modules, with suggested Standard/Premium tiers and recorded decisions |
 | [0024](0024-messages-audiences-and-scheduling.md) | Messages people write go to audiences modules declare, now or at a set time |
 | [0025](0025-feature-flags.md) | Feature flags switch code on and off without a deployment: release flags and kill switches |
+| [0026](0026-online-payments-through-hosted-gateways.md) | Organisations pay for their plan online through hosted payment gateways |

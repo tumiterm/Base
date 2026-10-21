@@ -23,6 +23,7 @@ public static class NotificationTemplates
     {
         public const string TrialEnding = "Subscriptions.TrialEnding";
         public const string StatusChanged = "Subscriptions.StatusChanged";
+        public const string PaymentReceived = "Subscriptions.PaymentReceived";
     }
 
     public static class Tenancy
@@ -126,6 +127,9 @@ public static class NotificationCatalog
         new(NotificationTemplates.Subscriptions.StatusChanged, "Subscription status changed", NotificationCategories.Billing,
             "Tells the organisation's contact that the subscription is past due, suspended, cancelled, expired or active again.",
             [NotificationChannel.Email], ["PlanName", "Status", "Reason"], IsMandatory: true),
+        new(NotificationTemplates.Subscriptions.PaymentReceived, "Payment received", NotificationCategories.Billing,
+            "A receipt for an online payment for the subscription, to the person who paid and the organisation's contact.",
+            [NotificationChannel.Email], ["PlanName", "Amount", "Reference", "PaidUntil", "Gateway"], IsMandatory: true),
         new(NotificationTemplates.Communications.Message, "Message from a person", NotificationCategories.Announcements,
             "Messages written and sent from Messages, alone or in bulk. Each one brings its own wording; this file is only the fallback.",
             [NotificationChannel.Email, NotificationChannel.InApp], []),

@@ -16,6 +16,14 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ### Added
 
+- **Online payments** for subscriptions (ADR 0026).
+  - Administrators pay from Subscription: choose a plan, a month or a year, and how to pay, then pay on the payment
+    provider's secure page. Paying for the same plan adds a period; another plan or period switches to it today.
+  - The provider's verified notification marks the payment paid and moves the subscription on by itself; repeats and
+    notices that don't match are ignored and logged. The payer and the organisation's contact get a receipt.
+  - Payments and their status on Subscription and in Platform → Payments. Suspended organisations can still pay.
+  - `IPaymentGateway` for providers, configured under `Payments:Gateways`, and a **Test** gateway (on in Development)
+    with a pretend checkout page. Permission **Pay for the subscription**. Job `payment-expiry`.
 - **Feature flags**: switch code on or off without a deployment, from Platform → Feature flags.
   - Off, everyone, or some organisations: the platform's own staff, chosen organisations and/or a stable percentage
     (growing it keeps those already in).

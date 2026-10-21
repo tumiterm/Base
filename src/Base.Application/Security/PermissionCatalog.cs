@@ -60,6 +60,7 @@ public static class PermissionCatalog
         new(PermissionCodes.People.View, "View people", "People", "See the people directory and each person's profile.", Everyone, []),
         new(PermissionCodes.People.Manage, "Manage people", "People", "Add people, edit their profiles, change their status and remove them.", AdminOnly, [PermissionCodes.People.View]),
         new(PermissionCodes.Subscription.View, "View subscription", "Subscription", "See this organisation's plan, usage and billing status.", AdminOnly, []),
+        new(PermissionCodes.Subscription.Pay, "Pay for the subscription", "Subscription", "Pay online for this organisation's plan, or switch plan by paying for another.", AdminOnly, [PermissionCodes.Subscription.View]),
         new(PermissionCodes.Platform.TenantsView, "View tenants", "Platform", "See every tenant, its subscription and usage.", AdminOnly, [], IsPlatform: true),
         new(PermissionCodes.Platform.TenantsManage, "Manage tenants", "Platform", "Create tenants, manage their domains and subscriptions, suspend and reinstate them.",
             AdminOnly, [PermissionCodes.Platform.TenantsView], IsPlatform: true),

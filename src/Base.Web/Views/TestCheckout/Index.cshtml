@@ -1,0 +1,26 @@
+@model TestCheckoutViewModel
+@{
+    ViewData["Title"] = "Test checkout";
+    var c = Model.Checkout;
+}
+<section class="panel test-checkout" aria-labelledby="checkout-title">
+    <div class="panel-header">
+        <h1 class="panel-title" id="checkout-title"><icon name="credit-card" class="icon-sm" /> Test checkout</h1>
+        <span class="chip chip-new">No money moves</span>
+    </div>
+    <div class="panel-body stack">
+        <p class="text-muted small mb-0">This stands in for a payment provider's page while developing. Choose what the provider would say; it reports back the way a real one does.</p>
+        <div>
+            <div class="text-muted small">@c.Description</div>
+            <div class="test-checkout-amount">@Display.Money(c.Amount, c.Currency)</div>
+            <div class="small text-muted">Reference <span class="mono">@c.Reference</span></div>
+        </div>
+        <form method="post" asp-action="Answer" class="d-flex flex-wrap gap-2">
+            <input type="hidden" name="token" value="@Model.Token" />
+            <input type="hidden" name="event" value="@Model.EventId" />
+            <button type="submit" name="outcome" value="pay" class="btn btn-primary"><icon name="check" class="icon-sm" /> Pay @Display.Money(c.Amount, c.Currency)</button>
+            <button type="submit" name="outcome" value="decline" class="btn btn-secondary">Decline</button>
+            <button type="submit" name="outcome" value="cancel" class="btn btn-link">Cancel and go back</button>
+        </form>
+    </div>
+</section>

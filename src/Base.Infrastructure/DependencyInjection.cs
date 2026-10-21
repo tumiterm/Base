@@ -59,6 +59,7 @@ public static class DependencyInjection
         services.AddOptions<DatabaseOptions>().BindConfiguration(DatabaseOptions.SectionName);
         services.AddOptions<SeedOptions>().BindConfiguration(SeedOptions.SectionName);
         services.AddOptions<Application.Flags.FeatureFlagOptions>().BindConfiguration(Application.Flags.FeatureFlagOptions.SectionName);
+        AddPaymentGateways(services, configuration);
         services.AddOptions<TenancyOptions>().BindConfiguration(TenancyOptions.SectionName).ValidateDataAnnotations().ValidateOnStart();
         services.AddOptions<OutboxOptions>().BindConfiguration(OutboxOptions.SectionName).ValidateDataAnnotations().ValidateOnStart();
 
@@ -256,6 +257,18 @@ public static class DependencyInjection
     /// Wraps the host's <see cref="ICurrentUser"/> (registered before this runs) so background work can act as a user
     /// through <see cref="IRunAsUser"/>.
     /// </summary>
+    /// <summary>Each gateway is registered only when switched on under <c>Payments:Gateways:{Code}</c>.</summary>
+    private static void AddPaymentGateways(IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<Application.Payments.PaymentOptions>().BindConfiguration(Application.Payments.PaymentOptions.SectionName);
+        if (configuration.GetSection(Payments.TestGatewayOptions.SectionName).Get<Payments.TestGatewayOptions>() is { Enabled: true })
+        {
+            services.AddScoped<Payments.TestPaymentGateway>();
+            services.AddScoped<Application.Payments.IPaymentGateway>(sp => sp.GetRequiredService<Payments.TestPaymentGateway>());
+            services.AddScoped<Application.Payments.ITestCheckout>(sp => sp.GetRequiredService<Payments.TestPaymentGateway>());
+        }
+    }
+
     private static void AddRunAs(IServiceCollection services)
     {
         var inner = services.Last(d => d.ServiceType == typeof(ICurrentUser));

@@ -1,0 +1,69 @@
+@model PlatformPaymentsViewModel
+@using Base.Domain.Payments
+@{
+    ViewData["Title"] = "Payments";
+    var results = Model.Payments;
+    var t = Model.Totals;
+    var filters = new (PaymentStatus? Status, string Label)[] { (null, "All"), (PaymentStatus.Succeeded, "Paid"), (PaymentStatus.Pending, "Waiting"), (PaymentStatus.Failed, "Declined"), (PaymentStatus.Cancelled, "Cancelled"), (PaymentStatus.Expired, "Expired") };
+}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Payments</h1>
+        <p class="page-subtitle">Online payments organisations make for their subscriptions. A paid payment moves the subscription on by itself.</p>
+    </div>
+</div>
+
+<div class="stat-grid">
+    <div class="panel stat-tile"><span class="file-tile is-code" aria-hidden="true"><icon name="receipt" /></span><div class="stat"><span class="stat-label">Received this month</span><span class="stat-value">@(t.Currency is null ? (t.SucceededThisMonth == 0 ? "0" : "Mixed") : Display.Money(t.ReceivedThisMonth, t.Currency))</span><span class="stat-sub">@t.SucceededThisMonth paid</span></div></div>
+    <div class="panel stat-tile @(t.FailedThisMonth > 0 ? "is-warning" : "")"><span class="file-tile" aria-hidden="true"><icon name="circle-x" /></span><div class="stat"><span class="stat-label">Declined</span><span class="stat-value">@t.FailedThisMonth</span><span class="stat-sub">This month</span></div></div>
+    <div class="panel stat-tile"><span class="file-tile" aria-hidden="true"><icon name="clock" /></span><div class="stat"><span class="stat-label">Waiting</span><span class="stat-value">@t.Pending</span><span class="stat-sub">For the provider to confirm</span></div></div>
+    <div class="panel stat-tile @(Model.Gateways.Count == 0 ? "is-warning" : "")"><span class="file-tile" aria-hidden="true"><icon name="credit-card" /></span><div class="stat"><span class="stat-label">Ways to pay</span><span class="stat-value">@Model.Gateways.Count</span><span class="stat-sub">@(Model.Gateways.Count == 0 ? "None configured" : string.Join(", ", Model.Gateways.Select(g => g.Name)))</span></div></div>
+</div>
+
+<div class="toolbar">
+    <nav class="segmented scroll-x" aria-label="Filter by status">
+        @foreach (var f in filters)
+        {
+            var active = f.Status == Model.Status;
+            <a class="@(active ? "is-active" : "")" aria-current="@(active ? "page" : null)" asp-action="Index" asp-route-status="@f.Status">@f.Label</a>
+        }
+    </nav>
+    <span class="toolbar-spacer"></span>
+    <span class="text-muted small">@results.Total @(results.Total == 1 ? "payment" : "payments")</span>
+</div>
+
+@if (results.Total == 0)
+{
+    <div class="empty-state">
+        <icon name="receipt" />
+        <div class="empty-state-title">@(Model.Status is null ? "No payments yet" : "Nothing here")</div>
+        <p class="mb-0">@(Model.Gateways.Count == 0 ? "Configure a payment provider under Payments:Gateways so organisations can pay from their Subscription page." : "Organisations pay from their Subscription page; payments show here as they come in.")</p>
+    </div>
+}
+else
+{
+    <ul class="panel item-list">
+        @foreach (var p in results.Items)
+        {
+            <li>
+                <span class="file-tile" aria-hidden="true"><icon name="receipt" /></span>
+                <div class="item-main">
+                    <div class="item-title">@(p.TenantName ?? "Unknown organisation") · @p.Description</div>
+                    <div class="item-sub"><span class="mono">@p.Reference</span> · @p.GatewayName · by @p.RequestedByName@(p.FailureReason is not null && p.Status != PaymentStatus.Succeeded ? " · " + p.FailureReason : "")</div>
+                </div>
+                <div class="item-aside text-end">
+                    <div class="fw-semibold">@Display.Money(p.Amount, p.Currency)</div>
+                    <span class="badge text-bg-@Display.Tone(p.Status)">@Display.Status(p.Status)</span>
+                    <div class="small text-muted mt-1"><local-time value="p.CreatedAt" format="d MMM, HH:mm" /></div>
+                </div>
+            </li>
+        }
+    </ul>
+    <div class="d-flex justify-content-between align-items-center mt-3">
+        <span class="text-muted small">Page @results.Page of @results.TotalPages</span>
+        <nav class="btn-group btn-group-sm" aria-label="Pages">
+            <a class="btn btn-outline-secondary @(results.HasPrevious ? "" : "disabled")" asp-route-page="@(results.Page - 1)" asp-route-status="@Model.Status">Previous</a>
+            <a class="btn btn-outline-secondary @(results.HasNext ? "" : "disabled")" asp-route-page="@(results.Page + 1)" asp-route-status="@Model.Status">Next</a>
+        </nav>
+    </div>
+}

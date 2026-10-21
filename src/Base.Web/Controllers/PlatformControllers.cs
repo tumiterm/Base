@@ -271,15 +271,6 @@ public sealed class PlatformPlansController(IPlanAdministration plans) : Control
     }
 }
 
-/// <summary>This organisation's own plan, status and usage. Open to every signed-in user so a suspended tenant can see why.</summary>
-[Route("subscription")]
-public sealed class SubscriptionController(ISubscriptionService subscriptions, ITenantEntitlements entitlements) : Controller
-{
-    [HttpGet("")]
-    public async Task<IActionResult> Index(CancellationToken cancellationToken) =>
-        View(new SubscriptionPageViewModel(await subscriptions.GetMineAsync(cancellationToken), await entitlements.GetAsync(cancellationToken)));
-}
-
 /// <summary>Where every tenant stands on releases: versions in use and how far each gated feature has spread.</summary>
 [Route("platform/releases")]
 [HasPermission(PermissionCodes.Platform.TenantsView)]

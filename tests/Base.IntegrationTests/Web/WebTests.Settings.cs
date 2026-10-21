@@ -130,6 +130,22 @@ public sealed partial class WebTests
     }
 
     [Fact]
+    public async Task Gateways_reach_the_notification_endpoint_without_signing_in_and_only_verified_notices_count()
+    {
+        var anonymous = Client();
+        using var forged = new FormUrlEncodedContent([new("token", "forged"), new("outcome", "pay")]);
+        (await anonymous.PostAsync("/payments/notify/test", forged, TestContext.Current.CancellationToken)).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        using var unknown = new FormUrlEncodedContent([new("x", "y")]);
+        (await anonymous.PostAsync("/payments/notify/nobody", unknown, TestContext.Current.CancellationToken)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        (await anonymous.GetAsync("/payments/test?token=forged", TestContext.Current.CancellationToken)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
+
+        var client = Client();
+        await SignInAsync(client);
+        (await client.GetStringAsync("/platform/payments", TestContext.Current.CancellationToken)).ShouldContain("Test payments");
+        (await client.GetStringAsync("/subscription", TestContext.Current.CancellationToken)).ShouldContain("No subscription needed");
+    }
+
+    [Fact]
     public async Task The_running_version_is_reported()
     {
         var client = Client();

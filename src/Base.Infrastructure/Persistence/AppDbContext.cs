@@ -8,6 +8,7 @@ using Base.Domain.Flags;
 using Base.Domain.Integrations;
 using Base.Domain.MasterData;
 using Base.Domain.Notifications;
+using Base.Domain.Payments;
 using Base.Domain.People;
 using Base.Domain.Settings;
 using Base.Domain.Subscriptions;
@@ -85,6 +86,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
     public DbSet<Broadcast> Broadcasts => Set<Broadcast>();
 
     public DbSet<FeatureFlagState> FeatureFlags => Set<FeatureFlagState>();
+    public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<PaymentNotification> PaymentNotifications => Set<PaymentNotification>();
 
     public DbSet<MessageTemplate> MessageTemplates => Set<MessageTemplate>();
 

@@ -18,6 +18,7 @@ public sealed class WebAppFactory(string connectionString) : WebApplicationFacto
         builder.UseSetting("ConnectionStrings:Default", connectionString);
         builder.UseSetting("Database:MigrateOnStartup", "true");
         builder.UseSetting("Outbox:Enabled", "false");
+        builder.UseSetting("Payments:Gateways:Test:Enabled", "true");
         builder.UseSetting("Seed:AdminEmail", AdminEmail);
         builder.UseSetting("Seed:AdminPassword", AdminPassword);
         builder.UseSetting("FileStorage:LocalDisk:RootPath", Path.Combine(Path.GetTempPath(), "base-tests", Guid.NewGuid().ToString("N")));

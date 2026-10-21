@@ -108,7 +108,30 @@ public sealed class PlanEditViewModel
     }
 }
 
-public sealed record SubscriptionPageViewModel(MySubscription Mine, TenantAccess Access);
+/// <param name="Gateways">Ways to pay online for the plan's currency; empty when none is configured.</param>
+/// <param name="Payments">This organisation's latest online payments.</param>
+public sealed record SubscriptionPageViewModel(
+    MySubscription Mine,
+    TenantAccess Access,
+    IReadOnlyList<Base.Application.Payments.PaymentGatewayView> Gateways,
+    IReadOnlyList<Base.Application.Payments.PaymentView> Payments,
+    bool CanPay);
+
+/// <summary>The pay form as posted from the subscription page.</summary>
+public sealed class PayForm
+{
+    public Guid PlanId { get; set; }
+
+    public BillingCycle BillingCycle { get; set; }
+
+    public string Gateway { get; set; } = string.Empty;
+}
+
+public sealed record PlatformPaymentsViewModel(
+    PagedResult<Base.Application.Payments.PaymentView> Payments,
+    Base.Application.Payments.PaymentTotals Totals,
+    Base.Domain.Payments.PaymentStatus? Status,
+    IReadOnlyList<Base.Application.Payments.PaymentGatewayView> Gateways);
 
 /// <summary>Plans side by side. Offered plans come first; retired ones keep their subscribers and stay editable.</summary>
 public sealed record PlanMatrixViewModel(IReadOnlyList<PlanSummary> Plans)
@@ -122,3 +145,5 @@ public sealed record PlanMatrixViewModel(IReadOnlyList<PlanSummary> Plans)
             .Where(x => x.Plans.Count > 0)];
 }
 
+
+public sealed record TestCheckoutViewModel(string Token, Base.Application.Payments.TestCheckoutView Checkout, string EventId);

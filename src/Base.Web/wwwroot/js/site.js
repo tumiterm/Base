@@ -789,3 +789,10 @@ document.querySelectorAll('input[type="file"][data-fill-title]').forEach((input)
         layout();
     });
 })();
+
+// Payments: post the gateway's form by itself, and re-check a payment that is still waiting.
+(() => {
+    document.querySelector('form[data-submit-on-load]')?.requestSubmit();
+    const seconds = Number(document.querySelector('[data-reload-in]')?.dataset.reloadIn);
+    if (seconds > 0) setTimeout(() => window.location.reload(), seconds * 1000);
+})();

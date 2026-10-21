@@ -135,6 +135,23 @@ public sealed class TenantSubscription : EntityBase, ITenantOwned
         MoveTo(SubscriptionStatus.Active, now, "Payment recorded");
     }
 
+    /// <summary>
+    /// A payment through a gateway for <paramref name="plan"/> and <paramref name="cycle"/>. The same plan and cycle
+    /// extend the subscription like <see cref="RecordPayment"/>; a different one switches to it with a fresh period from
+    /// <paramref name="now"/>.
+    /// </summary>
+    public void ApplyPayment(Plan plan, BillingCycle cycle, DateTimeOffset now, string reference)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        if (plan.Id != PlanId || cycle != BillingCycle)
+        {
+            ChangePlan(plan, cycle);
+            CurrentPeriodEnd = now;
+        }
+
+        RecordPayment(now, reference);
+    }
+
     /// <summary>Whether the trial ends within <paramref name="notice"/> and nobody has been told yet.</summary>
     public bool TrialEndsSoon(DateTimeOffset now, TimeSpan notice) =>
         Status == SubscriptionStatus.Trialing && !CancelAtPeriodEnd && TrialReminderSentAt is null && CurrentPeriodEnd > now && CurrentPeriodEnd - notice <= now;
