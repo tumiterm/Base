@@ -138,6 +138,7 @@ public sealed partial class WebTests
         using var unknown = new FormUrlEncodedContent([new("x", "y")]);
         (await anonymous.PostAsync("/payments/notify/nobody", unknown, TestContext.Current.CancellationToken)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
         (await anonymous.GetAsync("/payments/test?token=forged", TestContext.Current.CancellationToken)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        (await anonymous.GetAsync("/payments/go/PNOSUCHPAYMT", TestContext.Current.CancellationToken)).StatusCode.ShouldBe(HttpStatusCode.NotFound, "payment links are anonymous; an unknown one is simply not found");
 
         // Gateways sign the raw body: it must reach them exactly as sent, as well as parsed.
         using var raw = new StringContent("reference=PNOBODY12345&note=a+b%26c", System.Text.Encoding.UTF8, "application/x-www-form-urlencoded");

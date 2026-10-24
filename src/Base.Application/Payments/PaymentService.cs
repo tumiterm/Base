@@ -53,7 +53,8 @@ public sealed record PaymentView(
     DateTimeOffset? CompletedAt,
     bool Applied,
     bool IsRenewal = false,
-    bool SetsUpRenewal = false);
+    bool SetsUpRenewal = false,
+    bool CanShareLink = false);
 
 /// <param name="StopError">Why the gateway couldn't be told to stop it, while it may still be charging.</param>
 public sealed record RecurringPaymentView(
@@ -72,6 +73,10 @@ public sealed record RecurringPaymentView(
     bool CanUpdateCard,
     string? StopError,
     string? FirstReference = null);
+
+/// <param name="CheckoutUrl">The gateway's page to forward to; null when the link can no longer be used.</param>
+/// <param name="Status">The payment's status, to explain why not (null when there is no such payment).</param>
+public sealed record PaymentForward(Uri? CheckoutUrl, PaymentStatus? Status, string? Description, decimal Amount, string? Currency);
 
 public sealed record PaymentQuery(PaymentStatus? Status = null, int Page = 1, int PageSize = PageRequest.DefaultPageSize);
 
@@ -114,6 +119,12 @@ public interface IPaymentService
 
     /// <summary>The gateway's page for changing the card an automatic renewal charges. Needs <c>Subscription.Pay</c>.</summary>
     Task<ValidationResponse<Uri>> UpdateCardAsync(Guid id, Uri returnUrl, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Where a payment link (<c>payments/go/{reference}</c>) forwards to: the gateway's checkout page while the payment
+    /// is still waiting and hasn't expired. Anonymous: the reference is the capability, like the gateway's own link.
+    /// </summary>
+    Task<PaymentForward> ForwardAsync(string reference, CancellationToken cancellationToken = default);
 
     /// <summary>A gateway's notification, from an anonymous endpoint: trusted only once the gateway verified it.</summary>
     Task<NotificationReply> ReceiveAsync(string gateway, InboundNotification notification, CancellationToken cancellationToken = default);
@@ -219,9 +230,9 @@ internal sealed partial class PaymentService(
             return ValidationResponse.Failure(started.Error ?? $"{gateway.Name} couldn't start the payment. Try again, or choose another way to pay.").As<CheckoutRedirect>();
         }
 
-        payment.Started(started.GatewayReference);
+        payment.Started(started.GatewayReference, started.Redirect.IsFormPost ? null : started.Redirect.Url);
         await unitOfWork.SaveAsync(cancellationToken);
-        return ValidationResponse.Success(started.Redirect);
+        return ValidationResponse.Success(started.Redirect with { PaymentReference = payment.Reference });
     }
 
     public async Task<ValidationResponse<PaymentView>> ReturnedAsync(string reference, bool cancelled, CancellationToken cancellationToken = default)
@@ -470,6 +481,25 @@ internal sealed partial class PaymentService(
             : ValidationResponse.NotFound("The card for this renewal can't be changed online.").As<Uri>();
     }
 
+    public async Task<PaymentForward> ForwardAsync(string reference, CancellationToken cancellationToken = default)
+    {
+        Payment? payment;
+        using (tenant.BeginSystemScope())
+        {
+            payment = string.IsNullOrWhiteSpace(reference) || reference.Length != Payment.ReferenceLength
+                ? null
+                : await unitOfWork.Repository<Payment>().GetAsync(p => p.Reference == reference, asNoTracking: true, cancellationToken: cancellationToken);
+        }
+
+        if (payment is null)
+        {
+            return new PaymentForward(null, null, null, 0, null);
+        }
+
+        var usable = payment.CanForward && payment.ExpiresAt > time.GetUtcNow();
+        return new PaymentForward(usable ? new Uri(payment.CheckoutUrl!) : null, payment.Status, payment.Description, payment.Amount, payment.Currency);
+    }
+
     private Task<bool> HasWaitingPaymentAsync(Guid recurringId, CancellationToken cancellationToken) =>
         unitOfWork.Repository<Payment>().ExistsAsync(p => p.RecurringPaymentId == recurringId && p.Status == PaymentStatus.Pending, cancellationToken);
 
@@ -502,7 +532,8 @@ internal sealed partial class PaymentService(
         p.CompletedAt,
         p.AppliedAt is not null,
         p.IsRenewal,
-        p.RecurringPaymentId is not null && !p.IsRenewal);
+        p.RecurringPaymentId is not null && !p.IsRenewal,
+        p.CanForward && p.ExpiresAt > time.GetUtcNow());
 
     private static string Fingerprint(string body) => "sha256:" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(body)));
 

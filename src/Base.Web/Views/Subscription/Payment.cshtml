@@ -1,36 +1,47 @@
-@model Base.Application.Payments.PaymentView
+@model PaymentPageViewModel
 @using Base.Domain.Payments
 @{
-    ViewData["Title"] = "Payment " + Model.Reference;
-    var (icon, title, text) = Model.Status switch
+    var payment = Model.Payment;
+    ViewData["Title"] = "Payment " + payment.Reference;
+    var (icon, title, text) = payment.Status switch
     {
-        PaymentStatus.Succeeded => ("circle-check", "Payment received", Model.Applied ? "Thank you. Your subscription is up to date and a receipt is on its way by email." : "Thank you. Your subscription is being updated; this takes a moment."),
+        PaymentStatus.Succeeded => ("circle-check", "Payment received", payment.Applied ? "Thank you. Your subscription is up to date and a receipt is on its way by email." : "Thank you. Your subscription is being updated; this takes a moment."),
         PaymentStatus.Pending => ("clock", "Waiting for confirmation", "The payment provider hasn't confirmed the payment yet. This page checks again by itself; you can also leave it and come back."),
-        PaymentStatus.Failed => ("circle-x", "The payment didn't go through", (Model.FailureReason ?? "It was declined.") + " Nothing was taken. You can try again, or choose another way to pay."),
+        PaymentStatus.Failed => ("circle-x", "The payment didn't go through", (payment.FailureReason ?? "It was declined.") + " Nothing was taken. You can try again, or choose another way to pay."),
         PaymentStatus.Cancelled => ("ban", "Payment cancelled", "You left the payment page without paying. Nothing was taken."),
         _ => ("clock", "No answer from the payment provider", "We didn't hear back in time. If money was taken, the payment still counts as soon as the provider confirms it."),
     };
 }
 <nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-action="Index">Subscription</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">Payment</span></nav>
-<section class="panel payment-result" aria-labelledby="result-title" data-reload-in="@(Model.Status == PaymentStatus.Pending || (Model.Status == PaymentStatus.Succeeded && !Model.Applied) ? 5 : 0)">
+<section class="panel payment-result" aria-labelledby="result-title" data-reload-in="@(payment.Status == PaymentStatus.Pending || (payment.Status == PaymentStatus.Succeeded && !payment.Applied) ? 5 : 0)">
     <div class="panel-body stack">
         <div class="payment-result-head">
-            <span class="payment-result-icon is-@Display.Tone(Model.Status)" aria-hidden="true"><icon name="@icon" /></span>
+            <span class="payment-result-icon is-@Display.Tone(payment.Status)" aria-hidden="true"><icon name="@icon" /></span>
             <div>
                 <h1 class="h4 mb-1" id="result-title">@title</h1>
                 <p class="text-muted mb-0">@text</p>
             </div>
         </div>
         <dl class="kv">
-            <dt>Amount</dt><dd class="fw-semibold">@Display.Money(Model.Amount, Model.Currency)</dd>
-            <dt>For</dt><dd>@Model.Description</dd>
-            <dt>Reference</dt><dd class="mono">@Model.Reference</dd>
-            <dt>Paid with</dt><dd>@Model.GatewayName</dd>
-            <dt>Status</dt><dd><span class="badge text-bg-@Display.Tone(Model.Status)">@Display.Status(Model.Status)</span></dd>
-            <dt>Started</dt><dd><local-time value="Model.CreatedAt" format="d MMM yyyy, HH:mm" /></dd>
+            <dt>Amount</dt><dd class="fw-semibold">@Display.Money(payment.Amount, payment.Currency)</dd>
+            <dt>For</dt><dd>@payment.Description</dd>
+            <dt>Reference</dt><dd class="mono">@payment.Reference</dd>
+            <dt>Paid with</dt><dd>@payment.GatewayName</dd>
+            <dt>Status</dt><dd><span class="badge text-bg-@Display.Tone(payment.Status)">@Display.Status(payment.Status)</span></dd>
+            <dt>Started</dt><dd><local-time value="payment.CreatedAt" format="d MMM yyyy, HH:mm" /></dd>
         </dl>
+        @if (Model.ShareUrl is { } share)
+        {
+            <div class="stack">
+                <div class="small text-muted">Someone else paying? Send them this link (by email or WhatsApp); it opens the payment page while this payment is waiting.</div>
+                <div class="key-value">
+                    <code id="payment-link">@share</code>
+                    <button class="btn btn-secondary" type="button" data-copy="#payment-link"><icon name="copy" class="icon-sm" /> <span data-copy-label>Copy</span></button>
+                </div>
+            </div>
+        }
         <div class="d-flex flex-wrap gap-2">
-            @if (Model.Status is PaymentStatus.Failed or PaymentStatus.Cancelled or PaymentStatus.Expired)
+            @if (payment.Status is PaymentStatus.Failed or PaymentStatus.Cancelled or PaymentStatus.Expired)
             {
                 <a class="btn btn-primary" asp-action="Index" asp-fragment="pay"><icon name="refresh-cw" class="icon-sm" /> Try again</a>
             }

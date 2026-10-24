@@ -68,6 +68,7 @@ public sealed class YocoTests
 
         var refused = await Gateway(new Capture(HttpStatusCode.Unauthorized, """{"errorMessage":"bad key"}""")).StartCheckoutAsync(Checkout, CancellationToken.None);
         refused.Error.ShouldBe("Yoco couldn't start the payment (401).");
+        (await Gateway().StartCheckoutAsync(Checkout with { Amount = 1.99m }, CancellationToken.None)).Error.ShouldBe("Yoco can't take payments under R2.00.");
     }
 
     [Fact]

@@ -38,7 +38,10 @@ application in PCI DSS scope.
   tested against Payfast's own PHP samples. Setup is in `docs/payments.md`.
 - **Yoco** is the second: its Checkout API (the server creates a checkout; the person is sent to Yoco's page from a
   page of ours, so no CSP entry is needed) and Standard Webhooks signatures with a freshness window. Yoco's webhook
-  names its checkout, so a payment is also found by the gateway reference its checkout started with.
+  names its checkout, so a payment is also found by the gateway reference its checkout started with. Live Yoco
+  payments must come from a verified domain, so a checkout reached by a link is kept on the payment and the person
+  goes through our anonymous forwarding page (`payments/go/{reference}`), which also serves as a shareable payment
+  link while the payment waits.
 - **Automatic renewal is the gateway's.** A `RecurringPayment` records the agreement (plan, cycle, amount, the
   gateway's token) set up by a first payment with "Renew automatically"; the gateway charges each cycle by itself
   (Payfast Subscriptions) and each charge's notification becomes a renewal `Payment`, applied like any other. We keep

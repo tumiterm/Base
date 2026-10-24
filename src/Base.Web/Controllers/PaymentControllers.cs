@@ -61,11 +61,21 @@ public sealed class SubscriptionController(
             return RedirectToAction(nameof(Index), null, null, "pay");
         }
 
-        // Another site is reached from a page rather than by redirecting this form post, so the CSP's form-action
-        // (which also covers redirects after a post) needs no entry for gateways that only redirect.
         var redirect = started.Data!;
+        if (redirect.IsFormPost)
+        {
+            return View("GatewayRedirect", redirect);
+        }
+
+        // Another site is reached through our forwarding page on the public address, never by redirecting this post:
+        // the CSP's form-action (which covers redirects after a post) needs no entry, and gateways that check the
+        // referring domain (Yoco) see the address verified with them.
+        // The public address may be another origin than this one, so this page continues by script rather than by a
+        // redirect of the post (which form-action would refuse).
         var sameSite = string.Equals(redirect.Url.Authority, Request.Host.Value, StringComparison.OrdinalIgnoreCase);
-        return redirect.IsFormPost || !sameSite ? View("GatewayRedirect", redirect) : Redirect(redirect.Url.AbsoluteUri);
+        return sameSite || redirect.PaymentReference is null
+            ? Redirect(redirect.Url.AbsoluteUri)
+            : View("GatewayRedirect", new CheckoutRedirect(new Uri(await PublicBaseAsync(cancellationToken) + "/payments/go/" + redirect.PaymentReference)));
     }
 
     /// <summary>Turns automatic renewal off, at the gateway too.</summary>
@@ -97,7 +107,13 @@ public sealed class SubscriptionController(
     public async Task<IActionResult> Payment(string reference, bool cancelled = false, CancellationToken cancellationToken = default)
     {
         var result = await payments.ReturnedAsync(reference, cancelled, cancellationToken);
-        return result.IsError ? result.ToActionResult(this) : View(result.Data);
+        if (result.IsError)
+        {
+            return result.ToActionResult(this);
+        }
+
+        var share = result.Data!.CanShareLink ? await PublicBaseAsync(cancellationToken) + "/payments/go/" + result.Data.Reference : null;
+        return View(new PaymentPageViewModel(result.Data, share));
     }
 
     private async Task<PaymentUrls> UrlsAsync(CancellationToken cancellationToken)
@@ -105,9 +121,15 @@ public sealed class SubscriptionController(
         // The person comes back to the address they are on (a verified tenant host). Gateways post to the public
         // address (General.PublicBaseUrl as it applies to this organisation), never one taken from the request.
         var here = $"{Request.Scheme}://{Request.Host}{Request.PathBase}";
+        return new PaymentUrls(new Uri(here + "/subscription/payments"), new Uri(await PublicBaseAsync(cancellationToken) + "/payments/notify"));
+    }
+
+    private async Task<string> PublicBaseAsync(CancellationToken cancellationToken)
+    {
         var configuredBase = await settings.GetAsync(SettingCodes.General.PublicBaseUrl, cancellationToken);
-        var notifyBase = Uri.TryCreate(configuredBase, UriKind.Absolute, out var configured) ? configured.AbsoluteUri.TrimEnd('/') : here;
-        return new PaymentUrls(new Uri(here + "/subscription/payments"), new Uri(notifyBase + "/payments/notify"));
+        return Uri.TryCreate(configuredBase, UriKind.Absolute, out var configured)
+            ? configured.AbsoluteUri.TrimEnd('/')
+            : $"{Request.Scheme}://{Request.Host}{Request.PathBase}";
     }
 }
 
@@ -167,6 +189,28 @@ internal sealed class RawBodyAttribute(int maxBytes) : Attribute, IResourceFilte
 
     public void OnResourceExecuted(ResourceExecutedContext context)
     {
+    }
+}
+
+/// <summary>
+/// A payment link: a page on our own domain that forwards the browser to the gateway's checkout page while the payment
+/// is waiting. Gateways that check the referring domain (Yoco) need the person to arrive from a page like this, which
+/// also makes the link safe to send by email or WhatsApp. Anonymous: the reference is the capability.
+/// </summary>
+[Route("payments/go")]
+[AllowAnonymous]
+public sealed class PaymentForwardController(IPaymentService payments) : Controller
+{
+    [HttpGet("{reference}")]
+    public async Task<IActionResult> Index(string reference, CancellationToken cancellationToken)
+    {
+        var forward = await payments.ForwardAsync(reference, cancellationToken);
+        if (forward.Status is null)
+        {
+            return NotFound();
+        }
+
+        return forward.CheckoutUrl is { } url ? View("Forward", new CheckoutRedirect(url)) : View("ForwardUnavailable", forward);
     }
 }
 

@@ -1,0 +1,18 @@
+@model Base.Application.Payments.PaymentForward
+@using Base.Domain.Payments
+@{
+    ViewData["Title"] = "Payment link";
+    Layout = "_AuthLayout";
+    var (icon, title, text) = Model.Status switch
+    {
+        PaymentStatus.Succeeded => ("circle-check", "Already paid", "This payment has been made. Thank you; there's nothing more to do."),
+        PaymentStatus.Failed => ("circle-x", "This payment didn't go through", "Ask for a new payment link."),
+        PaymentStatus.Cancelled => ("ban", "This payment was cancelled", "Ask for a new payment link."),
+        _ => ("clock", "This payment link has expired", "Ask for a new payment link."),
+    };
+}
+<div class="empty-state border-0">
+    <icon name="@icon" />
+    <div class="empty-state-title">@title</div>
+    <p class="mb-0">@Model.Description@(Model.Currency is null ? "" : " · " + Display.Money(Model.Amount, Model.Currency)). @text</p>
+</div>

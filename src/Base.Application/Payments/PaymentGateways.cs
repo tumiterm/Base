@@ -68,6 +68,9 @@ public sealed record CheckoutRequest(
 public sealed record CheckoutRedirect(Uri Url, IReadOnlyDictionary<string, string>? FormFields = null)
 {
     public bool IsFormPost => FormFields is not null;
+
+    /// <summary>Our payment's reference, set once the payment is recorded (for forwarding links).</summary>
+    public string? PaymentReference { get; init; }
 }
 
 /// <param name="GatewayReference">The gateway's own id for the checkout, when it gives one up front.</param>

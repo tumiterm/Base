@@ -794,7 +794,7 @@ document.querySelectorAll('input[type="file"][data-fill-title]').forEach((input)
 (() => {
     document.querySelector('form[data-submit-on-load]')?.requestSubmit();
     const go = document.querySelector('a[data-navigate-on-load]');
-    if (go) window.location.assign(go.href);
+    if (go) window.location.replace(go.href);
     const seconds = Number(document.querySelector('[data-reload-in]')?.dataset.reloadIn);
     if (seconds > 0) setTimeout(() => window.location.reload(), seconds * 1000);
 })();

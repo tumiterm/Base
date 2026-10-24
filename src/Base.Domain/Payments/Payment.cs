@@ -37,6 +37,7 @@ public sealed class Payment : EntityBase, ITenantOwned
     public const int DescriptionMaxLength = 200;
     public const int ReasonMaxLength = 500;
     public const int NameMaxLength = 200;
+    public const int CheckoutUrlMaxLength = 2000;
 
     private const string ReferenceAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -130,11 +131,24 @@ public sealed class Payment : EntityBase, ITenantOwned
         return payment;
     }
 
-    public void Started(string? gatewayReference)
+    /// <summary>
+    /// The gateway's checkout page, when it is reached by a plain link: kept so the person can be forwarded to it from a
+    /// page of ours (gateways like Yoco check the referring domain), or sent the link to pay later.
+    /// </summary>
+    public string? CheckoutUrl { get; private set; }
+
+    public bool CanForward => Status == PaymentStatus.Pending && CheckoutUrl is not null;
+
+    public void Started(string? gatewayReference, Uri? checkoutUrl = null)
     {
         if (!string.IsNullOrWhiteSpace(gatewayReference))
         {
             GatewayReference = Limit(gatewayReference.Trim(), GatewayReferenceMaxLength);
+        }
+
+        if (checkoutUrl is not null && checkoutUrl.AbsoluteUri.Length <= CheckoutUrlMaxLength)
+        {
+            CheckoutUrl = checkoutUrl.AbsoluteUri;
         }
     }
 

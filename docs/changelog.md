@@ -29,6 +29,8 @@ Add a line under **Unreleased** with every change. A release moves those lines u
     Payfast's confirmation. Sandbox or live. Setup in `docs/payments.md`.
   - **Yoco** gateway (`Payments:Gateways:Yoco`): Yoco's Checkout API with its hosted payment page; webhooks verified
     by Standard Webhooks signature and timestamp. Once-off payments. Setup in `docs/payments.md`.
+  - **Payment links**: a waiting payment's page has a link (`/payments/go/{reference}`) to send by email or WhatsApp;
+    it forwards to the gateway's page from our own domain, which Yoco's verified-domain check needs.
   - **Automatic renewal**: "Renew automatically" when paying (Payfast Subscriptions, and the Test gateway). The gateway
     charges every month or year; each charge renews the subscription and sends a receipt. Subscription shows the
     renewal with Update card and Turn off; it stops by itself when the plan changes or the subscription ends, and the

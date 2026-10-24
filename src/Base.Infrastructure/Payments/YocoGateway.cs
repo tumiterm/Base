@@ -41,6 +41,9 @@ internal sealed partial class YocoGateway(IOptions<YocoOptions> options, IHttpCl
     public const string GatewayCode = "Yoco";
     public const string HttpClientName = "yoco";
 
+    /// <summary>Yoco doesn't accept payments under R2.00.</summary>
+    public const decimal MinimumAmount = 2m;
+
     /// <summary>How old a webhook may be, against replays.</summary>
     public static readonly TimeSpan Tolerance = TimeSpan.FromMinutes(5);
 
@@ -58,6 +61,11 @@ internal sealed partial class YocoGateway(IOptions<YocoOptions> options, IHttpCl
     public async Task<CheckoutStart> StartCheckoutAsync(CheckoutRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        if (request.Amount < MinimumAmount)
+        {
+            return CheckoutStart.Failed("Yoco can't take payments under R2.00.");
+        }
+
         using var message = new HttpRequestMessage(HttpMethod.Post, new Uri(new Uri(_options.ApiBaseUrl), "checkouts"))
         {
             // Serialized up front so the request has a Content-Length rather than a chunked body.

@@ -10,7 +10,7 @@ This page is how to set a gateway up.
 | --- | --- | --- |
 | `Test` | A pretend checkout page in the app (Pay / Decline / Cancel). On in Development. **Never in production.** | `Payments:Gateways:Test:Enabled` |
 | `Payfast` | Payfast's hosted checkout: card, Instant EFT, QR codes (SnapScan, Zapper, Scan to Pay), Apple Pay, Samsung Pay and others the merchant account has switched on. Rand only, R5.00 minimum. Automatic renewal. | `Payments:Gateways:Payfast` |
-| `Yoco` | Yoco's Checkout API: Yoco's hosted payment page (cards and the wallets Yoco offers there). Rand only. Once-off payments (no automatic renewal). | `Payments:Gateways:Yoco` |
+| `Yoco` | Yoco's Checkout API: Yoco's hosted payment page (cards and the wallets Yoco offers there). Rand only, R2.00 minimum. Once-off payments (no automatic renewal). | `Payments:Gateways:Yoco` |
 
 A gateway appears on the Subscription page once it is enabled, for plans in a currency it accepts.
 
@@ -116,7 +116,24 @@ curl -X POST https://payments.yoco.com/api/webhooks \
 The public address follows the same rules as Payfast's (a public HTTPS address that reaches the app; a tunnel on a
 developer machine). Register again with the live key when going live, and use that secret in production.
 
-### 3. What is checked on every webhook
+### 3. Verified domain and payment links
+
+Live Yoco payments must come from a website domain verified with Yoco (Yoco App → How to connect → Verified Domains):
+Yoco checks which page sent the person to its checkout. So the person is never redirected straight to Yoco. They pass
+through our forwarding page, `{public address}/payments/go/{reference}`, which loads on our domain and then continues to
+Yoco by script, as Yoco recommends. **Verify the domain of `General.PublicBaseUrl`**: the platform's, plus any
+organisation's own domain where that organisation's public address is set to it.
+
+The same page is the **payment link**: while a payment is waiting, its page under Subscription shows the link to copy
+and send by email or WhatsApp to whoever pays. It works without signing in (the reference is the key, as Yoco's own
+link would be) and stops working once the payment is paid, declined, cancelled or expired (`Payments:PendingFor`,
+two hours by default).
+
+Keep `Referrer-Policy` as the app sets it (`strict-origin-when-cross-origin`), serve the public address over HTTPS,
+and don't add `rel="noreferrer"` to links to it: any of those hides the domain from Yoco and live payments fail. Test
+keys skip the domain check.
+
+### 4. What is checked on every webhook
 
 - **Signature** (Standard Webhooks): HMAC-SHA256 of `webhook-id.webhook-timestamp.body` with the `whsec_` secret,
   compared with each `v1,` entry in `webhook-signature`.
@@ -127,14 +144,16 @@ developer machine). Register again with the live key when going live, and use th
 `payment.succeeded` marks the payment paid; `payment.failed` declined; anything else is logged and ignored.
 Repeats (same `webhook-id`) change nothing.
 
-### 4. Testing
+### 5. Testing
 
 Pay on Yoco's test page with the **test card** shown in the Yoco App (*How to connect → Test card details*). Test
 payments move no money.
 
-### 5. Going live
+### 6. Going live
 
 Verify your domain in the Yoco App, switch to the live secret key, register the webhook with it and set its secret.
+Then make a small real payment (over R2.00) through a payment link sent to yourself by email or WhatsApp, opened on a
+phone, to confirm the domain check passes.
 
 ## Automatic renewal
 

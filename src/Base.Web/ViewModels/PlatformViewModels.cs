@@ -150,3 +150,6 @@ public sealed record PlanMatrixViewModel(IReadOnlyList<PlanSummary> Plans)
 
 
 public sealed record TestCheckoutViewModel(string Token, Base.Application.Payments.TestCheckoutView Checkout, string EventId);
+
+/// <param name="ShareUrl">A link on our own domain that takes the payer to the gateway, while the payment waits.</param>
+public sealed record PaymentPageViewModel(Base.Application.Payments.PaymentView Payment, string? ShareUrl);

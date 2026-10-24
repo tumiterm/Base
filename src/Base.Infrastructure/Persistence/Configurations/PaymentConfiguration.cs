@@ -20,6 +20,7 @@ internal sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         builder.Property(p => p.Status).HasConversion<string>().HasMaxLength(20);
         builder.Property(p => p.BillingCycle).HasConversion<string>().HasMaxLength(20);
         builder.Property(p => p.FailureReason).HasMaxLength(Payment.ReasonMaxLength);
+        builder.Property(p => p.CheckoutUrl).HasMaxLength(Payment.CheckoutUrlMaxLength);
         builder.Property(p => p.RequestedByName).HasMaxLength(Payment.NameMaxLength).IsRequired();
         builder.HasIndex(p => new { p.TenantId, p.DateCreated });
         builder.HasIndex(p => new { p.Status, p.ExpiresAt });

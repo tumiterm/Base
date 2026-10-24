@@ -37,6 +37,7 @@ public sealed class PaymentTests(SqlServerFixture sql) : IAsyncLifetime
             {
                 services.AddSingleton<ICurrentUser>(_actor);
                 services.AddScoped<IPaymentGateway, ScriptedGateway>();
+                services.AddScoped<IPaymentGateway, LinkedGateway>();
             },
             new Dictionary<string, string?>(StringComparer.Ordinal) { ["Payments:Gateways:Test:Enabled"] = "true" });
         _starter = await PlanAsync("starter", 100m, 1000m);
@@ -117,6 +118,27 @@ public sealed class PaymentTests(SqlServerFixture sql) : IAsyncLifetime
         form["checkout"] = "CHK-" + reference;
         (await ReceiveAsync("scripted", form)).StatusCode.ShouldBe(200);
         (await StatusAsync(reference)).ShouldBe(PaymentStatus.Succeeded);
+    }
+
+    [Fact]
+    public async Task A_payment_link_forwards_to_the_gateway_only_while_the_payment_waits()
+    {
+        var redirect = (await Pay(new PayRequest(_pro, BillingCycle.Monthly, "Linked"))).GetDataOrThrow();
+        var reference = redirect.PaymentReference!;
+        redirect.Url.AbsoluteUri.ShouldBe("https://linked.example.com/checkout/" + reference);
+
+        var forward = await Payments(p => p.ForwardAsync(reference));
+        forward.ShouldSatisfyAllConditions(f => f.CheckoutUrl!.AbsoluteUri.ShouldBe(redirect.Url.AbsoluteUri), f => f.Amount.ShouldBe(300m));
+        (await Payments(p => p.ReturnedAsync(reference, cancelled: false))).GetDataOrThrow().CanShareLink.ShouldBeTrue();
+        (await _app.InScopeAsync(null, sp => sp.GetRequiredService<IPaymentService>().ForwardAsync(reference))).CheckoutUrl.ShouldNotBeNull("anyone with the link, signed in or not");
+
+        _app.Time.Advance(TimeSpan.FromHours(3));
+        (await Payments(p => p.ForwardAsync(reference))).ShouldSatisfyAllConditions(f => f.CheckoutUrl.ShouldBeNull("expired"), f => f.Status.ShouldBe(PaymentStatus.Pending));
+
+        var paid = (await Pay(new PayRequest(_pro, BillingCycle.Monthly, "Linked"))).GetDataOrThrow().PaymentReference!;
+        await ReceiveAsync("linked", Form(paid, "paid", "l-1"));
+        (await Payments(p => p.ForwardAsync(paid))).ShouldSatisfyAllConditions(f => f.CheckoutUrl.ShouldBeNull(), f => f.Status.ShouldBe(PaymentStatus.Succeeded));
+        (await Payments(p => p.ForwardAsync("PNOSUCHPAYMT"))).Status.ShouldBeNull();
     }
 
     [Fact]
@@ -299,6 +321,26 @@ public sealed class PaymentTests(SqlServerFixture sql) : IAsyncLifetime
             ["amount"] = amount ?? "300.00",
             ["token"] = token ?? string.Empty,
         };
+
+    /// <summary>A gateway reached by a plain link (like Yoco), whose notifications say whatever the test posts.</summary>
+    private sealed class LinkedGateway : IPaymentGateway
+    {
+        private readonly ScriptedGateway _reader = new();
+
+        public string Code => "Linked";
+
+        public string Name => "Linked";
+
+        public IReadOnlyList<string> Methods { get; } = ["Card"];
+
+        public IReadOnlyList<string> Currencies { get; } = ["ZAR"];
+
+        public Task<CheckoutStart> StartCheckoutAsync(CheckoutRequest request, CancellationToken cancellationToken) =>
+            Task.FromResult(CheckoutStart.Go(new CheckoutRedirect(new Uri("https://linked.example.com/checkout/" + request.Reference)), "LNK-" + request.Reference));
+
+        public Task<GatewayNotification> ReadNotificationAsync(InboundNotification notification, CancellationToken cancellationToken) =>
+            _reader.ReadNotificationAsync(notification, cancellationToken);
+    }
 
     /// <summary>A gateway whose notifications say whatever the test posts, including that they aren't verified.</summary>
     private sealed class ScriptedGateway : IPaymentGateway
