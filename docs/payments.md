@@ -22,7 +22,11 @@ locally without touching configuration; production credentials are only set when
 
 - **Test payments**: works as it is, including automatic renewals (**Simulate the next charge**).
 - **Payfast (sandbox)**: uses Payfast's shared sandbox merchant, which Payfast publishes for testing (they are not
-  secrets and take no real money). The checkout opens and you pay from the sandbox wallet. Payfast's ITN can't reach
+  secrets and take no real money). Anyone can change that shared account's settings, and when its passphrase isn't
+  the published one every checkout fails with "Generated signature does not match submitted signature" (the app's
+  signature matches Payfast's own PHP sample). **Use your own free sandbox account** (sandbox.payfast.co.za): set a
+  Salt Passphrase (letters, numbers and `-_/` only) and switch Recurring billing on (renewals need both, or Payfast
+  also reports a signature mismatch), then put its merchant ID, key and passphrase in user-secrets. The checkout opens and you pay from the sandbox wallet. Payfast's ITN can't reach
   `localhost`, so to see the payment marked paid on your machine, expose the app with a tunnel and point
   `General.PublicBaseUrl` (Administration → Settings) at it, e.g. `cloudflared tunnel --url http://localhost:5080`
   (no account needed) or `ngrok http 5080`. To use your own sandbox account instead, override the three values in

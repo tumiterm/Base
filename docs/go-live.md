@@ -175,6 +175,8 @@ Full details are in [payments.md](payments.md). For production:
 - [ ] Logs and traces reach your monitoring; alerts set up
 - [ ] API documentation `Off`; CORS only if needed
 - [ ] Real plans and prices created; sample plans and the Test gateway off
+- [ ] Payfast account: Salt Passphrase set (letters, numbers, `-_/`) and identical in `Payments:Gateways:Payfast:Passphrase`;
+      Recurring billing switched on if automatic renewal is offered; `MaxRecurringAmount` set to the account's limit
 - [ ] Payfast live: one small real payment (R5.00 or more) is marked paid and the subscription moves on
 - [ ] Yoco live: domain verified, webhook registered with the live key; one small real payment (over R2.00), made
       from a link opened on a phone, is marked paid
