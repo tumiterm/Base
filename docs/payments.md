@@ -99,6 +99,12 @@ Repeats are recognised (`pf_payment_id` + status) and change nothing.
 | `PaymentMethod` | (all) | Limit the checkout to one Payfast method code (`cc`, `ef`, `ap`, `sp`, `ss`, `zp`, `mp`...). |
 | `AllowedSourceAddresses` | none | Payfast's published addresses, if its host names don't resolve to them from your network. |
 | `VerifySourceAddress` | `true` | |
+| `MaxRecurringAmount` | none | The most an automatic renewal may charge each cycle. Payfast accounts limit subscription amounts and refuse more with their own error page ("The subscription amount is outside the limits set by the merchant or PayFast"). Set it to your account's limit: larger amounts are then refused with a clear message before anyone leaves the app, and can be paid once instead. |
+| `MaxAmount` | none | The most one payment may be, if the account limits it. |
+
+Find the limits in the Payfast dashboard, or ask Payfast support: they differ per account and between the sandbox
+and live. The sandbox's shared merchant has a subscription limit too, so in Development a large plan with **Renew
+automatically** on may hit it; pay once, or set `MaxRecurringAmount` in user-secrets once you know it.
 
 The browser posts the checkout form to Payfast, so the Content Security Policy's `form-action` includes the
 configured Payfast host automatically.

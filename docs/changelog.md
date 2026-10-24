@@ -114,6 +114,10 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ### Fixed
 
+- Paying for a large plan with **Renew automatically** through Payfast ended on Payfast's "400 Bad Request" page
+  when the account's subscription limit was lower. Payfast's `MaxRecurringAmount` and `MaxAmount` now set the
+  account's limits; larger payments are refused with a clear message before leaving the app, and a renewal that a
+  change of plan would take over the limit is stopped and the organisation told.
 - An automatic renewal charge no longer moves the subscription back to the plan the renewal was set up for after the
   plan changed; renewal charges only pay for the next period.
 - Domain fields accept a pasted address (`https://mtn.dev.localhost:7262`) and keep the host name, with a clearer

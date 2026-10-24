@@ -214,6 +214,10 @@ internal sealed partial class RenewalFollowsPlan(
             {
                 updated = GatewayResult.Failed("the new plan has nothing to charge in the same currency");
             }
+            else if (gateway?.MaximumRecurringCharge is { } maximum && amount > maximum)
+            {
+                updated = GatewayResult.Failed($"{gateway.Name} renews automatically only up to {plan.Currency} {maximum.ToString("N2", CultureInfo.InvariantCulture)}");
+            }
             else if (gateway is not { SupportsRecurringUpdate: true })
             {
                 updated = GatewayResult.Failed($"{gateway?.Name ?? recurring.Gateway} can't change what it charges");

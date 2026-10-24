@@ -26,7 +26,8 @@ public sealed class PaymentOptions
     public TimeSpan PendingFor { get; set; } = TimeSpan.FromHours(2);
 }
 
-public sealed record PaymentGatewayView(string Code, string Name, IReadOnlyList<string> Methods, bool SupportsRecurring = false, decimal MinimumCharge = 0m);
+public sealed record PaymentGatewayView(
+    string Code, string Name, IReadOnlyList<string> Methods, bool SupportsRecurring = false, decimal MinimumCharge = 0m, decimal? MaximumRecurringCharge = null);
 
 /// <param name="ReturnBase">Absolute URL the person comes back to; the payment reference is appended.</param>
 /// <param name="NotifyBase">Absolute URL gateways post notifications to; the gateway code is appended.</param>
@@ -146,7 +147,7 @@ internal sealed partial class PaymentService(
     public IReadOnlyList<PaymentGatewayView> Gateways(string? currency = null) =>
         gateways
             .Where(g => currency is null || g.Currencies.Contains(currency, StringComparer.OrdinalIgnoreCase))
-            .Select(g => new PaymentGatewayView(g.Code, g.Name, g.Methods, g.SupportsRecurring, g.MinimumCharge))
+            .Select(g => new PaymentGatewayView(g.Code, g.Name, g.Methods, g.SupportsRecurring, g.MinimumCharge, g.MaximumRecurringCharge))
             .ToList();
 
     public async Task<ValidationResponse<CheckoutRedirect>> StartAsync(PayRequest request, PaymentUrls urls, CancellationToken cancellationToken = default)
@@ -216,11 +217,26 @@ internal sealed partial class PaymentService(
                 $"{gateway.Name} can't take payments under {plan.Currency} {gateway.MinimumCharge.ToString("N2", CultureInfo.InvariantCulture)}; choose another way to pay.")).As<CheckoutRedirect>();
         }
 
+        if (gateway.MaximumCharge is { } maximum && amount > maximum)
+        {
+            return ValidationResponse.Failure(new ValidationError(
+                nameof(request.Gateway),
+                $"{gateway.Name} takes payments of up to {plan.Currency} {maximum.ToString("N2", CultureInfo.InvariantCulture)}; choose another way to pay.")).As<CheckoutRedirect>();
+        }
+
         // An upgrade's difference is paid once; an automatic renewal that is on follows the new plan by itself.
         var renew = request.RenewAutomatically && !upgrade;
         if (renew && !gateway.SupportsRecurring)
         {
             return ValidationResponse.Failure(new ValidationError(nameof(request.RenewAutomatically), $"{gateway.Name} can't renew automatically; pay without it.")).As<CheckoutRedirect>();
+        }
+
+        // Checked here, because past this point the gateway would only show its own error page.
+        if (renew && gateway.MaximumRecurringCharge is { } recurringMaximum && amount > recurringMaximum)
+        {
+            return ValidationResponse.Failure(new ValidationError(
+                nameof(request.RenewAutomatically),
+                $"{gateway.Name} renews automatically only up to {plan.Currency} {recurringMaximum.ToString("N2", CultureInfo.InvariantCulture)} a payment. Turn off \"Renew automatically\" to pay this once, or choose another way to pay.")).As<CheckoutRedirect>();
         }
 
         var owner = await unitOfWork.Repository<Tenant>().GetByIdAsync(tenant.TenantId, cancellationToken);

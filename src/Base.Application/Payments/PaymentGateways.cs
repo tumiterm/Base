@@ -44,6 +44,15 @@ public interface IPaymentGateway
     /// <summary>The smallest amount it takes in one payment (Payfast R5.00, Yoco R2.00).</summary>
     decimal MinimumCharge => 0m;
 
+    /// <summary>The largest amount it takes in one payment, when the merchant account has a limit; null for none known.</summary>
+    decimal? MaximumCharge => null;
+
+    /// <summary>
+    /// The largest amount an automatic renewal may charge each cycle (Payfast accounts limit subscription amounts);
+    /// null for none known.
+    /// </summary>
+    decimal? MaximumRecurringCharge => null;
+
     /// <summary>Whether <see cref="UpdateRecurringAsync"/> can change what an automatic renewal charges.</summary>
     bool SupportsRecurringUpdate => false;
 

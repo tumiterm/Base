@@ -38,6 +38,19 @@ public sealed class PayfastOptions
 
     public static IReadOnlyList<string> DefaultMethods { get; } = ["Card", "Instant EFT", "QR code"];
 
+    /// <summary>
+    /// The most one payment may be, if the Payfast account limits it (Payfast refuses more with its own error page, so
+    /// the app checks first). Empty for no limit.
+    /// </summary>
+    public decimal? MaxAmount { get; set; }
+
+    /// <summary>
+    /// The most an automatic renewal (Payfast subscription) may charge each cycle. Payfast accounts limit subscription
+    /// amounts (refused with "The subscription amount is outside the limits set by the merchant or PayFast"): set this
+    /// to the account's limit, so larger plans are paid once instead. Empty for no limit.
+    /// </summary>
+    public decimal? MaxRecurringAmount { get; set; }
+
     /// <summary>Accept notifications only from Payfast's addresses (resolved from its host names). Keep on in production.</summary>
     public bool VerifySourceAddress { get; set; } = true;
 
@@ -248,6 +261,10 @@ internal sealed partial class PayfastGateway(IOptions<PayfastOptions> options, I
     /// merchant ID, version and timestamp headers (<c>?testing=true</c> against the sandbox).
     /// </summary>
     public decimal MinimumCharge => MinimumAmount;
+
+    public decimal? MaximumCharge => _options.MaxAmount;
+
+    public decimal? MaximumRecurringCharge => _options.MaxRecurringAmount;
 
     public bool SupportsRecurringUpdate => true;
 

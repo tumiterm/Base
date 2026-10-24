@@ -140,6 +140,18 @@ public sealed partial class PaymentTests
         told.Body!.ShouldContain("Rigid can't change what it charges");
     }
 
+    [Fact]
+    public async Task A_gateways_limits_are_checked_before_anyone_is_sent_to_its_page()
+    {
+        var mid = await PlanAsync("mid", 1500m, 15000m, users: 10);
+        var renewing = await Pay(new PayRequest(mid, BillingCycle.Monthly, "Rigid", RenewAutomatically: true));
+        renewing.Errors.ShouldHaveSingleItem().ShouldSatisfyAllConditions(
+            e => e.Field.ShouldBe(nameof(PayRequest.RenewAutomatically)),
+            e => e.Message.ShouldStartWith("Rigid renews automatically only up to ZAR 1,000.00 a payment."));
+        (await Pay(new PayRequest(mid, BillingCycle.Monthly, "Rigid"))).IsSuccess.ShouldBeTrue("paid once, it's within the limit");
+        (await Pay(new PayRequest(_pro, BillingCycle.Annual, "Rigid"))).Message!.ShouldStartWith("Rigid takes payments of up to ZAR 2,500.00");
+    }
+
     private Task<T> Subscriptions<T>(Func<ISubscriptionService, Task<T>> work) =>
         _app.InScopeAsync(_tenant, sp => work(sp.GetRequiredService<ISubscriptionService>()));
 
@@ -170,6 +182,11 @@ public sealed partial class PaymentTests
         public IReadOnlyList<string> Currencies { get; } = ["ZAR"];
 
         public bool SupportsRecurring => true;
+
+        /// <summary>Like a Payfast account's limits.</summary>
+        public decimal? MaximumCharge => 2500m;
+
+        public decimal? MaximumRecurringCharge => 1000m;
 
         public Task<GatewayResult> CancelRecurringAsync(string token, CancellationToken cancellationToken) => Task.FromResult(GatewayResult.Ok());
 
