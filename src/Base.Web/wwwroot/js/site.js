@@ -813,3 +813,18 @@ document.querySelectorAll('input[type="file"][data-fill-title]').forEach((input)
     radios.forEach((r) => r.addEventListener('change', layout));
     layout();
 })();
+
+// Template editor: the preview frame follows the wording as it is typed (the draft is posted into the frame, not saved).
+(() => {
+    const form = document.querySelector('form[data-template-editor]');
+    const submit = form?.querySelector('[data-preview-submit]');
+    if (!form || !submit) return;
+    let timer;
+    const refresh = () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => form.requestSubmit(submit), 600);
+    };
+    form.addEventListener('input', refresh);
+    form.addEventListener('change', refresh);
+    if (document.querySelector('[data-refresh]')) refresh();
+})();

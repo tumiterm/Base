@@ -1,15 +1,12 @@
 --- email.subject
 Reminder: {{Title}}
---- email.html
-<p>Hello {{RecipientName}},</p>
-<p><strong>{{Title}}</strong></p>
-<p>{{Message}}</p>
---- email.text
-Hello {{RecipientName}},
-
-{{Title}}
-
+--- email.preheader
 {{Message}}
+--- email.heading
+{{Title}}
+--- email.body
+<p>Hello {{RecipientName}},</p>
+<p>{{Message}}</p>
 --- sms
 {{AppName}}: {{Title}}. {{Message}}
 --- inapp.title

@@ -110,7 +110,7 @@ internal sealed partial class NotificationService(
                 NotificationComposer.SerializeChannels(chain.Skip(i + 1)));
             messages.Add(NotificationMessage.Queue(
                 template.Code, template.Category, channel, recipient, recipient.AddressFor(channel)!,
-                NotificationComposer.Render(template, parts, channel, values), replay, fallbackOf));
+                composer.Render(template, parts, channel, values), replay, fallbackOf));
             return;
         }
     }
@@ -137,7 +137,7 @@ internal sealed partial class NotificationService(
 
             var message = NotificationMessage.RecordSensitive(template.Code, template.Category, channel, recipient, recipient.AddressFor(channel)!, previous);
             messages.Add(message);
-            var content = NotificationComposer.Render(template, parts, channel, values);
+            var content = composer.Render(template, parts, channel, values);
             ProviderResult result;
             try
             {

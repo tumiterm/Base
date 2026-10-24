@@ -18,7 +18,7 @@ using Microsoft.Extensions.Options;
 
 namespace Base.IntegrationTests.Notifications;
 
-public sealed class NotificationTests(SqlServerFixture sql) : IAsyncLifetime
+public sealed partial class NotificationTests(SqlServerFixture sql) : IAsyncLifetime
 {
     private readonly TestCurrentUser _actor = new TestCurrentUser().WithAllPermissions();
     private TestApp _app = null!;

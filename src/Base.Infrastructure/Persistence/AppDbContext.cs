@@ -83,6 +83,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
 
     public DbSet<NotificationTemplateOverride> NotificationTemplateOverrides => Set<NotificationTemplateOverride>();
 
+    public DbSet<NotificationTemplateRevision> NotificationTemplateRevisions => Set<NotificationTemplateRevision>();
+
     public DbSet<Broadcast> Broadcasts => Set<Broadcast>();
 
     public DbSet<FeatureFlagState> FeatureFlags => Set<FeatureFlagState>();

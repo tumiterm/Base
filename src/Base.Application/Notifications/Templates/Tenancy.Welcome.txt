@@ -1,10 +1,13 @@
 --- email.subject
 Welcome to {{AppName}}: {{OrganisationName}} is ready
---- email.html
+--- email.preheader
+Set your password, then invite your team.
+--- email.heading
+Welcome, {{OrganisationName}} is ready
+--- email.body
 <p>Hello {{RecipientName}},</p>
 <p><strong>{{OrganisationName}}</strong> has been set up on {{AppName}}, and you are its administrator. {{PlanLine}}</p>
-<p style="margin:24px 0"><a href="{{Link}}" style="background:#4f5bd5;color:#ffffff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600">Set my password</a></p>
-<p>The link works once and expires in 3 days. After that, here is how to get going:</p>
+<p>Start by setting your password: the link works once and expires in 3 days. Then:</p>
 <ol>
   <li><strong>Sign in</strong> at <a href="{{SignInUrl}}">{{SignInUrl}}</a> with this email address and your new password. Bookmark it.</li>
   <li><strong>Invite your team</strong> from Administration → Users. Each person gets their own invitation and picks their own password.</li>
@@ -12,21 +15,7 @@ Welcome to {{AppName}}: {{OrganisationName}} is ready
   <li><strong>Check your settings</strong> under Administration → Settings, such as the time zone dates are shown in.</li>
 </ol>
 <p>If you didn't expect this email, you can ignore it: nothing happens until the password is set.</p>
-<p style="color:#666;font-size:12px">If the button doesn't work, copy this address into your browser:<br>{{Link}}</p>
---- email.text
-Hello {{RecipientName}},
-
-{{OrganisationName}} has been set up on {{AppName}}, and you are its administrator. {{PlanLine}}
-
-1. Set your password (the link works once and expires in 3 days):
-   {{Link}}
-
-2. Sign in at {{SignInUrl}} with this email address and your new password. Bookmark it.
-
-3. Invite your team from Administration > Users. Each person gets their own invitation and picks their own password.
-
-4. Make it yours: add your logo and colours under Administration > Appearance.
-
-5. Check your settings under Administration > Settings, such as the time zone dates are shown in.
-
-If you didn't expect this email, you can ignore it: nothing happens until the password is set.
+--- email.button
+Set my password
+--- email.action
+{{Link}}

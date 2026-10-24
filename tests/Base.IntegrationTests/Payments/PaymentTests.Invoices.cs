@@ -79,6 +79,8 @@ public sealed partial class PaymentTests
         var kept = (await Billing(s => s.GetMineAsync())).GetDataOrThrow();
         kept.ShouldSatisfyAllConditions(d => d.Address.ShouldBe("1 Main Road\nCape Town\n8001"), d => d.Email.ShouldBe("accounts@acme.test"));
 
+        // The organisation names its own application; the seller is still the platform.
+        (await _app.InScopeAsync(_tenant, sp => sp.GetRequiredService<IApplicationSettingService>().SetAsync(SettingCodes.General.ApplicationName, "Acme Portal"))).IsSuccess.ShouldBeTrue();
         var paid = await PaidAsync(new PayRequest(_starter, BillingCycle.Monthly, "Test"), "b-1");
         var invoice = (await Invoices(s => s.ForPaymentAsync(paid))).GetDataOrThrow();
         invoice.ShouldSatisfyAllConditions(i => i.BuyerName.ShouldBe("Acme Trading (Pty) Ltd"), i => i.BuyerEmail.ShouldBe("accounts@acme.test"));
@@ -89,7 +91,9 @@ public sealed partial class PaymentTests
             h => h.ShouldContain("+27 21 555 0100"),
             h => h.ShouldContain("VAT number 4999999999"),
             h => h.ShouldContain("Registration 2020/123456/07"),
-            h => h.ShouldContain("class=\"logo is-empty\""));
+            h => h.ShouldContain("class=\"logo is-empty\""),
+            h => h.ShouldNotContain("Acme Portal"),
+            h => h.ShouldContain("<div class=\"seller\">Base</div>"));
 
         // Changed later, from the platform: new invoices use the change, the one issued keeps what it had.
         (await _app.InScopeAsync(_app.DefaultTenantId, sp => sp.GetRequiredService<ITenantAdministration>().UpdateAsync(

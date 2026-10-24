@@ -1,12 +1,18 @@
 --- email.subject
 Your {{AppName}} plan changes to {{PlanName}}
---- email.html
+--- email.preheader
+From {{PreviousPlanName}} to {{PlanName}}, {{When}}.
+--- email.heading
+Your plan changes to {{PlanName}}
+--- email.body
 <p>Hello,</p>
-<p>Your organisation's plan changes from {{PreviousPlanName}} to <strong>{{PlanName}}</strong> ({{Price}}) {{When}}: {{Reason}}.</p>
-<p>See what it includes at <a href="{{PublicBaseUrl}}/subscription">{{PublicBaseUrl}}/subscription</a>, or reply to this email if you think this is a mistake.</p>
---- email.text
-Hello,
-
-Your organisation's plan changes from {{PreviousPlanName}} to {{PlanName}} ({{Price}}) {{When}}: {{Reason}}.
-
-What it includes: {{PublicBaseUrl}}/subscription
+<p>Your organisation's plan changes from {{PreviousPlanName}} to <strong>{{PlanName}}</strong> {{When}}: {{Reason}}.</p>
+<p>If you think this is a mistake, reply to this email.</p>
+--- email.details
+New plan | {{PlanName}}
+Price | {{Price}}
+Previous plan | {{PreviousPlanName}}
+--- email.button
+See what it includes
+--- email.action
+{{PublicBaseUrl}}/subscription

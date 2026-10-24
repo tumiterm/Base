@@ -1,81 +1,193 @@
 @model Base.Application.Notifications.NotificationTemplateView
+@using Base.Application.Notifications
 @inject ICurrentUser CurrentUser
 @{
     var d = Model.Definition;
     ViewData["Title"] = d.Name;
-    var variables = d.Variables.Concat(Base.Application.Notifications.NotificationCatalog.BuiltInVariables).Order(StringComparer.Ordinal).ToList();
     var canManage = CurrentUser.HasPermission(PermissionCodes.Notifications.Manage);
+    var canEdit = canManage && Model.CanEdit;
+    var draft = ViewData["Draft"] as IDictionary<string, string?>;
+    string Value(string part) => draft is not null && draft.TryGetValue(part, out var v) ? v ?? string.Empty : Model.Part(part)?.Effective ?? string.Empty;
+    bool Has(string part) => Model.Part(part) is { IsEditable: true };
+    var action = Model.Part(TemplateParts.EmailAction)?.DefaultContent;
+    var details = EmailParts.ParseDetails(Model.Part(TemplateParts.EmailDetails)?.DefaultContent);
+    var hasEmail = Has(TemplateParts.EmailBody);
+    var revisions = Model.Revisions ?? [];
 }
 <nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-action="Index">Messages</a><icon name="chevron-right" class="icon-sm" /><a asp-action="Templates">Templates</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">@d.Name</span></nav>
 <div class="page-header">
     <div class="entity">
-        <span class="file-tile file-tile-lg" aria-hidden="true"><icon name="@MessageDisplay.Icon(d.Channels[0])" /></span>
+        <span class="file-tile file-tile-lg @(Model.IsCustomised ? "is-code" : "")" aria-hidden="true"><icon name="@MessageDisplay.Icon(d.Channels[0])" /></span>
         <div class="entity-text">
             <h1 class="page-title">@d.Name</h1>
             <p class="page-subtitle">@d.Description</p>
         </div>
     </div>
+    <div class="page-actions">
+        @if (Model.IsCustomised) {<span class="chip is-active">Reworded</span>} else {<span class="chip">Application's wording</span>}
+        @if (canEdit && Model.IsCustomised)
+        {
+            <form method="post" asp-action="Reset" asp-route-code="@d.Code" class="confirm-submit" data-confirm="Go back to the application's wording? Your wording stays in the versions, to bring back later.">
+                <button class="btn btn-ghost btn-sm" type="submit"><icon name="rotate-ccw" class="icon-sm" /> Use the application's wording</button>
+            </form>
+        }
+    </div>
 </div>
+
+@switch (Model.Editing)
+{
+    case TemplateEditing.Locked:
+        <div class="status-callout mb-3"><icon name="lock" /><div><div class="status-callout-title">This wording can't be changed</div><div class="small">It carries a sign-in link, so it keeps the application's wording: a reworded message could mislead people about the link. It still takes on your branding.</div></div></div>
+        break;
+    case TemplateEditing.NotInPlan:
+        <div class="status-callout is-warning mb-3"><icon name="sparkles" /><div><div class="status-callout-title">Your plan doesn't include custom email wording</div><div class="small">This is the wording that is sent. Plans with custom email wording let you change it, preview it and send yourself a test. <a asp-controller="Subscription" asp-action="Index">See plans</a></div></div></div>
+        break;
+}
 @if (!ViewData.ModelState.IsValid)
 {
     <div asp-validation-summary="All" class="alert alert-danger" role="alert"></div>
 }
-<div class="detail-grid">
-    <div class="stack">
-        @foreach (var part in Model.Parts)
-        {
-            var id = "part-" + part.Part.Replace('.', '-');
-            var html = part.Part.EndsWith("html", StringComparison.Ordinal);
-            <form class="panel" method="post" asp-action="SavePart" asp-route-code="@d.Code" asp-route-part="@part.Part" aria-labelledby="@id-title">
-                <div class="panel-header">
-                    <h2 class="panel-title" id="@id-title">@MessageDisplay.Part(part.Part)</h2>
-                    @if (part.OverrideContent is not null) {<span class="chip is-active">Customised</span>} else {<span class="text-muted small">Default wording</span>}
+
+<div class="template-editor">
+    <form class="panel" method="post" asp-action="Save" asp-route-code="@d.Code" data-template-editor aria-labelledby="wording-title">
+        <div class="panel-header">
+            <h2 class="panel-title" id="wording-title">Wording</h2>
+            @if (canEdit) {<span class="text-muted small">Saved as a new version each time</span>}
+        </div>
+        <fieldset class="panel-body stack" disabled="@(!canEdit)">
+            @if (hasEmail)
+            {
+                <div class="form-section-title"><icon name="mail" class="icon-sm" /> Email</div>
+                <div>
+                    <label class="form-label" for="p-subject">Subject</label>
+                    <input class="form-control" id="p-subject" name="parts[@TemplateParts.EmailSubject]" value="@Value(TemplateParts.EmailSubject)" data-placeholder-target maxlength="300" />
                 </div>
-                <div class="panel-body">
-                    <label class="visually-hidden" for="@id">@MessageDisplay.Part(part.Part)</label>
-                    <textarea class="form-control font-monospace" id="@id" name="content" rows="@(html ? 10 : part.Part.EndsWith("subject", StringComparison.Ordinal) || part.Part.EndsWith("title", StringComparison.Ordinal) ? 1 : 5)" spellcheck="@(html ? "false" : "true")" disabled="@(!canManage)">@part.Effective</textarea>
+                <div>
+                    <label class="form-label" for="p-preheader">Preview line</label>
+                    <input class="form-control" id="p-preheader" name="parts[@TemplateParts.EmailPreheader]" value="@Value(TemplateParts.EmailPreheader)" data-placeholder-target maxlength="300" />
+                    <div class="form-text">Shown after the subject in most inboxes. Leave it empty to use the application's.</div>
                 </div>
-                @if (canManage)
+                <div>
+                    <label class="form-label" for="p-heading">Heading</label>
+                    <input class="form-control" id="p-heading" name="parts[@TemplateParts.EmailHeading]" value="@Value(TemplateParts.EmailHeading)" data-placeholder-target maxlength="300" />
+                </div>
+                <div>
+                    <label class="form-label" for="p-body">Message</label>
+                    @if (canEdit)
+                    {
+                        <partial name="~/Views/Messages/_RichEditor.cshtml" model='("parts[" + TemplateParts.EmailBody + "]", (string?)Value(TemplateParts.EmailBody), "Message", "p-body")' />
+                    }
+                    else
+                    {
+                        <div class="rich-content is-readonly" id="p-body">@Html.Raw(Value(TemplateParts.EmailBody))</div>
+                    }
+                </div>
+                @if (details.Count > 0)
                 {
-                    <div class="panel-footer d-flex justify-content-end gap-2">
-                        @if (part.OverrideContent is not null)
-                        {
-                            <button class="btn btn-ghost" type="submit" formaction="@Url.Action("ResetPart", new { code = d.Code, part = part.Part })" formnovalidate>Reset to default</button>
-                        }
-                        <button class="btn btn-primary" type="submit"><icon name="check" class="icon-sm" /> Save</button>
+                    <div>
+                        <div class="form-label">Details</div>
+                        <dl class="kv mb-0 template-details">@foreach (var row in details) {<dt>@row.Label</dt><dd class="mono small">@row.Value</dd>}</dl>
+                        <div class="form-text">Set out as a table under the message, filled in by the application.</div>
                     </div>
                 }
-            </form>
-        }
-    </div>
-    <aside class="stack">
-        <section class="panel" aria-labelledby="vars-title">
-            <div class="panel-header"><h2 class="panel-title" id="vars-title">Placeholders</h2></div>
-            <div class="panel-body stack">
-                <p class="small text-muted mb-0">Filled in when the message is sent. Only these can be used.</p>
-                <div class="d-flex flex-wrap gap-1">
-                    @foreach (var v in variables) {<code class="chip mono">{{@v}}</code>}
+                @if (Has(TemplateParts.EmailButton))
+                {
+                    <div>
+                        <label class="form-label" for="p-button">Button</label>
+                        <input class="form-control" id="p-button" name="parts[@TemplateParts.EmailButton]" value="@Value(TemplateParts.EmailButton)" data-placeholder-target maxlength="100" />
+                        <div class="form-text">Goes to <span class="mono">@action</span>: the address is the application's, so the button always does what it says.</div>
+                    </div>
+                }
+            }
+            @if (Has(TemplateParts.Sms))
+            {
+                <div class="form-section-title"><icon name="message-square" class="icon-sm" /> SMS</div>
+                <div>
+                    <label class="visually-hidden" for="p-sms">SMS</label>
+                    <textarea class="form-control" id="p-sms" name="parts[@TemplateParts.Sms]" rows="3" data-placeholder-target data-sms-text>@Value(TemplateParts.Sms)</textarea>
+                    <div class="form-text" data-sms-count></div>
                 </div>
+            }
+            @if (Has(TemplateParts.InAppTitle))
+            {
+                <div class="form-section-title"><icon name="bell" class="icon-sm" /> In-app</div>
+                <div>
+                    <label class="form-label" for="p-inapp-title">Title</label>
+                    <input class="form-control" id="p-inapp-title" name="parts[@TemplateParts.InAppTitle]" value="@Value(TemplateParts.InAppTitle)" data-placeholder-target maxlength="200" />
+                </div>
+                <div>
+                    <label class="form-label" for="p-inapp-body">Message</label>
+                    <textarea class="form-control" id="p-inapp-body" name="parts[@TemplateParts.InAppBody]" rows="3" data-placeholder-target>@Value(TemplateParts.InAppBody)</textarea>
+                </div>
+            }
+            @if (canEdit)
+            {
+                <div>
+                    <div class="form-label">Placeholders</div>
+                    <div class="d-flex flex-wrap gap-1">
+                        @foreach (var v in Model.Variables) {<button type="button" class="chip mono" data-insert="{{@v}}" title="Insert into the field you were in">{{@v}}</button>}
+                    </div>
+                    <div class="form-text">Filled in when it's sent. Click one to put it where you were typing.</div>
+                </div>
+                <div>
+                    <label class="form-label" for="p-note">What changed <span class="text-muted">(optional)</span></label>
+                    <input class="form-control" id="p-note" name="note" maxlength="200" placeholder="Friendlier opening" />
+                </div>
+            }
+        </fieldset>
+        @if (canEdit)
+        {
+            <div class="panel-footer d-flex flex-wrap gap-2">
+                <button class="btn btn-primary" type="submit"><icon name="check" class="icon-sm" /> Save</button>
+                @if (hasEmail) {<button class="btn btn-secondary" type="submit" formaction="@Url.Action("SendTest", new { code = d.Code })"><icon name="send" class="icon-sm" /> Send me a test</button>}
+                <button type="submit" hidden formaction="@Url.Action("PreviewDraft", new { code = d.Code })" formtarget="template-preview" formnovalidate data-preview-submit tabindex="-1" aria-hidden="true">Preview</button>
             </div>
+        }
+    </form>
+
+    <div class="stack template-side">
+        <section class="panel" aria-labelledby="preview-title">
+            <div class="panel-header"><h2 class="panel-title" id="preview-title">Preview</h2><span class="text-muted small">With sample values@(canEdit ? "; updates as you type" : "")</span></div>
+            <iframe class="template-preview" name="template-preview" title="Preview of @d.Name" src="@Url.Action("Preview", new { code = d.Code })" sandbox="" data-refresh="@(draft is not null ? "true" : null)"></iframe>
         </section>
+        @if (revisions.Count > 0)
+        {
+            <section class="panel" aria-labelledby="versions-title">
+                <div class="panel-header"><h2 class="panel-title" id="versions-title">Versions</h2><span class="text-muted small">@revisions.Count</span></div>
+                <ul class="item-list">
+                    @foreach (var r in revisions)
+                    {
+                        var latest = r == revisions[0];
+                        <li>
+                            <span class="file-tile" aria-hidden="true"><icon name="history" /></span>
+                            <div class="item-main">
+                                <div class="item-title">Version @r.Number@if (latest) {<span class="chip is-active ms-1">In use</span>}</div>
+                                <div class="item-sub">@(r.Note ?? (r.ChangedParts == 0 ? "The application's wording" : $"{r.ChangedParts} part{(r.ChangedParts == 1 ? "" : "s")} reworded")) · <local-time value="r.SavedAt" format="d MMM yyyy, HH:mm" />@(r.SavedBy is null ? "" : " · " + r.SavedBy)</div>
+                            </div>
+                            @if (canEdit && !latest)
+                            {
+                                <form method="post" asp-action="Restore" asp-route-code="@d.Code" asp-route-id="@r.Id" class="confirm-submit" data-confirm="Bring back version @r.Number? It's saved as a new version.">
+                                    <button class="btn btn-ghost btn-sm" type="submit">Bring back</button>
+                                </form>
+                            }
+                        </li>
+                    }
+                </ul>
+            </section>
+        }
         <section class="panel" aria-labelledby="about-title">
             <div class="panel-header"><h2 class="panel-title" id="about-title">How it's sent</h2></div>
             <div class="panel-body">
-                <dl class="kv">
+                <dl class="kv mb-0">
+                    <dt>From</dt><dd>@(d.Sender == NotificationSender.Platform ? "The platform, to an organisation" : "This organisation")</dd>
                     <dt>Category</dt><dd>@d.Category</dd>
                     <dt>Channels</dt><dd>@string.Join(", ", d.Channels.Select(MessageDisplay.Channel))</dd>
                     @if (d.Fallback is { Count: > 0 } fallback) {<dt>If that fails</dt><dd>@string.Join(", then ", fallback.Select(MessageDisplay.Channel))</dd>}
                     <dt>Opt out</dt><dd>@(d.IsMandatory ? "Not possible: always sent" : "People can switch it off")</dd>
                     @if (d.IsSensitive) {<dt>Kept</dt><dd>Not stored: it contains a sign-in link</dd>}
+                    @if (d.WhatsApp is { } wa) {<dt>WhatsApp</dt><dd>Approved template <span class="mono">@wa.Name</span> (@wa.Language), worded in Meta Business Manager</dd>}
                 </dl>
             </div>
         </section>
-        @if (d.WhatsApp is { } wa)
-        {
-            <section class="panel" aria-labelledby="wa-title">
-                <div class="panel-header"><h2 class="panel-title" id="wa-title">WhatsApp</h2></div>
-                <div class="panel-body small">Sends the approved template <span class="mono">@wa.Name</span> (@wa.Language) with @string.Join(", ", wa.Parameters). Its wording is managed in Meta Business Manager, not here.</div>
-            </section>
-        }
-    </aside>
+    </div>
 </div>

@@ -45,9 +45,15 @@ public static class MessageDisplay
     /// <summary>"email.subject" → "Email subject", "inapp.body" → "In-app message".</summary>
     public static string Part(string part) => part switch
     {
-        "email.subject" => "Email subject",
+        "email.subject" => "Subject",
+        "email.preheader" => "Preview line",
+        "email.heading" => "Heading",
+        "email.body" => "Message",
+        "email.details" => "Details",
+        "email.button" => "Button",
+        "email.action" => "Button goes to",
         "email.html" => "Email body (HTML)",
-        "email.text" => "Email body (plain text)",
+        "email.text" => "Plain-text version",
         "sms" => "SMS",
         "inapp.title" => "In-app title",
         "inapp.body" => "In-app message",

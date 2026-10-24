@@ -5,10 +5,14 @@
 <div class="page-header">
     <div>
         <h1 class="page-title">Messages</h1>
-        <p class="page-subtitle">The wording of everything the application sends. Defaults ship with the application; changes here apply to this organisation only and can be reset.</p>
+        <p class="page-subtitle">The wording of everything the application sends. Each email is laid out for you: change the words, preview them and send yourself a test. Changes apply to this organisation only, and every version is kept.</p>
     </div>
 </div>
 <partial name="_Tabs" model='"templates"' />
+@if (Model.Any(t => t.Editing == Base.Application.Notifications.TemplateEditing.NotInPlan))
+{
+    <div class="status-callout is-warning mb-3"><icon name="sparkles" /><div><div class="status-callout-title">Your plan doesn't include custom email wording</div><div class="small">You can look at what is sent and preview it. Plans with custom email wording let you change it. <a asp-controller="Subscription" asp-action="Index">See plans</a></div></div></div>
+}
 <div class="stack">
     @foreach (var group in Model.GroupBy(t => t.Definition.Category, StringComparer.Ordinal))
     {
@@ -19,6 +23,7 @@
                 {
                     var d = t.Definition;
                     var custom = t.Parts.Count(p => p.OverrideContent is not null);
+                    var editing = t.Editing;
                     <li>
                         <span class="file-tile @(custom > 0 ? "is-code" : "")" aria-hidden="true"><icon name="@MessageDisplay.Icon(d.Channels[0])" /></span>
                         <div class="item-main">
@@ -28,7 +33,9 @@
                                 @foreach (var c in d.Channels) {<span class="chip"><icon name="@MessageDisplay.Icon(c)" /> @MessageDisplay.Channel(c)</span>}
                                 @if (d.Fallback is { Count: > 0 } fallback) {<span class="chip" title="Tried when the main channel can't deliver">then @string.Join(", ", fallback.Select(MessageDisplay.Channel))</span>}
                                 @if (d.IsMandatory) {<span class="chip" title="People can't opt out">Always sent</span>}
-                                @if (custom > 0) {<span class="chip is-active">@custom part@(custom == 1 ? "" : "s") customised</span>}
+                                @if (d.Sender == Base.Application.Notifications.NotificationSender.Platform) {<span class="chip" title="Sent by the platform to organisations">To organisations</span>}
+                                @if (editing == Base.Application.Notifications.TemplateEditing.Locked) {<span class="chip" title="Carries a sign-in link, so it keeps the application's wording"><icon name="lock" /> Wording fixed</span>}
+                                @if (custom > 0) {<span class="chip is-active">Reworded</span>}
                             </div>
                         </div>
                         <icon name="chevron-right" class="icon-sm text-muted mt-1" />

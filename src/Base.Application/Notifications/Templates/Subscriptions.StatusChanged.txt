@@ -1,12 +1,14 @@
 --- email.subject
 Your {{AppName}} subscription is now {{Status}}
---- email.html
+--- email.preheader
+{{Reason}}
+--- email.heading
+Your subscription is now {{Status}}
+--- email.body
 <p>Hello,</p>
 <p>Your organisation's {{PlanName}} subscription is now <strong>{{Status}}</strong>: {{Reason}}.</p>
-<p>See the details at <a href="{{PublicBaseUrl}}/subscription">{{PublicBaseUrl}}/subscription</a>, or reply to this email if you think this is a mistake.</p>
---- email.text
-Hello,
-
-Your organisation's {{PlanName}} subscription is now {{Status}}: {{Reason}}.
-
-Details: {{PublicBaseUrl}}/subscription
+<p>If you think this is a mistake, reply to this email.</p>
+--- email.button
+See the details
+--- email.action
+{{PublicBaseUrl}}/subscription

@@ -178,6 +178,20 @@ public sealed partial class WebTests(SqlServerFixture sql) : IAsyncLifetime
 
         (await client.GetStringAsync("/", TestContext.Current.CancellationToken)).ShouldContain("aria-label=\"Notifications, ");
         (await client.GetStringAsync("/admin/notifications/templates/General.Reminder", TestContext.Current.CancellationToken)).ShouldContain("general_reminder");
+
+        // The template editor: a sandboxed preview, live drafts posted into it, and saving as a version.
+        const string Editor = "/admin/notifications/templates/Identity.PasswordChanged";
+        (await client.GetStringAsync(Editor, TestContext.Current.CancellationToken)).ShouldContain("name=\"template-preview\"");
+        var preview = await client.GetAsync(Editor + "/preview", TestContext.Current.CancellationToken);
+        preview.StatusCode.ShouldBe(HttpStatusCode.OK);
+        preview.Headers.GetValues("Content-Security-Policy").Single().ShouldStartWith("sandbox");
+        (await preview.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).ShouldContain("Your password was changed");
+        var token = await GetMetaTokenAsync(client);
+        var draft = await PostFormAsync(client, Editor + "/preview", token, ("parts[email.heading]", "A draft heading"));
+        (await draft.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).ShouldContain("A draft heading");
+        (await PostFormAsync(client, Editor, token, ("parts[email.heading]", "A saved heading"), ("note", "Web test"))).StatusCode.ShouldBe(HttpStatusCode.Redirect);
+        (await client.GetStringAsync(Editor, TestContext.Current.CancellationToken)).ShouldSatisfyAllConditions(h => h.ShouldContain("A saved heading"), h => h.ShouldContain("Web test"));
+        (await PostFormAsync(client, Editor + "/reset", token)).StatusCode.ShouldBe(HttpStatusCode.Redirect);
         (await client.GetFromJsonAsync<int>("/api/me/notifications/unread-count", TestContext.Current.CancellationToken)).ShouldBeGreaterThanOrEqualTo(0);
         var preferences = await client.GetStringAsync("/api/me/notifications/preferences", TestContext.Current.CancellationToken);
         preferences.ShouldContain("\"channel\":\"WhatsApp\"");

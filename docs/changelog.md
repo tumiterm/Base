@@ -16,6 +16,13 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ### Added
 
+- **Reword emails and messages**, with a live preview: Administration → Messages → Templates. Each email is set out
+  for you (heading, message, details, one button); you change the words (subject, preview line, heading, message,
+  button label, SMS and in-app text), see the email update as you type with sample values, and send yourself a test.
+  Every save is a version, with who and what changed; bring back any earlier one or go back to the application's
+  wording. Button addresses and details stay the application's, and security emails with a sign-in link keep their
+  wording. Organisations reword their own messages on plans with the new **Custom email wording** feature (Branding);
+  what the platform sends organisations (billing, invoices, plan changes) is worded by the platform.
 - **Billing details** for each organisation: registered name, contact person, billing email, phone, address, VAT and
   registration numbers. Kept by the organisation (Subscription → Billing → Billing details) or by the platform (the
   tenant's page) and copied onto each new invoice under *Billed to*. Invoices show the platform's logo, and the
@@ -120,6 +127,9 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ### Changed
 
+- Notification template files hold an email's words in parts (`email.heading`, `email.body`, `email.details`,
+  `email.button`, `email.action`, `email.preheader`) laid out by `EmailLayout`; `email.html` still works as the body,
+  and the plain text is made from the parts. `NotificationTemplateDefinition` gains `Sender`.
 - **Subscription** deals only with the subscription and fits on one screen: the plan's facts in a row, usage and
   recent payments beside it, plans side by side with their features folded away, and the billing cycle and Continue
   in the plans' header. How to pay (provider, automatic renewal) is on the next page, only when something is due.
@@ -139,6 +149,9 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ### Fixed
 
+- The invoice email named the organisation as the seller ("Vodacom's invoice for Vodacom") when no seller name was
+  set: it now falls back to the platform's name. Links in emails open the organisation's own address, not the
+  platform's.
 - **Received this month** on Platform → Payments counted test and sandbox payments as money received, and started the
   month at midnight UTC. It now counts real payments only (test ones are shown apart), per currency, by the month of
   the display time zone.

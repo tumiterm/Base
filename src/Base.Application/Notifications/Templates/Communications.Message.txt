@@ -1,12 +1,10 @@
 --- email.subject
 A message from {{AppName}}
---- email.html
+--- email.heading
+You have a new message
+--- email.body
 <p>Hello {{RecipientName}},</p>
 <p>You have a new message in {{AppName}}.</p>
---- email.text
-Hello {{RecipientName}},
-
-You have a new message in {{AppName}}.
 --- sms
 {{AppName}}: you have a new message.
 --- inapp.title

@@ -76,7 +76,9 @@ cross-cutting feature or adding a package:
   `BackgroundService` with its own timer. A new external dependency gets an `IHealthCheck` tagged `dependency`
   (never `ready` unless the app can't serve without it).
 - Notify people only through `INotificationService` (template code + recipient + data). New template = constant in
-  `NotificationTemplates` + `NotificationCatalog` entry + `Notifications/Templates/{Code}.txt` (tests check they match).
+  `NotificationTemplates` + `NotificationCatalog` entry (its `Sender`) + `Notifications/Templates/{Code}.txt` with
+  words in parts (`email.heading`, `email.body`, `email.details`, `email.button` + `email.action`; never layout
+  markup: `EmailLayout` owns it) and a sample for each new placeholder in `NotificationSamples` (tests check them).
   Templates containing secrets are `IsSensitive` (sent at once, stored without content). Providers are configured
   under `Notifications:Providers` (or, for email, the SMTP server under Settings → Email); nothing is sent on a channel
   until it is switched on. `IEmailSender` is only for

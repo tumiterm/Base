@@ -62,7 +62,7 @@ internal sealed class InvoiceService(
     IEnumerable<IPaymentGateway> gateways,
     IBrandingService branding,
     IPlatformTenant platform,
-    IServiceScopeFactory scopes,
+    Common.PlatformScope platformScope,
     TimeProvider time) : IInvoiceService
 {
     public async Task<ValidationResponse<InvoiceView>> ForPaymentAsync(string paymentReference, CancellationToken cancellationToken = default)
@@ -226,9 +226,7 @@ internal sealed class InvoiceService(
             return (buyer, null);
         }
 
-        await using var scope = scopes.CreateAsyncScope();
-        scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(platformId, null);
-        var seller = await DataUriAsync(scope.ServiceProvider.GetRequiredService<IBrandingService>(), cancellationToken);
+        var seller = await platformScope.RunAsync(sp => DataUriAsync(sp.GetRequiredService<IBrandingService>(), cancellationToken), cancellationToken);
         return (seller, string.Equals(seller, buyer, StringComparison.Ordinal) ? null : buyer);
     }
 
@@ -269,7 +267,7 @@ public interface IInvoiceNumbers
 }
 
 /// <summary>Issues a payment's invoice once, frozen with today's seller details and the organisation as buyer.</summary>
-internal sealed class InvoiceIssuer(IUnitOfWork unitOfWork, IInvoiceNumbers numbers, IApplicationSettingService settings, TimeProvider time)
+internal sealed class InvoiceIssuer(IUnitOfWork unitOfWork, IInvoiceNumbers numbers, IApplicationSettingService settings, Common.PlatformScope platformScope, TimeProvider time)
     : IDomainEventHandler<PaymentSucceeded>
 {
     public async Task HandleAsync(PaymentSucceeded domainEvent, CancellationToken cancellationToken)
@@ -293,7 +291,9 @@ internal sealed class InvoiceIssuer(IUnitOfWork unitOfWork, IInvoiceNumbers numb
         var seller = await settings.GetAsync(SettingCodes.Invoices.SellerName, cancellationToken);
         if (string.IsNullOrWhiteSpace(seller))
         {
-            seller = await settings.GetAsync(SettingCodes.General.ApplicationName, cancellationToken) ?? "Base";
+            // The platform's own name: the organisation paying has its own application name, which isn't the seller's.
+            seller = await platformScope.RunAsync(
+                sp => sp.GetRequiredService<IApplicationSettingService>().GetAsync(SettingCodes.General.ApplicationName, cancellationToken), cancellationToken) ?? "Base";
         }
 
         var rate = decimal.TryParse(await settings.GetAsync(SettingCodes.Invoices.VatRatePercent, cancellationToken), NumberStyles.Number, CultureInfo.InvariantCulture, out var r) ? r : 0m;

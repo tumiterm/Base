@@ -7,9 +7,16 @@ namespace Base.Application.Notifications;
 /// <code>
 /// --- email.subject
 /// Welcome to {{AppName}}
-/// --- email.html
+/// --- email.heading
+/// You're in
+/// --- email.body
 /// &lt;p&gt;Hello {{RecipientName}}&lt;/p&gt;
+/// --- email.button
+/// Sign in
+/// --- email.action
+/// {{PublicBaseUrl}}/account/login
 /// </code>
+/// The email layout turns the parts into the message (see <see cref="EmailLayout"/>).
 /// Files are versioned and reviewed with the code; tenants can override single parts in the database.
 /// </summary>
 public static class NotificationTemplateFiles
@@ -50,6 +57,13 @@ public static class NotificationTemplateFiles
         }
 
         Flush();
+
+        // Older files hold the whole email in email.html: it is the body the layout wraps.
+        if (parts.Remove(TemplateParts.EmailHtml, out var html) && !parts.ContainsKey(TemplateParts.EmailBody))
+        {
+            parts[TemplateParts.EmailBody] = html;
+        }
+
         return parts;
 
         void Flush()

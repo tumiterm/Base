@@ -543,6 +543,13 @@ a.chip:hover, button.chip:hover { border-color: var(--border-strong); color: var
 .kv { display: grid; grid-template-columns: minmax(7rem, max-content) minmax(0, 1fr); gap: var(--s-2) var(--s-4); margin: 0; }
 .kv dt { color: var(--text-3); font-weight: 500; }
 .kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+/* Template editor: the wording beside a live preview of the email (600px wide, as mail clients show it). */
+.template-editor { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 40rem); gap: var(--s-4); align-items: start; }
+.template-editor fieldset { min-width: 0; border: 0; margin: 0; }
+.template-preview { display: block; width: 100%; height: 44rem; border: 0; border-radius: 0 0 var(--radius-lg) var(--radius-lg); background: #f4f5f7; }
+.template-details { grid-template-columns: minmax(0, 12rem) minmax(0, 1fr); }
+.rich-content.is-readonly { border: 1px solid var(--border); border-radius: var(--radius); padding: var(--s-3); background: var(--surface-2); }
+@media (max-width: 1299.98px) { .template-editor { grid-template-columns: minmax(0, 1fr); } }
 .detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 22rem); gap: var(--s-4); align-items: start; }
 .stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); align-content: start; }
 .stack > .segmented, .stack > .btn, .stack > .stepper { justify-self: start; }

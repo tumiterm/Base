@@ -54,7 +54,7 @@ internal sealed record MessageWording(
         if (Subject is not null && Html is not null && Text is not null)
         {
             parts[TemplateParts.EmailSubject] = Subject;
-            parts[TemplateParts.EmailHtml] = Html;
+            parts[TemplateParts.EmailBody] = Html;
             parts[TemplateParts.EmailText] = Text;
         }
 

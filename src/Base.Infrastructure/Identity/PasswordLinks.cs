@@ -22,7 +22,7 @@ internal sealed class PasswordLinks(
     IPlatformTenant platform,
     AppDbContext db,
     IOptions<InviteTokenProviderOptions> inviteOptions,
-    TimeProvider time)
+    TimeProvider time) : ITenantAddress
 {
     /// <summary>A fresh invite link for a user who hasn't set a password yet, to hand over by any channel.</summary>
     public async Task<ValidationResponse<InviteLink>> CreateInviteAsync(ApplicationUser user, CancellationToken cancellationToken)
@@ -37,7 +37,7 @@ internal sealed class PasswordLinks(
     }
 
     /// <summary>The address for the current tenant's links, or the <c>General.PublicBaseUrl</c> setting when it has none.</summary>
-    public async Task<string> BaseUrlAsync(CancellationToken cancellationToken) =>
+    public async Task<string> BaseUrlAsync(CancellationToken cancellationToken = default) =>
         await ReachableBaseUrlAsync(cancellationToken) ?? await ConfiguredAsync(cancellationToken);
 
     public static string Build(string baseUrl, ApplicationUser user, string token, PasswordTokenKind kind) =>

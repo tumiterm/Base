@@ -60,3 +60,15 @@ internal sealed class NotificationTemplateOverrideConfiguration : IEntityTypeCon
         builder.HasIndex(o => new { o.TenantId, o.TemplateCode, o.Part }).IsUnique();
     }
 }
+
+internal sealed class NotificationTemplateRevisionConfiguration : IEntityTypeConfiguration<NotificationTemplateRevision>
+{
+    public void Configure(EntityTypeBuilder<NotificationTemplateRevision> builder)
+    {
+        builder.ToTable("NotificationTemplateRevisions");
+        builder.Property(r => r.TemplateCode).HasMaxLength(NotificationMessage.TemplateCodeMaxLength).IsRequired();
+        builder.Property(r => r.PartsJson).HasMaxLength(-1).IsRequired();
+        builder.Property(r => r.Note).HasMaxLength(NotificationTemplateRevision.NoteMaxLength);
+        builder.HasIndex(r => new { r.TenantId, r.TemplateCode, r.Number }).IsUnique();
+    }
+}

@@ -14,6 +14,9 @@ public static class FeatureCodes
     public const string DocumentGeneration = "Feature.DocumentGeneration";
     public const string DataExchange = "Feature.DataExchange";
     public const string CustomBranding = "Feature.CustomBranding";
+
+    /// <summary>The organisation rewords the emails and messages it sends (not security ones with a sign-in link).</summary>
+    public const string CustomEmailWording = "Feature.CustomEmailWording";
     public const string Api = "Feature.Api";
     public const string Messaging = "Feature.Messaging";
     public const string BulkMessaging = "Feature.BulkMessaging";
@@ -115,6 +118,8 @@ public static class EntitlementCatalog
         EntitlementDefinition.Limit(LimitCodes.StorageMb, "File storage", ModuleCodes.Documents, 1024, "1.0", "Total size of stored files.", "MB", 1024L * 1024L),
         EntitlementDefinition.Feature(FeatureCodes.DataExchange, "Import & export", ModuleCodes.DataExchange, FeatureTier.Standard, "1.0", "Excel and CSV exports of lists, and file imports."),
         EntitlementDefinition.Feature(FeatureCodes.CustomBranding, "Custom branding", ModuleCodes.Branding, FeatureTier.Premium, "1.0", "Own accent colour, logo and default theme."),
+        EntitlementDefinition.Feature(FeatureCodes.CustomEmailWording, "Custom email wording", ModuleCodes.Branding, FeatureTier.Premium, "1.1",
+            "Reword the emails and messages the organisation sends (invitations aside), with a preview, test sends and earlier versions to go back to."),
         EntitlementDefinition.Feature(FeatureCodes.Messaging, "Send messages", ModuleCodes.Messaging, FeatureTier.Standard, "1.1", "Write to chosen people by email, SMS, WhatsApp or in-app, now or at a set time, with saved templates."),
         EntitlementDefinition.Feature(FeatureCodes.BulkMessaging, "Bulk messages", ModuleCodes.Messaging, FeatureTier.Premium, "1.1", "Send to everyone a filter matches (a department, a role) or to a pasted list."),
         EntitlementDefinition.Limit(LimitCodes.MessagesPerMonth, "Messages per month", ModuleCodes.Messaging, 1000, "1.1", "Messages sent from Messages each month, one per person per channel.", resetsMonthly: true),

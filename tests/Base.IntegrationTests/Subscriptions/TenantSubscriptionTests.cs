@@ -54,7 +54,8 @@ public sealed partial class TenantSubscriptionTests(SqlServerFixture sql) : IAsy
         var invitation = _app.Sent.On(NotificationChannel.Email).ShouldHaveSingleItem();
         invitation.To.ShouldBe("owner@acme.test");
         // The tenant's address keeps the platform address's scheme and port (https://localhost:7262 in these tests).
-        WebUtility.HtmlDecode(Href().Match(invitation.HtmlBody!).Groups["href"].Value).ShouldStartWith("https://acme.example.com:7262/account/set-password?kind=invite");
+        Href().Matches(invitation.HtmlBody!).Select(m => WebUtility.HtmlDecode(m.Groups["href"].Value))
+            .ShouldContain(h => h.StartsWith("https://acme.example.com:7262/account/set-password?kind=invite", StringComparison.Ordinal));
 
         // The tenant's administrator holds the Administrator role, but none of the platform's permissions.
         var principal = await _app.InScopeAsync(tenantId, async sp =>

@@ -72,6 +72,16 @@ public static class NotificationCategories
 /// <summary>A WhatsApp template approved by Meta: its name, language, and the variables that fill {{1}}, {{2}}, ...</summary>
 public sealed record WhatsAppTemplate(string Name, string Language, IReadOnlyList<string> Parameters);
 
+/// <summary>Whose email it is: the organisation's own, or the platform's to the organisation (its plan, its invoices).</summary>
+public enum NotificationSender
+{
+    /// <summary>Sent by the organisation to its people: its name and look, wording it may change.</summary>
+    Organisation = 0,
+
+    /// <summary>Sent by the platform to an organisation: the platform's name, look and wording, changed only by the platform.</summary>
+    Platform = 1,
+}
+
 /// <summary>Everything about a notification except its wording, which lives in Templates/{Code}.txt.</summary>
 /// <param name="Channels">Channels sent by default, each independently (e.g. Email and InApp).</param>
 /// <param name="Variables">Data the caller must supply. Built-ins (<see cref="NotificationCatalog.BuiltInVariables"/>) are added automatically.</param>
@@ -79,6 +89,7 @@ public sealed record WhatsAppTemplate(string Name, string Language, IReadOnlyLis
 /// <param name="IsSensitive">Content contains a secret (sign-in link): sent immediately and never stored.</param>
 /// <param name="Fallback">Tried in order when a channel is unavailable or fails (e.g. SMS after WhatsApp).</param>
 /// <param name="WhatsApp">The approved template for the WhatsApp channel; required to send on WhatsApp.</param>
+/// <param name="Sender">Whose message it is, which decides whose wording and look it gets and who may change them.</param>
 public sealed record NotificationTemplateDefinition(
     string Code,
     string Name,
@@ -89,7 +100,15 @@ public sealed record NotificationTemplateDefinition(
     bool IsMandatory = false,
     bool IsSensitive = false,
     IReadOnlyList<NotificationChannel>? Fallback = null,
-    WhatsAppTemplate? WhatsApp = null);
+    WhatsAppTemplate? WhatsApp = null,
+    NotificationSender Sender = NotificationSender.Organisation)
+{
+    /// <summary>
+    /// Security messages carrying a sign-in link keep the application's wording: a reworded one could mislead about
+    /// the link. Their look still follows the branding.
+    /// </summary>
+    public bool IsRewordable => !IsSensitive;
+}
 
 public static class NotificationCatalog
 {
@@ -106,7 +125,7 @@ public static class NotificationCatalog
             [NotificationChannel.Email], ["Link"], IsMandatory: true, IsSensitive: true),
         new(NotificationTemplates.Tenancy.Welcome, "Welcome to a new organisation", NotificationCategories.Security,
             "Sent to a new organisation's first administrator: a single-use link to set a password, where to sign in, and the first steps.",
-            [NotificationChannel.Email], ["Link", "OrganisationName", "SignInUrl", "PlanLine"], IsMandatory: true, IsSensitive: true),
+            [NotificationChannel.Email], ["Link", "OrganisationName", "SignInUrl", "PlanLine"], IsMandatory: true, IsSensitive: true, Sender: NotificationSender.Platform),
         new(NotificationTemplates.Identity.PasswordReset, "Password reset", NotificationCategories.Security,
             "Sent when a password reset is requested. Contains a single-use link.",
             [NotificationChannel.Email], ["Link"], IsMandatory: true, IsSensitive: true),
@@ -126,24 +145,24 @@ public static class NotificationCatalog
             "Tells whoever created an API client that its key expires in two weeks, so an integration doesn't stop without warning.",
             [NotificationChannel.Email, NotificationChannel.InApp], ["ClientName", "ExpiresOn"], IsMandatory: true),
         new(NotificationTemplates.Subscriptions.TrialEnding, "Trial ending", NotificationCategories.Billing,
-            "Tells the organisation's contact that the trial ends soon.", [NotificationChannel.Email], ["PlanName", "EndsOn"], IsMandatory: true),
+            "Tells the organisation's contact that the trial ends soon.", [NotificationChannel.Email], ["PlanName", "EndsOn"], IsMandatory: true, Sender: NotificationSender.Platform),
         new(NotificationTemplates.Subscriptions.StatusChanged, "Subscription status changed", NotificationCategories.Billing,
             "Tells the organisation's contact that the subscription is past due, suspended, cancelled, expired or active again.",
-            [NotificationChannel.Email], ["PlanName", "Status", "Reason"], IsMandatory: true),
+            [NotificationChannel.Email], ["PlanName", "Status", "Reason"], IsMandatory: true, Sender: NotificationSender.Platform),
         new(NotificationTemplates.Subscriptions.PaymentReceived, "Payment received", NotificationCategories.Billing,
             "A receipt for an online payment for the subscription, to the person who paid and the organisation's contact.",
-            [NotificationChannel.Email], ["PlanName", "Amount", "Reference", "PaidUntil", "Gateway"], IsMandatory: true),
+            [NotificationChannel.Email], ["PlanName", "Amount", "Reference", "PaidUntil", "Gateway"], IsMandatory: true, Sender: NotificationSender.Platform),
         new(NotificationTemplates.Subscriptions.AutoRenewalStopped, "Automatic renewal stopped", NotificationCategories.Billing,
             "Tells the organisation's contact that the automatic renewal stopped (at the payment provider, or because it couldn't follow a change of plan), so they pay before the period ends.",
-            [NotificationChannel.Email], ["PlanName", "Gateway", "Amount", "Reason"], IsMandatory: true),
+            [NotificationChannel.Email], ["PlanName", "Gateway", "Amount", "Reason"], IsMandatory: true, Sender: NotificationSender.Platform),
         new(NotificationTemplates.Subscriptions.PlanChanged, "Plan changed", NotificationCategories.Billing,
             "Tells the organisation's contact that the platform changed its plan, now or from the end of the period, and why.",
-            [NotificationChannel.Email], ["PlanName", "PreviousPlanName", "Price", "When", "Reason"], IsMandatory: true),
+            [NotificationChannel.Email], ["PlanName", "PreviousPlanName", "Price", "When", "Reason"], IsMandatory: true, Sender: NotificationSender.Platform),
         new(NotificationTemplates.Subscriptions.Invoice, "Invoice", NotificationCategories.Billing,
             "An invoice for a subscription payment, sent on request to the address someone entered.",
             [NotificationChannel.Email],
             ["InvoiceTitle", "InvoiceNumber", "IssuedOn", "SellerName", "BuyerName", "Description", "Total", "VatLabel", "VatAmount", "PaidOn", "PaymentReference", "InvoicePath"],
-            IsMandatory: true),
+            IsMandatory: true, Sender: NotificationSender.Platform),
         new(NotificationTemplates.Communications.Message, "Message from a person", NotificationCategories.Announcements,
             "Messages written and sent from Messages, alone or in bulk. Each one brings its own wording; this file is only the fallback.",
             [NotificationChannel.Email, NotificationChannel.InApp], []),

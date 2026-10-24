@@ -1,12 +1,18 @@
 --- email.subject
 Automatic renewal stopped for {{PlanName}}
---- email.html
+--- email.preheader
+Pay before the current period ends to keep your subscription going.
+--- email.heading
+Automatic renewal stopped
+--- email.body
 <p>Hello,</p>
-<p>The automatic renewal of your organisation's {{PlanName}} subscription ({{Amount}} each period) through {{Gateway}} has stopped, so it won't be charged again: {{Reason}}.</p>
-<p>To keep your subscription going, pay before the current period ends, and switch automatic renewal on again if you like, at <a href="{{PublicBaseUrl}}/subscription">{{PublicBaseUrl}}/subscription</a>.</p>
---- email.text
-Hello,
-
-The automatic renewal of your organisation's {{PlanName}} subscription ({{Amount}} each period) through {{Gateway}} has stopped, so it won't be charged again: {{Reason}}.
-
-To keep your subscription going, pay before the current period ends, and switch automatic renewal on again if you like: {{PublicBaseUrl}}/subscription
+<p>The automatic renewal of your organisation's subscription has stopped, so it won't be charged again: {{Reason}}.</p>
+<p>To keep your subscription going, pay before the current period ends. You can switch automatic renewal on again when you pay.</p>
+--- email.details
+Plan | {{PlanName}}
+Each period | {{Amount}}
+Paid through | {{Gateway}}
+--- email.button
+Open my subscription
+--- email.action
+{{PublicBaseUrl}}/subscription

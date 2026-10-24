@@ -147,10 +147,19 @@ the API at `/api/users`, `/api/roles` and `/api/permissions`.
 Business code calls `INotificationService.SendAsync(new Notification(template, recipient, data, channels?))`.
 
 - **Templates** are entries in `NotificationCatalog` (category, default channels, fallback, mandatory or sensitive,
-  WhatsApp template) plus a wording file `Application/Notifications/Templates/{Code}.txt`. A file has sections
-  (`email.subject`, `email.html`, `email.text`, `sms`, `inapp.title`, `inapp.body`) with `{{Variable}}` placeholders.
-  Unknown variables are an error; HTML parts are encoded. Tenants override individual sections in the database, and
-  overrides are validated against the template's variables.
+  WhatsApp template, and `Sender`: the organisation's own message, or the platform's to an organisation) plus a
+  wording file `Application/Notifications/Templates/{Code}.txt`. A file has sections with `{{Variable}}`
+  placeholders. An email is words, not markup: `email.subject`, `email.preheader` (the inbox preview line),
+  `email.heading`, `email.body` (simple HTML), `email.details` (`Label | Value` lines, `**` for a total),
+  `email.button` and `email.action` (the button's address). `EmailLayout` lays them out and writes the plain-text
+  version (`email.text` overrides it; an older file's `email.html` is read as the body). Then `sms`, `inapp.title`,
+  `inapp.body`. Unknown variables are an error; values are encoded.
+- **Rewording** (Administration → Messages → Templates). The words (subject, preview line, heading, body, button
+  label, SMS, in-app) are saved as a whole, as a numbered `NotificationTemplateRevision`, with a live preview filled
+  from `NotificationSamples` and a test send to the editor. Addresses and details stay the application's. An
+  organisation rewords its own messages when its plan has `Feature.CustomEmailWording`; what the platform sends
+  organisations (`Sender = Platform`) is worded by the platform tenant and applies in every tenant; sensitive
+  templates (sign-in links) are never reworded. Links start from the tenant's own address (`ITenantAddress`).
 - **Queueing.** `SendAsync` resolves the recipient (from the user account or explicit addresses; phones are
   normalised to E.164), then picks the first usable channel in each chain (primary, then fallback). Channels that are
   off, have no address, or that the user opted out of are recorded as **Skipped**, with the reason. The rest are

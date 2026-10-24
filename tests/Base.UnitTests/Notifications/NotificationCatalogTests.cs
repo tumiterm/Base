@@ -119,6 +119,53 @@ public sealed class TemplateFileTests
         Should.Throw<FormatException>(() => NotificationTemplateFiles.Parse("--- sms\na\n--- sms\nb"));
 }
 
+public sealed class EmailLayoutTests
+{
+    [Theory]
+    [MemberData(nameof(NotificationCatalogTests.AllCodes), MemberType = typeof(NotificationCatalogTests))]
+    public void Every_placeholder_has_a_sample_for_previews(string code) =>
+        NotificationCatalog.Get(code).Variables.Where(v => !NotificationSamples.Has(v)).ShouldBeEmpty($"Add a sample to NotificationSamples for {code}");
+
+    [Theory]
+    [MemberData(nameof(NotificationCatalogTests.AllCodes), MemberType = typeof(NotificationCatalogTests))]
+    public void A_button_always_has_an_address_set_by_the_application(string code)
+    {
+        var parts = NotificationTemplateFiles.PartsOf(code);
+        parts.ContainsKey(TemplateParts.EmailButton).ShouldBe(parts.ContainsKey(TemplateParts.EmailAction), $"{code}: a button and its address come together");
+    }
+
+    [Fact]
+    public void Details_are_label_and_value_lines_and_empty_values_drop_out()
+    {
+        EmailParts.ParseDetails("Plan | Pro\nVAT (not registered) | \n** Total paid | ZAR 100.00\nno bar here").ShouldBe(
+            [new EmailDetail("Plan", "Pro"), new EmailDetail("Total paid", "ZAR 100.00", IsTotal: true)]);
+    }
+
+    [Fact]
+    public void The_layout_encodes_every_value_and_writes_the_button_address_out()
+    {
+        var email = new EmailParts("Hi <you>", "Soon & now", "Big <news>", "<p>Body</p>", [new EmailDetail("A<b>", "1 & 2")], "Go <now>", "https://example.com/?a=1&b=2");
+        var html = EmailLayout.Html(email, new EmailBrand("Acme & Co"));
+        html.ShouldSatisfyAllConditions(
+            h => h.ShouldContain("Big &lt;news&gt;"),
+            h => h.ShouldContain("A&lt;b&gt;"),
+            h => h.ShouldContain("Go &lt;now&gt;"),
+            h => h.ShouldContain("href=\"https://example.com/?a=1&amp;b=2\""),
+            h => h.ShouldContain("Acme &amp; Co"),
+            h => h.ShouldContain("<p>Body</p>"),
+            h => h.ShouldNotContain("<news>"));
+        EmailLayout.Text(email, "Body", new EmailBrand("Acme")).ShouldContain("Go <now>:\nhttps://example.com/?a=1&b=2");
+    }
+
+    [Fact]
+    public void Older_files_with_a_whole_html_body_still_work()
+    {
+        var parts = NotificationTemplateFiles.Parse("--- email.subject\nHi\n--- email.html\n<p>Old</p>");
+        parts[TemplateParts.EmailBody].ShouldBe("<p>Old</p>");
+        parts.ContainsKey(TemplateParts.EmailHtml).ShouldBeFalse();
+    }
+}
+
 public sealed class PhoneNumberTests
 {
     [Theory]
