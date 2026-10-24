@@ -19,8 +19,20 @@ public sealed record PageRequest
     public int Skip => (Page - 1) * PageSize;
 }
 
+/// <summary>Where a page sits among the pages, whatever it holds (for pagers).</summary>
+public interface IPagedResult
+{
+    int Page { get; }
+
+    int TotalPages { get; }
+
+    bool HasPrevious { get; }
+
+    bool HasNext { get; }
+}
+
 /// <summary>One page of results plus the database-side total.</summary>
-public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Total, int Page, int PageSize)
+public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Total, int Page, int PageSize) : IPagedResult
 {
     public int TotalPages => PageSize == 0 ? 0 : (int)Math.Ceiling(Total / (double)PageSize);
 

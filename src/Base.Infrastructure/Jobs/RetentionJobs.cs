@@ -15,11 +15,15 @@ internal sealed class AuditRetentionJob(AppDbContext db, IApplicationSettingServ
 {
     private const int BatchSize = 5000;
 
+    /// <summary>Financial records: their history is kept whatever the retention (tax law asks for years, not months).</summary>
+    private static readonly string[] KeptForGood =
+        [nameof(Domain.Payments.Payment), nameof(Domain.Payments.RecurringPayment), nameof(Domain.Subscriptions.TenantSubscription), nameof(Domain.Subscriptions.Plan), nameof(Domain.Subscriptions.PlanEntitlement)];
+
     public string Code => "audit-retention";
 
     public string Name => "Audit retention";
 
-    public string Description => "Deletes audit entries older than Audit.RetentionDays.";
+    public string Description => "Deletes audit entries older than Audit.RetentionDays, except those of payments, subscriptions and plans.";
 
     public TimeSpan Interval => TimeSpan.FromDays(1);
 
@@ -34,7 +38,7 @@ internal sealed class AuditRetentionJob(AppDbContext db, IApplicationSettingServ
         {
             // All tenants: retention is a platform policy. ExecuteDelete bypasses the append-only guard by design.
             deleted = await db.AuditEntries.IgnoreQueryFilters()
-                .Where(e => e.OccurredAt < cutoff)
+                .Where(e => e.OccurredAt < cutoff && !KeptForGood.Contains(e.EntityType))
                 .OrderBy(e => e.Id)
                 .Take(BatchSize)
                 .ExecuteDeleteAsync(cancellationToken);

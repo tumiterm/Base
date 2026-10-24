@@ -17,7 +17,12 @@ namespace Base.Web.Controllers;
 /// <summary>The platform's tenants: list, create, and run each one's domains and subscription.</summary>
 [Route("platform/tenants")]
 [HasPermission(PermissionCodes.Platform.TenantsView)]
-public sealed class PlatformTenantsController(ITenantAdministration tenants, ISubscriptionService subscriptions, IPlanAdministration plans, INotificationChannels channels) : Controller
+public sealed class PlatformTenantsController(
+    ITenantAdministration tenants,
+    ISubscriptionService subscriptions,
+    IPlanAdministration plans,
+    INotificationChannels channels,
+    Base.Application.Payments.IBillingHistory billing) : Controller
 {
     [HttpGet("")]
     public async Task<IActionResult> Index(string? search, SubscriptionStatus? status, int page = 1, CancellationToken cancellationToken = default) =>
@@ -64,8 +69,20 @@ public sealed class PlatformTenantsController(ITenantAdministration tenants, ISu
         var result = await tenants.GetAsync(id, cancellationToken);
         return result.IsSuccess
             ? View(new TenantDetailsViewModel(
-                result.Data!, await plans.ListAsync(includeRetired: false, cancellationToken), await channels.DescribeAsync(NotificationChannel.Email, cancellationToken)))
+                result.Data!,
+                await plans.ListAsync(includeRetired: false, cancellationToken),
+                await channels.DescribeAsync(NotificationChannel.Email, cancellationToken),
+                (await billing.ListAsync(id, 1, 8, cancellationToken)).Data?.Items))
             : NotFound();
+    }
+
+    /// <summary>The tenant's billing history: subscription, payments and renewal, who did what and why.</summary>
+    [HttpGet("{id:guid}/billing")]
+    public async Task<IActionResult> Billing(Guid id, int page = 1, CancellationToken cancellationToken = default)
+    {
+        var tenant = await tenants.GetAsync(id, cancellationToken);
+        var history = await billing.ListAsync(id, page, 50, cancellationToken);
+        return tenant.IsError || history.IsError ? NotFound() : View(new TenantBillingViewModel(tenant.Data!.Tenant, history.Data!));
     }
 
     [HttpPost("{id:guid}/administrators")]

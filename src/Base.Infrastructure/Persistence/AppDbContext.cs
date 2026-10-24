@@ -90,6 +90,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
     public DbSet<PaymentNotification> PaymentNotifications => Set<PaymentNotification>();
     public DbSet<RecurringPayment> RecurringPayments => Set<RecurringPayment>();
 
+    public DbSet<BillingEvent> BillingEvents => Set<BillingEvent>();
+
     public DbSet<MessageTemplate> MessageTemplates => Set<MessageTemplate>();
 
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();

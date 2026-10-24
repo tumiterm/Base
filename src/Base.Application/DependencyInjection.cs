@@ -69,6 +69,7 @@ public static class DependencyInjection
         services.AddScoped<IScheduledJob, ReleaseWindowJob>();
         services.AddScoped<IPlanAdministration, PlanAdministration>();
         services.AddScoped<ISubscriptionService, SubscriptionService>();
+        services.AddScoped<Payments.IBillingHistory, Payments.BillingHistory>();
         services.AddScoped<IScheduledJob, SubscriptionLifecycleJob>();
         services.AddScoped<IPaymentService, PaymentService>();
         services.AddScoped<IDomainEventHandler<PaymentSucceeded>, PaymentSucceededHandler>();

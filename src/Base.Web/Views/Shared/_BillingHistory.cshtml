@@ -1,0 +1,26 @@
+@model IReadOnlyList<Base.Application.Payments.BillingEventView>
+@if (Model.Count == 0)
+{
+    <p class="text-muted mb-0">Nothing has happened yet.</p>
+}
+else
+{
+    <ol class="billing-log">
+        @foreach (var e in Model)
+        {
+            <li class="is-@e.Tone">
+                <div class="billing-log-main">
+                    <div class="billing-log-title">@e.Title</div>
+                    @if (e.Detail is not null || e.Reason is not null)
+                    {
+                        <div class="billing-log-detail">@e.Detail@(e.Detail is not null && e.Reason is not null ? " · " : "")@if (e.Reason is not null) {<span>“@e.Reason”</span>}</div>
+                    }
+                </div>
+                <div class="billing-log-meta">
+                    <local-time value="e.OccurredAt" format="d MMM yyyy, HH:mm" />
+                    <span>@e.ActorName@(e.PaymentReference is null ? "" : " · ")@if (e.PaymentReference is not null) {<span class="mono">@e.PaymentReference</span>}</span>
+                </div>
+            </li>
+        }
+    </ol>
+}

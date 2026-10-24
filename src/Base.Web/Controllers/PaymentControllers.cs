@@ -24,6 +24,7 @@ public sealed class SubscriptionController(
     ISubscriptionService subscriptions,
     ITenantEntitlements entitlements,
     IPaymentService payments,
+    IBillingHistory billing,
     IApplicationSettingService settings,
     ICurrentUser currentUser) : Controller
 {
@@ -185,6 +186,14 @@ public sealed class SubscriptionController(
     public async Task<IActionResult> Payments(int page = 1, CancellationToken cancellationToken = default)
     {
         var result = await payments.ListMineAsync(new PaymentQuery(Page: page, PageSize: 25), cancellationToken);
+        return result.IsError ? result.ToActionResult(this) : View(result.Data);
+    }
+
+    /// <summary>The billing history: everything that happened to the subscription and its payments, who and why.</summary>
+    [HttpGet("billing")]
+    public async Task<IActionResult> Billing(int page = 1, CancellationToken cancellationToken = default)
+    {
+        var result = await billing.ListMineAsync(page, 50, cancellationToken);
         return result.IsError ? result.ToActionResult(this) : View(result.Data);
     }
 

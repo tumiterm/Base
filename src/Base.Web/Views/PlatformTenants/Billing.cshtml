@@ -1,0 +1,19 @@
+@model TenantBillingViewModel
+@{
+    ViewData["Title"] = "Billing history: " + Model.Tenant.Name;
+}
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+    <a asp-action="Index">Tenants</a><icon name="chevron-right" class="icon-sm" />
+    <a asp-action="Details" asp-route-id="@Model.Tenant.Id">@Model.Tenant.Name</a><icon name="chevron-right" class="icon-sm" />
+    <span aria-current="page">Billing history</span>
+</nav>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Billing history</h1>
+        <p class="page-subtitle">@Model.Tenant.Name's subscription, payments and automatic renewal: who did what, when and why. Append-only and kept for good.</p>
+    </div>
+</div>
+<section class="panel">
+    <div class="panel-body"><partial name="_BillingHistory" model="Model.History.Items" /></div>
+    <partial name="_Pager" model="Model.History" />
+</section>

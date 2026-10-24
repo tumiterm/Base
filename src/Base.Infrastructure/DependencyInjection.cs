@@ -122,6 +122,7 @@ public static class DependencyInjection
     private static void AddPersistence(IServiceCollection services, string connectionString, IHostEnvironment environment)
     {
         services.AddScoped<AuditingInterceptor>();
+        services.AddScoped<Payments.BillingLedgerInterceptor>();
         services.AddScoped<DomainEventOutboxInterceptor>();
         services.AddScoped<AuditTrailInterceptor>();
         services.AddSingleton<SlowQueryInterceptor>();
@@ -136,6 +137,7 @@ public static class DependencyInjection
                 sql.CommandTimeout(database.CommandTimeoutSeconds);
             });
             options.AddInterceptors(
+                provider.GetRequiredService<Payments.BillingLedgerInterceptor>(), // before the outbox takes the domain events
                 provider.GetRequiredService<DomainEventOutboxInterceptor>(),
                 provider.GetRequiredService<AuditingInterceptor>(),
                 provider.GetRequiredService<AuditTrailInterceptor>(), // last of the save interceptors: sees final ids, stamps and tenants

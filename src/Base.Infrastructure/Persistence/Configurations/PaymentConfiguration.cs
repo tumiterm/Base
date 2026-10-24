@@ -65,3 +65,23 @@ internal sealed class PaymentNotificationConfiguration : IEntityTypeConfiguratio
         builder.Property(n => n.Detail).HasMaxLength(PaymentNotification.DetailMaxLength);
     }
 }
+
+internal sealed class BillingEventConfiguration : IEntityTypeConfiguration<BillingEvent>
+{
+    public void Configure(EntityTypeBuilder<BillingEvent> builder)
+    {
+        builder.Property(e => e.Id).ValueGeneratedNever();
+        builder.Property(e => e.Kind).HasConversion<string>().HasMaxLength(30);
+        builder.Property(e => e.ActorName).HasMaxLength(BillingEvent.NameMaxLength).IsRequired();
+        builder.Property(e => e.BillingCycle).HasConversion<string>().HasMaxLength(20);
+        builder.Property(e => e.Amount).HasPrecision(18, 2);
+        builder.Property(e => e.Currency).HasMaxLength(Payment.CurrencyLength).IsUnicode(false);
+        builder.Property(e => e.PaymentReference).HasMaxLength(Payment.ReferenceLength).IsUnicode(false);
+        builder.Property(e => e.Gateway).HasMaxLength(BillingEvent.CodeMaxLength);
+        builder.Property(e => e.Detail).HasMaxLength(BillingEvent.TextMaxLength);
+        builder.Property(e => e.Reason).HasMaxLength(BillingEvent.TextMaxLength);
+        builder.Property(e => e.TraceId).HasMaxLength(64).IsUnicode(false);
+        builder.HasOne<Domain.Tenancy.Tenant>().WithMany().HasForeignKey(e => e.TenantId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(e => new { e.TenantId, e.OccurredAt });
+    }
+}

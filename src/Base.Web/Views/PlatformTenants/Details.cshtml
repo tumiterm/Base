@@ -223,6 +223,14 @@
             <div class="panel-header"><h2 class="panel-title" id="usage-title">Usage</h2><span class="text-muted small">Against the plan's limits</span></div>
             <div class="panel-body"><partial name="_UsageMeters" model="Model.Details.Usage" /></div>
         </section>
+
+        @if (Model.Billing is { Count: > 0 } billing)
+        {
+            <section class="panel" aria-labelledby="billing-title">
+                <div class="panel-header"><h2 class="panel-title" id="billing-title">Billing history</h2><a class="small" asp-action="Billing" asp-route-id="@t.Id">See all</a></div>
+                <div class="panel-body"><partial name="_BillingHistory" model="billing" /></div>
+            </section>
+        }
     </div>
 
     <div class="stack">

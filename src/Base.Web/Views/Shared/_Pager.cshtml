@@ -1,0 +1,12 @@
+@model Base.Application.Common.Persistence.IPagedResult
+@* Previous / next for a paged list; keeps the current route and swaps the page. *@
+@if (Model.TotalPages > 1)
+{
+    <div class="panel-footer d-flex justify-content-between align-items-center">
+        <span class="text-muted small">Page @Model.Page of @Model.TotalPages</span>
+        <nav class="btn-group btn-group-sm" aria-label="Pages">
+            <a class="btn btn-outline-secondary @(Model.HasPrevious ? "" : "disabled")" asp-route-page="@(Model.Page - 1)">Previous</a>
+            <a class="btn btn-outline-secondary @(Model.HasNext ? "" : "disabled")" asp-route-page="@(Model.Page + 1)">Next</a>
+        </nav>
+    </div>
+}

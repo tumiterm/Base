@@ -16,6 +16,12 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ### Added
 
+- **Billing history**: every event of an organisation's subscription, payments and automatic renewal (checkout
+  started, paid, failed, expired; renewal on, charged, changed, stopped or not stoppable; status and plan changes with
+  the operator's reason; scheduled changes, trial extensions, cancellations), who did it (a person, the payment
+  provider or the system) and why. Written in the same save as the change, append-only, kept for good. On
+  Subscription → Billing (tabs Payments / Billing history) and on the tenant's platform page. The audit trail's
+  retention no longer removes the history of payments, subscriptions and plans.
 - Each plan on Subscription says what choosing it does before you continue ("Starts 21 Feb: nothing to pay today",
   "Starts today: pay R1,234 now", "Pays ahead"), and the review explains why no payment page opens for a change that
   waits for the period end.

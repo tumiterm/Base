@@ -271,6 +271,20 @@ A waiting change can be withdrawn from the tenant's page. API: `GET
 /api/platform/tenants/{id}/subscription/plan/preview?planId=&billingCycle=`, `PUT .../subscription/plan` with
 `when`, `reason` (required) and `allowOverLimits`, and `DELETE .../subscription/plan/scheduled`.
 
+## Records
+
+- **Billing history** (`BillingEvent`): one line per event of a subscription, payment or automatic renewal, with who
+  (person, payment provider, or system), why (the operator's reason, the provider's failure reason) and the payment
+  reference. Written by `BillingLedgerInterceptor` in the same save as the change, so it can't be missing or ahead
+  of it; append-only (changing a line throws) and never purged. Shown on Subscription → Billing and on the tenant's
+  platform page.
+- **Audit trail**: field-by-field changes of payments, renewals, subscriptions and plans. `Audit.RetentionDays`
+  doesn't apply to these types: financial records must be kept for years (in South Africa at least five, under the
+  Tax Administration Act).
+- **Gateway notifications** (`PaymentNotification`): every notification received, applied or not, and why.
+- **Logs**: gateway errors and refusals, with the trace id that the billing history also stores. Ship logs to a
+  central store in production ([go-live.md](go-live.md)); the local file keeps 14 days.
+
 ## Not yet
 
 Refunds and invoices; automatic renewal through Yoco (its Checkout API takes once-off payments).

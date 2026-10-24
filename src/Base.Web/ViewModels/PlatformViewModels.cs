@@ -29,7 +29,13 @@ public sealed class CreateTenantViewModel
     public IReadOnlyList<PlanSummary> Plans { get; set; } = [];
 }
 
-public sealed record TenantDetailsViewModel(TenantDetails Details, IReadOnlyList<PlanSummary> Plans, Base.Application.Notifications.ChannelRoute EmailRoute);
+public sealed record TenantDetailsViewModel(
+    TenantDetails Details,
+    IReadOnlyList<PlanSummary> Plans,
+    Base.Application.Notifications.ChannelRoute EmailRoute,
+    IReadOnlyList<Base.Application.Payments.BillingEventView>? Billing = null);
+
+public sealed record TenantBillingViewModel(TenantSummary Tenant, PagedResult<Base.Application.Payments.BillingEventView> History);
 
 public sealed class PlanEditViewModel
 {

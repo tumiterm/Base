@@ -1,0 +1,16 @@
+@model Base.Application.Common.Persistence.PagedResult<Base.Application.Payments.BillingEventView>
+@{
+    ViewData["Title"] = "Billing history";
+}
+<nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-action="Index">Subscription</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">Billing history</span></nav>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Billing</h1>
+        <p class="page-subtitle">Everything that happened to this organisation's subscription and payments, who did it and why. Kept for good.</p>
+    </div>
+</div>
+<partial name="_BillingTabs" model="@("history")" />
+<section class="panel">
+    <div class="panel-body"><partial name="_BillingHistory" model="Model.Items" /></div>
+    <partial name="_Pager" model="Model" />
+</section>
