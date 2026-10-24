@@ -35,13 +35,28 @@ public sealed class SubscriptionController(
         var canView = currentUser.HasPermission(PermissionCodes.Subscription.View);
         var history = canView ? (await payments.ListMineAsync(new PaymentQuery(PageSize: 10), cancellationToken)).Data?.Items ?? [] : [];
         var recurring = canView ? (await payments.RecurringMineAsync(cancellationToken)).Data : null;
+
+        // What choosing each plan on the current billing cycle would do, shown on its card before anyone clicks.
+        var changes = new Dictionary<Guid, PlanChangePreview>();
+        if (canView && mine.Subscription is { } current)
+        {
+            foreach (var plan in mine.Plans)
+            {
+                if ((await subscriptions.PreviewMineAsync(plan.Id, current.BillingCycle, cancellationToken)).Data is { } preview)
+                {
+                    changes[plan.Id] = preview;
+                }
+            }
+        }
+
         return View(new SubscriptionPageViewModel(
             mine,
             await entitlements.GetAsync(cancellationToken),
             payments.Gateways(currency),
             history,
             currentUser.HasPermission(PermissionCodes.Subscription.Pay),
-            recurring));
+            recurring,
+            changes));
     }
 
     /// <summary>Starts paying: to the gateway's page, by redirect or a form the browser posts by itself.</summary>

@@ -58,6 +58,14 @@
             }
             else if (waits)
             {
+                var provider = Model.Gateway is { Length: > 0 } code ? Model.Gateways.FirstOrDefault(g => g.Code == code)?.Name ?? code : null;
+                <div class="status-callout">
+                    <icon name="info" />
+                    <div>
+                        <div class="status-callout-title">There's nothing to pay today@(provider is null ? "" : $", so {provider} won't open")</div>
+                        <div class="small">You've already paid for @c.From.Name until <local-time value="c.EffectiveAt" format="d MMMM yyyy" />. On that date @c.To.Name starts and its first payment of @Display.Money(c.ToPrice, c.To.Currency) is due@(c.RenewsAutomatically ? ", charged by your automatic renewal" : ": pay it here then, on the payment provider's page"). To pay with a provider today, choose your current plan (pays ahead) or a dearer one.</div>
+                    </div>
+                </div>
                 <p class="mb-0">
                     You keep @c.From.Name, with everything it includes, until <local-time value="c.EffectiveAt" format="d MMMM yyyy" />: you've paid for it.
                     Then you move to @c.To.Name @(c.ToCycle != c.FromCycle ? (c.ToCycle == BillingCycle.Annual ? "billed yearly" : "billed monthly") : string.Empty)

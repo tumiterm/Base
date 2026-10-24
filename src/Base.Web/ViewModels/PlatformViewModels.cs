@@ -116,7 +116,8 @@ public sealed record SubscriptionPageViewModel(
     IReadOnlyList<Base.Application.Payments.PaymentGatewayView> Gateways,
     IReadOnlyList<Base.Application.Payments.PaymentView> Payments,
     bool CanPay,
-    Base.Application.Payments.RecurringPaymentView? Recurring = null);
+    Base.Application.Payments.RecurringPaymentView? Recurring = null,
+    IReadOnlyDictionary<Guid, PlanChangePreview>? Changes = null);
 
 /// <summary>The pay form as posted from the subscription page.</summary>
 public sealed class PayForm

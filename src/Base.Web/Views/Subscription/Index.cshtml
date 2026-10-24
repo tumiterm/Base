@@ -148,6 +148,26 @@ else
                                         <span class="choice-title">@plan.Name @if (current) {<span class="badge text-bg-primary ms-1">Your plan</span>}</span>
                                         <span class="choice-price">@Display.Money(plan.MonthlyPrice, plan.Currency) <small>/month</small></span>
                                         <span class="choice-desc">or @Display.Money(plan.AnnualPrice, plan.Currency) /year</span>
+                                        @if (Model.Changes?.GetValueOrDefault(plan.Id) is { } change)
+                                        {
+                                            <span class="choice-note">
+                                                @switch (change.Kind)
+                                                {
+                                                    case PlanChangeKind.Upgrade:
+                                                        <text><icon name="arrow-up-right" class="icon-sm" /> Starts today: pay @Display.Money(change.AmountDueNow, change.Currency) now, the difference</text>
+                                                        break;
+                                                    case PlanChangeKind.AtPeriodEnd:
+                                                        <text><icon name="calendar" class="icon-sm" /> Starts <local-time value="change.EffectiveAt" format="d MMM yyyy" />: nothing to pay today</text>
+                                                        break;
+                                                    case PlanChangeKind.Extend:
+                                                        <text><icon name="plus" class="icon-sm" /> Pays ahead: adds a @(s.BillingCycle == BillingCycle.Annual ? "year" : "month") after <local-time value="change.PeriodEnd" format="d MMM yyyy" /></text>
+                                                        break;
+                                                    default:
+                                                        <text><icon name="credit-card" class="icon-sm" /> Starts today: pay @Display.Money(change.AmountDueNow, change.Currency)</text>
+                                                        break;
+                                                }
+                                            </span>
+                                        }
                                         @if (plan.Description is not null) {<span class="choice-desc">@plan.Description</span>}
                                         <partial name="_PlanFeatures" model="plan" />
                                     </label>

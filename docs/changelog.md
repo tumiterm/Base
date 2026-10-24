@@ -16,6 +16,9 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ### Added
 
+- Each plan on Subscription says what choosing it does before you continue ("Starts 21 Feb: nothing to pay today",
+  "Starts today: pay R1,234 now", "Pays ahead"), and the review explains why no payment page opens for a change that
+  waits for the period end.
 - **Payments work locally out of the box**: in Development, Payfast (its shared sandbox merchant) and Yoco are on
   next to Test payments. Yoco needs only your own test key, once; no webhook. A payment still waiting when the person
   comes back is confirmed by asking the gateway (Yoco), server to server, in Development and production alike.

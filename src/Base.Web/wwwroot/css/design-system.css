@@ -564,6 +564,8 @@ a.chip:hover, button.chip:hover { border-color: var(--border-strong); color: var
 .choice-card:has(> input:focus-visible) { box-shadow: var(--focus-ring); }
 .choice-card.is-current { border-style: dashed; }
 .choice-card:has(input:disabled) { opacity: .55; cursor: not-allowed; }
+.choice-note { display: block; font-size: var(--text-xs); font-weight: 500; line-height: 1.4; color: var(--accent-subtle-text); background: var(--accent-subtle); border-radius: var(--radius); padding: var(--s-1) var(--s-2); }
+.choice-note > .icon { vertical-align: -2px; margin-right: 2px; }
 .choice-check { position: absolute; top: var(--s-3); right: var(--s-3); display: grid; place-items: center; width: 1.125rem; height: 1.125rem; border: 1px solid var(--border-strong); border-radius: 50%; color: transparent; transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease); }
 .choice-check .icon { width: 0.75rem; height: 0.75rem; }
 .choice-card:has(> input:checked) .choice-check { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); }
