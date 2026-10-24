@@ -19,7 +19,7 @@ else
     <section class="panel">
         <div class="table-responsive">
             <table class="table table-app mb-0">
-                <thead><tr><th>Payment</th><th>Reference</th><th>Paid with</th><th>Date</th><th class="text-end">Amount</th><th>Status</th></tr></thead>
+                <thead><tr><th>Payment</th><th>Reference</th><th>Paid with</th><th>Date</th><th class="text-end">Amount</th><th>Status</th><th><span class="visually-hidden">Invoice</span></th></tr></thead>
                 <tbody>
                     @foreach (var p in Model.Items)
                     {
@@ -30,6 +30,7 @@ else
                             <td><local-time value="p.CreatedAt" format="d MMM yyyy, HH:mm" /></td>
                             <td class="text-end fw-semibold">@Display.Money(p.Amount, p.Currency)</td>
                             <td><span class="badge text-bg-@Display.Tone(p.Status)">@Display.Status(p.Status)</span></td>
+                            <td class="text-end">@if (p.Status == Base.Domain.Payments.PaymentStatus.Succeeded) {<a class="btn btn-ghost btn-sm" asp-action="PaymentInvoice" asp-route-reference="@p.Reference"><icon name="file-text" class="icon-sm" /> Invoice</a>}</td>
                         </tr>
                     }
                 </tbody>

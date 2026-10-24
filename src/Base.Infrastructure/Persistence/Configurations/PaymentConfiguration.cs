@@ -85,3 +85,38 @@ internal sealed class BillingEventConfiguration : IEntityTypeConfiguration<Billi
         builder.HasIndex(e => new { e.TenantId, e.OccurredAt });
     }
 }
+
+internal sealed class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
+{
+    public const string NumberSequence = "InvoiceNumbers";
+
+    public void Configure(EntityTypeBuilder<Invoice> builder)
+    {
+        builder.Property(i => i.Id).ValueGeneratedNever();
+
+        // Numbers come from one sequence across the platform, given by the database as the row is inserted.
+        builder.Property(i => i.Sequence).HasDefaultValueSql($"NEXT VALUE FOR {NumberSequence}").ValueGeneratedOnAdd();
+        builder.HasIndex(i => i.Sequence).IsUnique();
+        builder.Ignore(i => i.Number);
+        builder.Ignore(i => i.Subtotal);
+        builder.Ignore(i => i.IsTaxInvoice);
+        builder.HasIndex(i => i.PaymentId).IsUnique();
+        builder.HasOne<Payment>().WithMany().HasForeignKey(i => i.PaymentId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Domain.Tenancy.Tenant>().WithMany().HasForeignKey(i => i.TenantId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(i => new { i.TenantId, i.IssuedAt });
+        builder.Property(i => i.PaymentReference).HasMaxLength(Payment.ReferenceLength).IsUnicode(false);
+        builder.Property(i => i.Gateway).HasMaxLength(Payment.GatewayMaxLength);
+        builder.Property(i => i.SellerName).HasMaxLength(Invoice.NameMaxLength).IsRequired();
+        builder.Property(i => i.SellerAddress).HasMaxLength(Invoice.TextMaxLength);
+        builder.Property(i => i.VatNumber).HasMaxLength(50);
+        builder.Property(i => i.BuyerName).HasMaxLength(Invoice.NameMaxLength).IsRequired();
+        builder.Property(i => i.BuyerEmail).HasMaxLength(Invoice.NameMaxLength);
+        builder.Property(i => i.Description).HasMaxLength(Payment.DescriptionMaxLength).IsRequired();
+        builder.Property(i => i.Currency).HasMaxLength(Payment.CurrencyLength).IsUnicode(false);
+        builder.Property(i => i.Total).HasPrecision(18, 2);
+        builder.Property(i => i.VatAmount).HasPrecision(18, 2);
+        builder.Property(i => i.VatRatePercent).HasPrecision(5, 2);
+        builder.Property(i => i.Footer).HasMaxLength(Invoice.TextMaxLength);
+        builder.Property(i => i.LastSentTo).HasMaxLength(Invoice.NameMaxLength);
+    }
+}

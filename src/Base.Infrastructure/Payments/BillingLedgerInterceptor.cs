@@ -56,6 +56,9 @@ internal sealed class BillingLedgerInterceptor(ICurrentUser currentUser, TimePro
                 case TenantSubscription subscription:
                     lines.AddRange(FromSubscription(entry, subscription));
                     break;
+                case Invoice invoice:
+                    lines.AddRange(FromInvoice(entry, invoice));
+                    break;
             }
         }
 
@@ -91,6 +94,18 @@ internal sealed class BillingLedgerInterceptor(ICurrentUser currentUser, TimePro
             // Settled by the provider's word when nobody is signed in (its notification, or its answer when asked).
             yield return Line(p.TenantId, k, p.Gateway).ForPlan(p.PlanId, p.BillingCycle).ForPayment(p.Amount, p.Currency, p.Reference, p.Gateway)
                 .With(p.Description, p.Status == PaymentStatus.Succeeded ? null : p.FailureReason);
+        }
+    }
+
+    private IEnumerable<BillingEvent> FromInvoice(EntityEntry entry, Invoice i)
+    {
+        if (entry.State == EntityState.Added)
+        {
+            yield return Line(i.TenantId, BillingEventKind.InvoiceIssued).ForPayment(i.Total, i.Currency, i.PaymentReference, i.Gateway).With(i.Description);
+        }
+        else if (Changed(entry, nameof(Invoice.LastSentAt)) && i.LastSentTo is { } to)
+        {
+            yield return Line(i.TenantId, BillingEventKind.InvoiceSent).ForPayment(i.Total, i.Currency, i.PaymentReference, i.Gateway).With($"{i.Number} to {to}");
         }
     }
 

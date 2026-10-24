@@ -45,6 +45,10 @@
             {
                 <a class="btn btn-primary" asp-action="Index" asp-fragment="pay"><icon name="refresh-cw" class="icon-sm" /> Try again</a>
             }
+            @if (payment.Status == PaymentStatus.Succeeded)
+            {
+                <a class="btn btn-primary" asp-action="PaymentInvoice" asp-route-reference="@payment.Reference"><icon name="file-text" class="icon-sm" /> View invoice</a>
+            }
             <a class="btn btn-secondary" asp-action="Index">Back to subscription</a>
         </div>
     </div>

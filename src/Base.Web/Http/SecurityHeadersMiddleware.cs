@@ -20,6 +20,11 @@ internal sealed class SecurityHeadersMiddleware(RequestDelegate next, PaymentChe
 
     private const string PdfPreviewPolicy = "default-src 'none'; frame-ancestors 'self'";
 
+    // A generated document opened on its own to be printed or saved as PDF by the browser: its own inline styles, our
+    // print script and nothing else; never framed, no forms.
+    private const string PrintablePolicy =
+        "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'";
+
     public Task InvokeAsync(HttpContext context)
     {
         context.Response.OnStarting(() =>
@@ -39,6 +44,11 @@ internal sealed class SecurityHeadersMiddleware(RequestDelegate next, PaymentChe
             }
 
             headers.XFrameOptions = "DENY";
+            if (context.Features.Get<PrintableDocument>() is not null)
+            {
+                headers.ContentSecurityPolicy = PrintablePolicy;
+                return Task.CompletedTask;
+            }
 
             // The API reference UI (development only) loads its own assets; everything else gets the strict policy.
             if (!context.Request.Path.StartsWithSegments("/scalar", StringComparison.OrdinalIgnoreCase))
@@ -53,6 +63,9 @@ internal sealed class SecurityHeadersMiddleware(RequestDelegate next, PaymentChe
     }
 }
 
+/// <summary>Marks a response as a generated document opened to be printed (or saved as PDF) by the browser.</summary>
+internal sealed record PrintableDocument;
+
 /// <summary>Marks a response as a file preview that our own pages may show in a frame.</summary>
 internal sealed record FramedPreview(bool Sandboxed);
 
@@ -63,5 +76,12 @@ internal static class FramedPreviewExtensions
     {
         ArgumentNullException.ThrowIfNull(response);
         response.HttpContext.Features.Set(new FramedPreview(sandboxed));
+    }
+
+    /// <summary>Serves this response as a document to print, under its own narrow policy.</summary>
+    public static void AsPrintableDocument(this HttpResponse response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        response.HttpContext.Features.Set(new PrintableDocument());
     }
 }

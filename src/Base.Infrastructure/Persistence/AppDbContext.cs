@@ -92,6 +92,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
 
     public DbSet<BillingEvent> BillingEvents => Set<BillingEvent>();
 
+    public DbSet<Invoice> Invoices => Set<Invoice>();
+
     public DbSet<MessageTemplate> MessageTemplates => Set<MessageTemplate>();
 
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
@@ -106,6 +108,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
     {
         base.OnModelCreating(builder);
         builder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+        builder.HasSequence<long>(Configurations.InvoiceConfiguration.NumberSequence).StartsAt(1).IncrementsBy(1);
 
         // Last, so conventions see every entity: row version, audit defaults, named soft-delete + tenant filters.
         builder.ApplyEntityConventions(this);

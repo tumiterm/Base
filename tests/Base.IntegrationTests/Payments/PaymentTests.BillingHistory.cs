@@ -25,15 +25,11 @@ public sealed partial class PaymentTests
         (await Operator(s => s.ChangePlanAsync(_tenant, new ChangePlanRequest(_pro, BillingCycle.Monthly, Reason: "Agreed with sales")))).IsSuccess.ShouldBeTrue();
 
         var history = (await _app.InScopeAsync(_app.DefaultTenantId, sp => sp.GetRequiredService<IBillingHistory>().ListAsync(_tenant))).GetDataOrThrow().Items;
-        history.Select(e => e.Kind).Reverse().ShouldBe(
-        [
-            BillingEventKind.Subscribed,
-            BillingEventKind.CheckoutStarted,
-            BillingEventKind.PaymentReceived,
-            BillingEventKind.StatusChanged,
-            BillingEventKind.PaidUpTo,
-            BillingEventKind.PlanChanged,
-        ]);
+        var kinds = history.Select(e => e.Kind).Reverse().ToList();
+        kinds.Take(3).ShouldBe([BillingEventKind.Subscribed, BillingEventKind.CheckoutStarted, BillingEventKind.PaymentReceived]);
+        kinds.Skip(3).SkipLast(1).ShouldBe(
+            [BillingEventKind.StatusChanged, BillingEventKind.PaidUpTo, BillingEventKind.InvoiceIssued], ignoreOrder: true, "applying the payment and issuing its invoice happen side by side");
+        kinds[^1].ShouldBe(BillingEventKind.PlanChanged);
         history.Single(e => e.Kind == BillingEventKind.CheckoutStarted).ShouldSatisfyAllConditions(
             e => e.ActorName.ShouldBe("Test Actor"),
             e => e.Title.ShouldBe("Payment of ZAR 100.00 started with Test payments"),

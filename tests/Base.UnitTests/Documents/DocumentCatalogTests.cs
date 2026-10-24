@@ -25,7 +25,9 @@ public sealed class DocumentCatalogTests
         {
             DocumentTypeCatalog.Find(template.DocumentType).ShouldNotBeNull(template.Code);
             var used = TemplateRenderer.VariablesIn(DocumentTemplateFiles.Find(template.Code)!);
-            used.ShouldBe(template.Variables.Concat(DocumentTemplateCatalog.BuiltInVariables), ignoreOrder: true, customMessage: template.Code);
+            // Every declared variable is used; the built-ins may be (an invoice shows its own date, not today's).
+            template.Variables.ShouldAllBe(v => used.Contains(v), template.Code);
+            used.ShouldAllBe(v => template.Variables.Contains(v) || DocumentTemplateCatalog.BuiltInVariables.Contains(v), template.Code);
         }
     }
 

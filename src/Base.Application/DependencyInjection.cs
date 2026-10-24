@@ -70,6 +70,9 @@ public static class DependencyInjection
         services.AddScoped<IPlanAdministration, PlanAdministration>();
         services.AddScoped<ISubscriptionService, SubscriptionService>();
         services.AddScoped<Payments.IBillingHistory, Payments.BillingHistory>();
+        services.AddScoped<Payments.InvoiceIssuer>();
+        services.AddScoped<IDomainEventHandler<PaymentSucceeded>>(sp => sp.GetRequiredService<Payments.InvoiceIssuer>());
+        services.AddScoped<Payments.IInvoiceService, Payments.InvoiceService>();
         services.AddScoped<IScheduledJob, SubscriptionLifecycleJob>();
         services.AddScoped<IPaymentService, PaymentService>();
         services.AddScoped<IDomainEventHandler<PaymentSucceeded>, PaymentSucceededHandler>();
@@ -105,7 +108,8 @@ public static class DependencyInjection
         services.AddScoped<IRecordLabelProvider, DocumentRecordLabels>();
         services.AddScoped<IDocumentRetention, DocumentRetention>();
         services.AddScoped<IScheduledJob, DocumentRetentionJob>();
-        services.AddScoped<IDocumentGenerator, DocumentGenerator>();
+        services.AddScoped<DocumentGenerator>();
+        services.AddScoped<IDocumentGenerator>(sp => sp.GetRequiredService<DocumentGenerator>());
         services.AddSingleton<IDocumentRenderer, HtmlDocumentRenderer>();
         services.TryAddScoped<IDocumentAccessPolicy, DefaultDocumentAccessPolicy>();
 

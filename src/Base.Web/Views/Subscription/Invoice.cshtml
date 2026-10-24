@@ -1,0 +1,64 @@
+@model Base.Application.Payments.InvoiceView
+@inject ICurrentUser CurrentUser
+@{
+    ViewData["Title"] = Model.Title + " " + Model.Number;
+    var canSend = CurrentUser.HasPermission(PermissionCodes.Subscription.Pay);
+    var pdf = Model.Formats.Contains("pdf");
+}
+<nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-action="Index">Subscription</a><icon name="chevron-right" class="icon-sm" /><a asp-action="Payments">Billing</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">@Model.Number</span></nav>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">@Model.Title @Model.Number</h1>
+        <p class="page-subtitle">@Model.Description · @Display.Money(Model.Total, Model.Currency) · paid <local-time value="Model.PaidAt" format="d MMMM yyyy" /></p>
+    </div>
+    <div class="page-actions">
+        @if (pdf)
+        {
+            <a class="btn btn-primary" asp-action="InvoicePdf" asp-route-number="@Model.Number"><icon name="download" class="icon-sm" /> Download PDF</a>
+        }
+        else
+        {
+            @* No PDF renderer on this server: the browser saves it as PDF from its print dialog. *@
+            <a class="btn btn-primary" asp-action="InvoicePdf" asp-route-number="@Model.Number" target="_blank" rel="noopener" title="Opens the print dialog: choose Save as PDF"><icon name="download" class="icon-sm" /> Download PDF</a>
+        }
+    </div>
+</div>
+
+<div class="detail-grid">
+    <section class="panel invoice-preview" aria-label="Preview">
+        <iframe src="@Url.Action("InvoiceDocument", new { number = Model.Number })" title="Preview of @Model.Number" sandbox=""></iframe>
+    </section>
+
+    <div class="stack">
+        @if (canSend)
+        {
+            <form method="post" asp-action="SendInvoice" asp-route-number="@Model.Number" class="panel" aria-labelledby="send-title">
+                <div class="panel-header"><h2 class="panel-title" id="send-title">Send by email</h2></div>
+                <div class="panel-body stack">
+                    <div>
+                        <label class="form-label" for="invoice-email">Email address</label>
+                        <input class="form-control" id="invoice-email" name="email" type="email" required maxlength="200" value="@(Model.LastSentTo ?? Model.BuyerEmail)" placeholder="accounts@example.com" />
+                        <div class="form-text">Change it to send to your accounts department or anyone else.</div>
+                    </div>
+                    @if (Model.LastSentAt is { } sentAt)
+                    {
+                        <p class="text-muted small mb-0">Last sent to @Model.LastSentTo, <local-time value="sentAt" format="d MMM yyyy, HH:mm" />.</p>
+                    }
+                </div>
+                <div class="panel-footer"><button type="submit" class="btn btn-primary"><icon name="send" class="icon-sm" /> Send invoice</button></div>
+            </form>
+        }
+        <section class="panel" aria-labelledby="facts-title">
+            <div class="panel-header"><h2 class="panel-title" id="facts-title">Details</h2></div>
+            <div class="panel-body">
+                <dl class="kv mb-0">
+                    <dt>Billed to</dt><dd>@Model.BuyerName</dd>
+                    <dt>Issued</dt><dd><local-time value="Model.IssuedAt" format="d MMMM yyyy" /></dd>
+                    <dt>Total</dt><dd>@Display.Money(Model.Total, Model.Currency)</dd>
+                    <dt>VAT included</dt><dd>@Display.Money(Model.VatAmount, Model.Currency)</dd>
+                    <dt>Payment</dt><dd><a class="mono" asp-action="Payment" asp-route-reference="@Model.PaymentReference">@Model.PaymentReference</a></dd>
+                </dl>
+            </div>
+        </section>
+    </div>
+</div>

@@ -26,6 +26,7 @@ public static class NotificationTemplates
         public const string PaymentReceived = "Subscriptions.PaymentReceived";
         public const string AutoRenewalStopped = "Subscriptions.AutoRenewalStopped";
         public const string PlanChanged = "Subscriptions.PlanChanged";
+        public const string Invoice = "Subscriptions.Invoice";
     }
 
     public static class Tenancy
@@ -138,6 +139,11 @@ public static class NotificationCatalog
         new(NotificationTemplates.Subscriptions.PlanChanged, "Plan changed", NotificationCategories.Billing,
             "Tells the organisation's contact that the platform changed its plan, now or from the end of the period, and why.",
             [NotificationChannel.Email], ["PlanName", "PreviousPlanName", "Price", "When", "Reason"], IsMandatory: true),
+        new(NotificationTemplates.Subscriptions.Invoice, "Invoice", NotificationCategories.Billing,
+            "An invoice for a subscription payment, sent on request to the address someone entered.",
+            [NotificationChannel.Email],
+            ["InvoiceTitle", "InvoiceNumber", "IssuedOn", "SellerName", "BuyerName", "Description", "Total", "VatLabel", "VatAmount", "PaidOn", "PaymentReference", "InvoicePath"],
+            IsMandatory: true),
         new(NotificationTemplates.Communications.Message, "Message from a person", NotificationCategories.Announcements,
             "Messages written and sent from Messages, alone or in bulk. Each one brings its own wording; this file is only the fallback.",
             [NotificationChannel.Email, NotificationChannel.InApp], []),

@@ -16,6 +16,10 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ### Added
 
+- **Invoices** for paid subscription payments: numbered in sequence, frozen when issued, *Tax invoice* with VAT once
+  a VAT number is set (Settings → Invoices). Preview on the page, **Download PDF** (server PDF with Gotenberg,
+  otherwise the browser's Save as PDF), and **Send by email** to an address you can change. Payments list and payment
+  page link to the invoice; issuing and sending appear in the billing history.
 - **Billing history**: every event of an organisation's subscription, payments and automatic renewal (checkout
   started, paid, failed, expired; renewal on, charged, changed, stopped or not stoppable; status and plan changes with
   the operator's reason; scheduled changes, trial extensions, cancellations), who did it (a person, the payment

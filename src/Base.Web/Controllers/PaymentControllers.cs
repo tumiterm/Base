@@ -1,10 +1,12 @@
 using Base.Application.Common.Abstractions;
+using Base.Application.Documents.Generation;
 using Base.Application.Payments;
 using Base.Application.Security;
 using Base.Application.Settings;
 using Base.Application.Subscriptions;
 using Base.Domain.Payments;
 using Base.Domain.Subscriptions;
+using Base.Web.Http;
 using Base.Web.Results;
 using Base.Web.Security;
 using Base.Web.ViewModels;
@@ -25,6 +27,7 @@ public sealed class SubscriptionController(
     ITenantEntitlements entitlements,
     IPaymentService payments,
     IBillingHistory billing,
+    IInvoiceService invoices,
     IApplicationSettingService settings,
     ICurrentUser currentUser) : Controller
 {
@@ -187,6 +190,93 @@ public sealed class SubscriptionController(
     {
         var result = await payments.ListMineAsync(new PaymentQuery(Page: page, PageSize: 25), cancellationToken);
         return result.IsError ? result.ToActionResult(this) : View(result.Data);
+    }
+
+    /// <summary>A paid payment's invoice (issued now if it predates invoices).</summary>
+    [HttpGet("payments/{reference}/invoice")]
+    public async Task<IActionResult> PaymentInvoice(string reference, CancellationToken cancellationToken)
+    {
+        var invoice = await invoices.ForPaymentAsync(reference, cancellationToken);
+        return invoice.IsError ? invoice.ToActionResult(this) : RedirectToAction(nameof(Invoice), new { number = invoice.Data!.Number });
+    }
+
+    /// <summary>The invoice with a preview of it, downloads, and sending it by email.</summary>
+    [HttpGet("invoices/{number}")]
+    public async Task<IActionResult> Invoice(string number, CancellationToken cancellationToken)
+    {
+        var invoice = await invoices.GetAsync(number, cancellationToken);
+        return invoice.IsError ? invoice.ToActionResult(this) : View(invoice.Data);
+    }
+
+    /// <summary>The rendered invoice for the preview frame: sandboxed, so nothing in it can run.</summary>
+    [HttpGet("invoices/{number}/document")]
+    public async Task<IActionResult> InvoiceDocument(string number, CancellationToken cancellationToken)
+    {
+        var file = await invoices.RenderAsync(number, DocumentFormats.Html, cancellationToken);
+        if (file.IsError)
+        {
+            return file.ToActionResult(this);
+        }
+
+        Response.AllowFramedPreview(sandboxed: true);
+        Response.Headers.CacheControl = "private, no-store";
+        return File(file.Data!.Content, "text/html; charset=utf-8");
+    }
+
+    /// <summary>
+    /// The invoice as a PDF: produced by the server where a PDF renderer is configured (Gotenberg), otherwise opened
+    /// ready to print, so the browser saves it as PDF.
+    /// </summary>
+    [HttpGet("invoices/{number}/pdf")]
+    public async Task<IActionResult> InvoicePdf(string number, CancellationToken cancellationToken)
+    {
+        var invoice = await invoices.GetAsync(number, cancellationToken);
+        if (invoice.IsError)
+        {
+            return invoice.ToActionResult(this);
+        }
+
+        if (invoice.Data!.Formats.Contains(DocumentFormats.Pdf, StringComparer.OrdinalIgnoreCase))
+        {
+            return await DownloadInvoice(number, DocumentFormats.Pdf, cancellationToken);
+        }
+
+        var html = await invoices.RenderAsync(number, DocumentFormats.Html, cancellationToken);
+        if (html.IsError)
+        {
+            return html.ToActionResult(this);
+        }
+
+        var page = System.Text.Encoding.UTF8.GetString(html.Data!.Content);
+        var script = $"<script src=\"{Url.Content("~/js/print-on-load.js")}\"></script>";
+        page = page.Contains("</body>", StringComparison.OrdinalIgnoreCase)
+            ? page.Replace("</body>", script + "</body>", StringComparison.OrdinalIgnoreCase)
+            : page + script;
+        Response.AsPrintableDocument();
+        Response.Headers.CacheControl = "private, no-store";
+        return Content(page, "text/html; charset=utf-8");
+    }
+
+    [HttpGet("invoices/{number}/download")]
+    public async Task<IActionResult> DownloadInvoice(string number, string format = DocumentFormats.Pdf, CancellationToken cancellationToken = default)
+    {
+        var file = await invoices.RenderAsync(number, format, cancellationToken);
+        if (file.IsError)
+        {
+            this.Flash(Application.Common.Results.ValidationResponse.Failure(file.Message ?? "The invoice couldn't be produced."));
+            return RedirectToAction(nameof(Invoice), new { number });
+        }
+
+        return File(file.Data!.Content, file.Data.ContentType, file.Data.FileName);
+    }
+
+    [HttpPost("invoices/{number}/send")]
+    [HasPermission(PermissionCodes.Subscription.Pay)]
+    public async Task<IActionResult> SendInvoice(string number, string email, CancellationToken cancellationToken)
+    {
+        var sent = await invoices.SendAsync(number, email, cancellationToken);
+        this.Flash(sent.IsSuccess || sent.Errors.Count == 0 ? sent : Application.Common.Results.ValidationResponse.Failure(string.Join(" ", sent.Errors.Select(e => e.Message))));
+        return RedirectToAction(nameof(Invoice), new { number });
     }
 
     /// <summary>The billing history: everything that happened to the subscription and its payments, who and why.</summary>

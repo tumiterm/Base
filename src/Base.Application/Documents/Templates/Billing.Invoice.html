@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>{{ InvoiceTitle }} {{ InvoiceNumber }}</title>
+    <style>
+        @page { size: A4; margin: 20mm 18mm; }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: "Helvetica Neue", Arial, sans-serif; font-size: 10.5pt; line-height: 1.5; color: #1a1a1a; background: #fff; }
+        .sheet { max-width: 180mm; margin: 0 auto; padding: 8mm 0; }
+        header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border-bottom: 2px solid #1a1a1a; padding-bottom: 12px; }
+        .seller { font-size: 15pt; font-weight: bold; }
+        .muted { color: #5b6470; }
+        .small { font-size: 9pt; }
+        .pre { white-space: pre-line; }
+        h1 { margin: 0; font-size: 18pt; letter-spacing: .02em; text-align: right; }
+        .meta { margin-top: 6px; text-align: right; }
+        .parties { display: flex; justify-content: space-between; gap: 24px; margin: 22px 0; }
+        .label { font-size: 8.5pt; text-transform: uppercase; letter-spacing: .06em; color: #5b6470; margin-bottom: 2px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        th { text-align: left; font-size: 8.5pt; text-transform: uppercase; letter-spacing: .06em; color: #5b6470; border-bottom: 1px solid #c9ced6; padding: 6px 0; }
+        td { padding: 10px 0; border-bottom: 1px solid #e3e6ea; vertical-align: top; }
+        .right { text-align: right; }
+        .num { text-align: right; white-space: nowrap; }
+        .totals { margin-left: auto; width: 60%; margin-top: 12px; }
+        .totals td { border: 0; padding: 4px 0; }
+        .totals .grand td { border-top: 2px solid #1a1a1a; padding-top: 8px; font-size: 12pt; font-weight: bold; }
+        .paid { display: inline-block; margin-top: 18px; padding: 4px 10px; border: 1.5px solid #1f7a4d; color: #1f7a4d; border-radius: 4px; font-weight: bold; letter-spacing: .06em; }
+        footer { margin-top: 28px; padding-top: 10px; border-top: 1px solid #e3e6ea; }
+    </style>
+</head>
+<body>
+<div class="sheet">
+    <header>
+        <div>
+            <div class="seller">{{ SellerName }}</div>
+            <div class="muted small pre">{{ SellerAddress }}</div>
+            <div class="muted small">{{ VatLine }}</div>
+        </div>
+        <div>
+            <h1>{{ InvoiceTitle }}</h1>
+            <div class="meta"><strong>{{ InvoiceNumber }}</strong><br><span class="muted">Issued {{ IssuedOn }}</span></div>
+        </div>
+    </header>
+
+    <div class="parties">
+        <div>
+            <div class="label">Billed to</div>
+            <div><strong>{{ BuyerName }}</strong></div>
+            <div class="muted">{{ BuyerEmail }}</div>
+        </div>
+        <div class="right">
+            <div class="label">Payment</div>
+            <div>{{ PaidOn }}, {{ PaidWith }}</div>
+            <div class="muted small">Reference {{ PaymentReference }}</div>
+        </div>
+    </div>
+
+    <table>
+        <thead><tr><th>Description</th><th class="num">Amount</th></tr></thead>
+        <tbody><tr><td>{{ Description }}</td><td class="num">{{ Total }}</td></tr></tbody>
+    </table>
+
+    <table class="totals">
+        <tr><td class="muted">{{ SubtotalLabel }}</td><td class="num">{{ Subtotal }}</td></tr>
+        <tr><td class="muted">{{ VatLabel }}</td><td class="num">{{ VatAmount }}</td></tr>
+        <tr class="grand"><td>Total paid</td><td class="num">{{ Total }}</td></tr>
+    </table>
+
+    <div class="paid">PAID</div>
+
+    <footer class="muted small pre">{{ Footer }}</footer>
+</div>
+</body>
+</html>

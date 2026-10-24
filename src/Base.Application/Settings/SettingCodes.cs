@@ -124,6 +124,21 @@ public static class SettingCodes
         public const string ErrorRetentionDays = "System.ErrorRetentionDays";
     }
 
+    public static class Invoices
+    {
+        /// <summary>Who issues the invoices: the platform's legal name.</summary>
+        public const string SellerName = "Invoices.SellerName";
+
+        public const string SellerAddress = "Invoices.SellerAddress";
+
+        /// <summary>Set once VAT registered: invoices become tax invoices and show the VAT included.</summary>
+        public const string VatNumber = "Invoices.VatNumber";
+
+        public const string VatRatePercent = "Invoices.VatRatePercent";
+
+        public const string Footer = "Invoices.Footer";
+    }
+
     public static class Audit
     {
         public const string RetentionDays = "Audit.RetentionDays";

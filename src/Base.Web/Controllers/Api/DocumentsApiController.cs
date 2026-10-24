@@ -82,7 +82,7 @@ public sealed class DocumentsApiController(IDocumentService documents, IDocument
     /// <summary>The templates that can be generated and the formats available on this installation.</summary>
     [HttpGet("templates")]
     [RequiresFeature(FeatureCodes.DocumentGeneration)]
-    public object Templates() => new { Formats = generator.Formats, Templates = DocumentTemplateCatalog.All, DocumentTemplateCatalog.BuiltInVariables };
+    public object Templates() => new { Formats = generator.Formats, Templates = DocumentTemplateCatalog.ForPeople, DocumentTemplateCatalog.BuiltInVariables };
 
     /// <summary>Renders and stores a document (or a new version of one).</summary>
     [HttpPost("generate")]

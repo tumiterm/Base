@@ -24,6 +24,8 @@ public enum BillingEventKind
     RenewalChanged = 16,
     RenewalStopped = 17,
     RenewalStopFailed = 18,
+    InvoiceIssued = 19,
+    InvoiceSent = 20,
 }
 
 /// <summary>

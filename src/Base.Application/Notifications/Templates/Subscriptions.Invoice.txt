@@ -1,0 +1,24 @@
+--- email.subject
+{{InvoiceTitle}} {{InvoiceNumber}} from {{SellerName}}
+--- email.html
+<p>Hello,</p>
+<p>Here is {{SellerName}}'s {{InvoiceTitle}} <strong>{{InvoiceNumber}}</strong> for {{BuyerName}}, issued {{IssuedOn}}.</p>
+<table cellpadding="6" style="border-collapse:collapse">
+<tr><td>{{Description}}</td><td align="right">{{Total}}</td></tr>
+<tr><td style="color:#666">{{VatLabel}}</td><td align="right" style="color:#666">{{VatAmount}}</td></tr>
+<tr><td><strong>Total paid</strong></td><td align="right"><strong>{{Total}}</strong></td></tr>
+</table>
+<p>Paid on {{PaidOn}}, reference {{PaymentReference}}.</p>
+<p>View or download it (as PDF where available) at <a href="{{PublicBaseUrl}}{{InvoicePath}}">{{PublicBaseUrl}}{{InvoicePath}}</a>.</p>
+--- email.text
+Hello,
+
+Here is {{SellerName}}'s {{InvoiceTitle}} {{InvoiceNumber}} for {{BuyerName}}, issued {{IssuedOn}}.
+
+{{Description}}: {{Total}}
+{{VatLabel}}: {{VatAmount}}
+Total paid: {{Total}}
+
+Paid on {{PaidOn}}, reference {{PaymentReference}}.
+
+View or download it: {{PublicBaseUrl}}{{InvoicePath}}

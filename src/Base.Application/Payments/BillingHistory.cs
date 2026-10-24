@@ -100,6 +100,8 @@ internal sealed class BillingHistory(IUnitOfWork unitOfWork, ITenantContext tena
             BillingEventKind.RenewalChanged => ($"Automatic renewal changed to {money} {cycle} for {plan}", "info"),
             BillingEventKind.RenewalStopped => ("Automatic renewal stopped", "warning"),
             BillingEventKind.RenewalStopFailed => ($"{gateway} couldn't be told to stop the automatic renewal", "danger"),
+            BillingEventKind.InvoiceIssued => ($"Invoice issued for {money}", "info"),
+            BillingEventKind.InvoiceSent => ("Invoice emailed", "secondary"),
             _ => (e.Kind.ToString(), "secondary"),
         };
         var detail = e.Kind switch

@@ -197,7 +197,7 @@ public sealed class DocumentsController(IDocumentService documents, IDocumentGen
     }
 
     private GenerateDocumentViewModel Model(DocumentTemplateDefinition? selected, IReadOnlyDictionary<string, string?> values, string? title, string format, bool finalize) =>
-        new(DocumentTemplateCatalog.All, generator.Formats, selected, values, title, format, finalize);
+        new(DocumentTemplateCatalog.ForPeople, generator.Formats, selected, values, title, format, finalize);
 
     private string DefaultFormat() => generator.Formats.Contains(DocumentFormats.Pdf, StringComparer.Ordinal) ? DocumentFormats.Pdf : DocumentFormats.Html;
 

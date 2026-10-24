@@ -271,6 +271,19 @@ A waiting change can be withdrawn from the tenant's page. API: `GET
 /api/platform/tenants/{id}/subscription/plan/preview?planId=&billingCycle=`, `PUT .../subscription/plan` with
 `when`, `reason` (required) and `allowOverLimits`, and `DELETE .../subscription/plan/scheduled`.
 
+## Invoices
+
+- Every paid payment gets one invoice, issued as it is paid (or the first time a paid payment's invoice is opened, for
+  payments from before invoices). Numbered from one database sequence (`INV-000123`) and **frozen**: seller, buyer and
+  amounts are copied in, so later changes to settings or the organisation don't alter an issued invoice.
+- Settings → Invoices: seller name (empty uses the application name), address, footer, and **VAT number** plus
+  **VAT rate**. With a VAT number the invoice is a *Tax invoice* showing the VAT included in the price.
+- Subscription → Billing → **Invoice** (or the payment's page): a preview, **Download PDF**, and **Send by email** to
+  any address (pre-filled with the organisation's contact; editable). Issuing and sending are in the billing history.
+- PDF: with `Documents:Pdf:Gotenberg` configured the server produces the PDF; without it, Download PDF opens the
+  invoice ready to print and the browser saves it as PDF. Set up Gotenberg for production ([go-live.md](go-live.md)).
+- The `Billing.Invoice` template is filled by the application only: the document generator refuses it to people.
+
 ## Records
 
 - **Billing history** (`BillingEvent`): one line per event of a subscription, payment or automatic renewal, with who

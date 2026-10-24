@@ -54,13 +54,30 @@ internal sealed class DocumentGenerator(
     public async Task<ValidationResponse<GeneratedFile>> RenderAsync(DocumentGenerationRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        if (DocumentTemplateCatalog.Find(request.TemplateCode) is { IsSystem: true })
+        {
+            return Invalid("TemplateCode", $"Unknown document template '{request.TemplateCode}'.").As<GeneratedFile>();
+        }
+
         var rendered = await RenderCoreAsync(request.TemplateCode, request.Format, request.Data, null, cancellationToken);
+        return rendered.IsSuccess ? rendered.Data!.File : rendered.As<GeneratedFile>();
+    }
+
+    /// <summary>Renders one of the application's own templates (an invoice) from data it built itself.</summary>
+    internal async Task<ValidationResponse<GeneratedFile>> RenderSystemAsync(string templateCode, string format, object data, string title, CancellationToken cancellationToken)
+    {
+        var rendered = await RenderCoreAsync(templateCode, format, data, title, cancellationToken);
         return rendered.IsSuccess ? rendered.Data!.File : rendered.As<GeneratedFile>();
     }
 
     public async Task<ValidationResponse<DocumentDetails>> GenerateAsync(GenerateDocumentRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        if (DocumentTemplateCatalog.Find(request.TemplateCode) is { IsSystem: true })
+        {
+            return Invalid("TemplateCode", $"Unknown document template '{request.TemplateCode}'.").As<DocumentDetails>();
+        }
+
         var rendered = await RenderCoreAsync(request.TemplateCode, request.Format, request.Data, request.Title, cancellationToken);
         if (!rendered.IsSuccess)
         {
