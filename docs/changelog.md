@@ -16,6 +16,13 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ### Added
 
+- **Billing details** for each organisation: registered name, contact person, billing email, phone, address, VAT and
+  registration numbers. Kept by the organisation (Subscription → Billing → Billing details) or by the platform (the
+  tenant's page) and copied onto each new invoice under *Billed to*. Invoices show the platform's logo, and the
+  organisation's own logo when it has one.
+- **Platform → Payments** redone: a table with the organisation (linked to its page), reference, provider, date,
+  amount and status; filters for status, real or test payments and provider; search by organisation, reference or
+  plan; tiles for received this month (with last month), test payments, declined, waiting and automatic renewals.
 - **Invoices** for paid subscription payments: numbered in sequence, frozen when issued, *Tax invoice* with VAT once
   a VAT number is set (Settings → Invoices). Preview on the page, **Download PDF** (server PDF with Gotenberg,
   otherwise the browser's Save as PDF), and **Send by email** to an address you can change. Payments list and payment
@@ -132,6 +139,12 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ### Fixed
 
+- **Received this month** on Platform → Payments counted test and sandbox payments as money received, and started the
+  month at midnight UTC. It now counts real payments only (test ones are shown apart), per currency, by the month of
+  the display time zone.
+- Invoice numbers no longer jump (a restart skipped the numbers SQL Server's sequence had cached): they run without gaps.
+- A table whose header stuck to the page slid the header over its first row when the table scrolled sideways
+  (the organisation's Payments list).
 - Payfast checkouts post exactly the values they are signed over (trimmed, blanks left out). A description cut at
   100 characters on a space was signed without the space but posted with it, which Payfast refused as a signature
   mismatch. In Development the signed fields are logged (merchant key masked) to diagnose a mismatch.

@@ -73,6 +73,7 @@ public static class DependencyInjection
         services.AddScoped<Payments.InvoiceIssuer>();
         services.AddScoped<IDomainEventHandler<PaymentSucceeded>>(sp => sp.GetRequiredService<Payments.InvoiceIssuer>());
         services.AddScoped<Payments.IInvoiceService, Payments.InvoiceService>();
+        services.AddScoped<Tenancy.IBillingDetailsService, Tenancy.BillingDetailsService>();
         services.AddScoped<IScheduledJob, SubscriptionLifecycleJob>();
         services.AddScoped<IPaymentService, PaymentService>();
         services.AddScoped<IDomainEventHandler<PaymentSucceeded>, PaymentSucceededHandler>();

@@ -69,7 +69,8 @@ public sealed record TenantDetails(
     IReadOnlyList<TenantDomainView> Domains,
     SubscriptionView? Subscription,
     IReadOnlyList<UsageView> Usage,
-    IReadOnlyList<UserSummary> Users);
+    IReadOnlyList<UserSummary> Users,
+    BillingDetails? Billing = null);
 
 /// <param name="Host">Optional host name the tenant is reached at, e.g. acme.example.com (added as verified).</param>
 /// <param name="PlanId">Null leaves the tenant without a subscription: unrestricted, like the platform tenant.</param>
@@ -83,4 +84,8 @@ public sealed record CreateTenantRequest(
     BillingCycle BillingCycle = BillingCycle.Monthly,
     bool WithTrial = true);
 
-public sealed record UpdateTenantRequest(string Name, string? ContactEmail);
+/// <param name="Billing">
+/// Who and where invoices are made out to (the tenant can keep these itself too); null leaves them as they are.
+/// <see cref="ContactEmail"/> wins over its <see cref="BillingDetails.Email"/>.
+/// </param>
+public sealed record UpdateTenantRequest(string Name, string? ContactEmail, BillingDetails? Billing = null);

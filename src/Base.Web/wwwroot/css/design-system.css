@@ -432,6 +432,8 @@ textarea.form-control { padding-top: 0.45rem; line-height: 1.5; }
   position: sticky; top: var(--topbar-h); z-index: 1; background: var(--surface-2); color: var(--text-3); font-size: var(--text-xs); font-weight: 600;
   letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; border-bottom: 1px solid var(--border);
 }
+/* In a scrolling wrapper the header can't stick to the page, so it stays put rather than sliding over the rows. */
+.table-responsive > .table > thead > tr > th { position: static; }
 .table > tbody > tr:last-child > * { border-bottom: 0; }
 .table > tbody > tr { transition: background var(--dur-fast) var(--ease); }
 .table > tbody > tr:hover > * { background: var(--surface-hover); }
@@ -524,6 +526,9 @@ a.chip:hover, button.chip:hover { border-color: var(--border-strong); color: var
 /* ---------- Toolbars, entity cells, key-value lists ---------- */
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); margin-bottom: var(--s-3); }
 .toolbar-search { flex: 1 1 16rem; max-width: 24rem; }
+/* Search with a few filters beside it: one line where there is room. */
+.toolbar-search.has-filters { flex-basis: 34rem; max-width: 44rem; }
+.toolbar-search.has-filters .input-affix { min-width: 12rem; }
 .toolbar-spacer { flex: 1; }
 .segmented a { display: inline-flex; align-items: center; gap: 0.375rem; height: calc(var(--control-h) - 6px); padding: 0 0.625rem; border-radius: 6px; color: var(--text-2); font-size: var(--text-base); font-weight: 500; text-decoration: none; white-space: nowrap; transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
 .segmented a:hover { color: var(--text); }
@@ -590,6 +595,11 @@ a.chip:hover, button.chip:hover { border-color: var(--border-strong); color: var
 .renewal-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); padding: var(--s-3) var(--s-4); border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); }
 .renewal-row > .icon { color: var(--text-3); }
 .plan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: var(--s-3); }
+.form-disclosure > summary { cursor: pointer; color: var(--text-2); font-size: var(--text-sm); font-weight: 500; }
+.form-disclosure[open] > summary { margin-bottom: var(--s-1); }
+.text-pre { white-space: pre-line; }
+.billing-details-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 18rem); gap: var(--s-5); align-items: start; }
+@media (max-width: 960px) { .billing-details-layout { grid-template-columns: minmax(0, 1fr); } }
 .plan-details { margin-top: auto; font-size: var(--text-sm); }
 .plan-details > summary { cursor: pointer; color: var(--text-2); font-weight: 500; padding-top: var(--s-1); }
 .plan-details[open] > summary { margin-bottom: var(--s-2); }
@@ -909,6 +919,13 @@ a.stat-tile:hover { border-color: var(--border-strong); color: var(--text); }
 .stat-tile .stat-sub { color: var(--text-3); font-size: var(--text-sm); }
 .stat-tile.is-alert .stat-value { color: var(--danger); }
 .stat-tile.is-warning .stat-value { color: var(--warning); }
+/* Many tiles above a list: two to a row on phones, so the list isn't pushed off the screen. */
+@media (max-width: 575.98px) {
+  .stat-grid.is-compact { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-2); }
+  .stat-grid.is-compact .stat-tile { padding: var(--s-3); }
+  .stat-grid.is-compact .stat-tile > .file-tile { display: none; }
+  .stat-grid.is-compact .stat-value { font-size: var(--text-lg); }
+}
 .item-list { margin: 0; padding: 0; list-style: none; }
 .item-list > li { display: flex; align-items: flex-start; gap: var(--s-3); padding: var(--s-3) var(--s-4); border-bottom: 1px solid var(--border); }
 .item-list > li:last-child { border-bottom: 0; }

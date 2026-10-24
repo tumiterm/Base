@@ -108,7 +108,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
     {
         base.OnModelCreating(builder);
         builder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
-        builder.HasSequence<long>(Configurations.InvoiceConfiguration.NumberSequence).StartsAt(1).IncrementsBy(1);
 
         // Last, so conventions see every entity: row version, audit defaults, named soft-delete + tenant filters.
         builder.ApplyEntityConventions(this);

@@ -70,9 +70,13 @@ internal sealed partial class TenantAdministrationService(
         var platformId = await platform.GetIdAsync(cancellationToken);
         TenantSummary? summary;
         List<TenantDomainView> domains;
+        BillingDetails? billingDetails;
         using (tenant.BeginSystemScope())
         {
             summary = await Project(db.Tenants.AsNoTracking().Where(t => t.Id == tenantId), platformId).FirstOrDefaultAsync(cancellationToken);
+            billingDetails = await db.Tenants.AsNoTracking().Where(t => t.Id == tenantId)
+                .Select(t => new BillingDetails(t.LegalName, t.BillingContactName, t.ContactEmail, t.Phone, t.Address, t.TaxNumber, t.RegistrationNumber))
+                .FirstOrDefaultAsync(cancellationToken);
             domains = await db.TenantDomains.AsNoTracking().Where(d => d.TenantId == tenantId).OrderBy(d => d.Host)
                 .Select(d => new TenantDomainView(d.Id, d.Host, d.IsVerified)).ToListAsync(cancellationToken);
         }
@@ -96,7 +100,8 @@ internal sealed partial class TenantAdministrationService(
             domains,
             await subscriptions.GetAsync(tenantId, cancellationToken),
             await subscriptions.UsageAsync(tenantId, cancellationToken),
-            people);
+            people,
+            billingDetails);
     }
 
     public async Task<ValidationResponse<Guid>> CreateAsync(CreateTenantRequest request, CancellationToken cancellationToken = default)
@@ -173,6 +178,11 @@ internal sealed partial class TenantAdministrationService(
 
         target.Rename(request.Name);
         target.ChangeContact(request.ContactEmail);
+        if (request.Billing is { } billing)
+        {
+            target.ChangeBillingDetails(billing.LegalName, billing.ContactName, billing.Phone, billing.Address, billing.TaxNumber, billing.RegistrationNumber);
+        }
+
         await unitOfWork.SaveAsync(cancellationToken);
         return ValidationResponse.Success("Tenant saved.");
     }

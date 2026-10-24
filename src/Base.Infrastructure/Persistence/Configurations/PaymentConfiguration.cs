@@ -88,14 +88,12 @@ internal sealed class BillingEventConfiguration : IEntityTypeConfiguration<Billi
 
 internal sealed class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
 {
-    public const string NumberSequence = "InvoiceNumbers";
-
     public void Configure(EntityTypeBuilder<Invoice> builder)
     {
         builder.Property(i => i.Id).ValueGeneratedNever();
 
-        // Numbers come from one sequence across the platform, given by the database as the row is inserted.
-        builder.Property(i => i.Sequence).HasDefaultValueSql($"NEXT VALUE FOR {NumberSequence}").ValueGeneratedOnAdd();
+        // One run of numbers across the platform, given by InvoiceNumbers; the unique index backs it up.
+        builder.Property(i => i.Sequence).ValueGeneratedNever();
         builder.HasIndex(i => i.Sequence).IsUnique();
         builder.Ignore(i => i.Number);
         builder.Ignore(i => i.Subtotal);
@@ -111,6 +109,11 @@ internal sealed class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
         builder.Property(i => i.VatNumber).HasMaxLength(50);
         builder.Property(i => i.BuyerName).HasMaxLength(Invoice.NameMaxLength).IsRequired();
         builder.Property(i => i.BuyerEmail).HasMaxLength(Invoice.NameMaxLength);
+        builder.Property(i => i.BuyerContact).HasMaxLength(Invoice.NameMaxLength);
+        builder.Property(i => i.BuyerPhone).HasMaxLength(50);
+        builder.Property(i => i.BuyerAddress).HasMaxLength(Invoice.TextMaxLength);
+        builder.Property(i => i.BuyerTaxNumber).HasMaxLength(50);
+        builder.Property(i => i.BuyerRegistrationNumber).HasMaxLength(50);
         builder.Property(i => i.Description).HasMaxLength(Payment.DescriptionMaxLength).IsRequired();
         builder.Property(i => i.Currency).HasMaxLength(Payment.CurrencyLength).IsUnicode(false);
         builder.Property(i => i.Total).HasPrecision(18, 2);

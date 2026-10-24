@@ -11,6 +11,10 @@ public sealed class Tenant : EntityBase, INamedEntity
     public const string DefaultCode = "default";
     public const int ContactEmailMaxLength = 256;
     public const int ReleaseVersionMaxLength = 32;
+    public const int BillingNameMaxLength = 200;
+    public const int PhoneMaxLength = 50;
+    public const int AddressMaxLength = 500;
+    public const int NumberMaxLength = 50;
 
     /// <summary>What a tenant that never adopted a release is on: every gated feature is still ahead of it.</summary>
     public const string NoRelease = "0.0.0";
@@ -41,6 +45,23 @@ public sealed class Tenant : EntityBase, INamedEntity
     /// <summary>Who receives subscription and billing notices.</summary>
     public string? ContactEmail { get; private set; }
 
+    /// <summary>The registered (legal) name to bill, when it differs from <see cref="Name"/>.</summary>
+    public string? LegalName { get; private set; }
+
+    /// <summary>The person accounts deal with.</summary>
+    public string? BillingContactName { get; private set; }
+
+    public string? Phone { get; private set; }
+
+    /// <summary>Postal or physical address, one part per line.</summary>
+    public string? Address { get; private set; }
+
+    /// <summary>The organisation's VAT (tax) number, shown on its invoices.</summary>
+    public string? TaxNumber { get; private set; }
+
+    /// <summary>Company registration number.</summary>
+    public string? RegistrationNumber { get; private set; }
+
     public IReadOnlyCollection<TenantDomain> Domains => _domains.AsReadOnly();
 
     /// <summary>
@@ -66,6 +87,17 @@ public sealed class Tenant : EntityBase, INamedEntity
 
     public void ChangeContact(string? email) => ContactEmail = string.IsNullOrWhiteSpace(email) ? null : email.Trim();
 
+    /// <summary>Who and where invoices are made out to. Invoices already issued keep the details they were issued with.</summary>
+    public void ChangeBillingDetails(string? legalName, string? contactName, string? phone, string? address, string? taxNumber, string? registrationNumber)
+    {
+        LegalName = Clean(legalName);
+        BillingContactName = Clean(contactName);
+        Phone = Clean(phone);
+        Address = Clean(address?.ReplaceLineEndings("\n"));
+        TaxNumber = Clean(taxNumber);
+        RegistrationNumber = Clean(registrationNumber);
+    }
+
     public void Activate() => IsActive = true;
 
     public void Deactivate() => IsActive = false;
@@ -78,4 +110,6 @@ public sealed class Tenant : EntityBase, INamedEntity
         _domains.Add(domain);
         return domain;
     }
+
+    private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

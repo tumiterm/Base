@@ -28,6 +28,7 @@ public sealed class SubscriptionController(
     IPaymentService payments,
     IBillingHistory billing,
     IInvoiceService invoices,
+    Application.Tenancy.IBillingDetailsService billingDetails,
     IApplicationSettingService settings,
     ICurrentUser currentUser) : Controller
 {
@@ -287,6 +288,29 @@ public sealed class SubscriptionController(
         return result.IsError ? result.ToActionResult(this) : View(result.Data);
     }
 
+    /// <summary>Who and where this organisation's invoices are made out to.</summary>
+    [HttpGet("details")]
+    public async Task<IActionResult> Details(CancellationToken cancellationToken)
+    {
+        var result = await billingDetails.GetMineAsync(cancellationToken);
+        return result.IsError ? result.ToActionResult(this) : View(result.Data);
+    }
+
+    [HttpPost("details")]
+    [HasPermission(PermissionCodes.Subscription.Pay)]
+    public async Task<IActionResult> Details(Application.Tenancy.BillingDetails details, CancellationToken cancellationToken)
+    {
+        var saved = await billingDetails.SaveMineAsync(details, cancellationToken);
+        if (saved.IsSuccess)
+        {
+            this.Flash(saved);
+            return RedirectToAction(nameof(Details));
+        }
+
+        saved.AddToModelState(ModelState);
+        return View(details);
+    }
+
     /// <summary>Where the gateway sends the person back to; the gateway's own notification decides the outcome.</summary>
     [HttpGet("payments/{reference}")]
     public async Task<IActionResult> Payment(string reference, bool cancelled = false, CancellationToken cancellationToken = default)
@@ -449,10 +473,16 @@ public sealed class TestCheckoutController(IPaymentService payments, IServicePro
 public sealed class PlatformPaymentsController(IPaymentService payments) : Controller
 {
     [HttpGet("")]
-    public async Task<IActionResult> Index(PaymentStatus? status, int page = 1, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Index(PaymentStatus? status, string? search, string? mode, string? gateway, int page = 1, CancellationToken cancellationToken = default)
     {
-        var list = await payments.ListAllAsync(new PaymentQuery(status, page), cancellationToken);
+        search = string.IsNullOrWhiteSpace(search) ? null : search.Trim();
+        mode = mode is "live" or "test" ? mode : null;
+        gateway = string.IsNullOrWhiteSpace(gateway) ? null : gateway.Trim();
+        var list = await payments.ListAllAsync(
+            new PaymentQuery(status, page, Search: search, Test: mode is null ? null : string.Equals(mode, "test", StringComparison.Ordinal), Gateway: gateway), cancellationToken);
         var totals = await payments.TotalsAsync(cancellationToken);
-        return list.IsError ? list.ToActionResult(this) : View(new PlatformPaymentsViewModel(list.Data!, totals.Data!, status, payments.Gateways()));
+        return list.IsError
+            ? list.ToActionResult(this)
+            : View(new PlatformPaymentsViewModel(list.Data!, totals.Data!, status, payments.Gateways(), search, mode, gateway));
     }
 }

@@ -2,4 +2,5 @@
 <nav class="tabs" aria-label="Billing">
     <a class="@(Model == "payments" ? "active" : "")" aria-current="@(Model == "payments" ? "page" : null)" asp-action="Payments"><icon name="receipt" class="icon-sm" /> Payments</a>
     <a class="@(Model == "history" ? "active" : "")" aria-current="@(Model == "history" ? "page" : null)" asp-action="Billing"><icon name="history" class="icon-sm" /> Billing history</a>
+    <a class="@(Model == "details" ? "active" : "")" aria-current="@(Model == "details" ? "page" : null)" asp-action="Details"><icon name="building-2" class="icon-sm" /> Billing details</a>
 </nav>

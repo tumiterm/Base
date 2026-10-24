@@ -41,6 +41,12 @@ public interface IPaymentGateway
     Task<GatewayNotification> CheckAsync(string reference, string? gatewayReference, CancellationToken cancellationToken) =>
         Task.FromResult(GatewayNotification.Rejected($"{Name} can't be asked how a payment went."));
 
+    /// <summary>
+    /// Whether it takes no real money (a sandbox or test account, or the built-in Test gateway): its payments still move
+    /// subscriptions on, but are kept out of what was received.
+    /// </summary>
+    bool IsTestMode => false;
+
     /// <summary>The smallest amount it takes in one payment (Payfast R5.00, Yoco R2.00).</summary>
     decimal MinimumCharge => 0m;
 

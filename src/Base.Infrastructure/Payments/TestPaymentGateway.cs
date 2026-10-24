@@ -20,7 +20,7 @@ public sealed class TestGatewayOptions
 /// </summary>
 internal sealed class TestPaymentGateway(IDataProtectionProvider protection) : IPaymentGateway, ITestCheckout
 {
-    public const string GatewayCode = "Test";
+    public const string GatewayCode = Domain.Payments.Payment.TestGateway;
     public const string TokenField = "token";
     public const string OutcomeField = "outcome";
     public const string EventField = "event";
@@ -32,6 +32,8 @@ internal sealed class TestPaymentGateway(IDataProtectionProvider protection) : I
     public string Code => GatewayCode;
 
     public string Name => "Test payments";
+
+    public bool IsTestMode => true;
 
     public IReadOnlyList<string> Methods { get; } = ["Pretend card", "No money moves"];
 

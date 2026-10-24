@@ -7,6 +7,8 @@
 @using Base.Application.Tenancy
 @{
     var t = Model.Details.Tenant;
+    var billingDetails = Model.Details.Billing ?? new BillingDetails();
+    var billingFields = (billingDetails, "billing", false, true);
     var s = Model.Details.Subscription;
     ViewData["Title"] = t.Name;
     var canManage = CurrentUser.HasPermission(PermissionCodes.Platform.TenantsManage);
@@ -245,16 +247,29 @@
                             <input class="form-control" id="org-name" name="name" value="@t.Name" required />
                         </div>
                         <div>
-                            <label class="form-label" for="org-contact">Billing contact</label>
+                            <label class="form-label" for="org-contact">Billing email</label>
                             <input class="form-control" id="org-contact" name="contactEmail" type="email" value="@t.ContactEmail" placeholder="billing@example.com" />
-                            <div class="form-text">Trial and payment notices go here.</div>
+                            <div class="form-text">Invoices, trial and payment notices go here.</div>
                         </div>
+                        <details class="form-disclosure" open="@(billingDetails.IsEmpty ? null : "open")">
+                            <summary>Invoice details</summary>
+                            <div class="pt-2"><partial name="_BillingDetailsFields" model="billingFields" /></div>
+                        </details>
                         <div><button class="btn btn-secondary btn-sm" type="submit">Save</button></div>
                     </form>
                 }
                 else
                 {
-                    <dl class="kv"><dt>Billing contact</dt><dd>@(t.ContactEmail ?? "—")</dd><dt>Created</dt><dd><local-time value="t.DateCreated" format="d MMM yyyy" /></dd></dl>
+                    <dl class="kv">
+                        <dt>Billing email</dt><dd>@(t.ContactEmail ?? "—")</dd>
+                        <dt>Invoiced as</dt><dd>@(billingDetails.LegalName ?? t.Name)</dd>
+                        @if (billingDetails.ContactName is { } contact) {<dt>Contact</dt><dd>@contact</dd>}
+                        @if (billingDetails.Phone is { } phone) {<dt>Phone</dt><dd>@phone</dd>}
+                        @if (billingDetails.Address is { } address) {<dt>Address</dt><dd class="text-pre">@address</dd>}
+                        @if (billingDetails.TaxNumber is { } vat) {<dt>VAT number</dt><dd>@vat</dd>}
+                        @if (billingDetails.RegistrationNumber is { } reg) {<dt>Registration</dt><dd>@reg</dd>}
+                        <dt>Created</dt><dd><local-time value="t.DateCreated" format="d MMM yyyy" /></dd>
+                    </dl>
                 }
             </div>
         </section>

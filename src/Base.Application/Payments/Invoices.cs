@@ -1,4 +1,5 @@
 using System.Globalization;
+using Base.Application.Branding;
 using Base.Application.Common.Abstractions;
 using Base.Application.Common.Persistence;
 using Base.Application.Common.Results;
@@ -9,6 +10,7 @@ using Base.Application.Security;
 using Base.Application.Settings;
 using Base.Domain.Payments;
 using Base.Domain.Tenancy;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Base.Application.Payments;
 
@@ -58,6 +60,9 @@ internal sealed class InvoiceService(
     INotificationService notifications,
     IApplicationSettingService settings,
     IEnumerable<IPaymentGateway> gateways,
+    IBrandingService branding,
+    IPlatformTenant platform,
+    IServiceScopeFactory scopes,
     TimeProvider time) : IInvoiceService
 {
     public async Task<ValidationResponse<InvoiceView>> ForPaymentAsync(string paymentReference, CancellationToken cancellationToken = default)
@@ -173,6 +178,12 @@ internal sealed class InvoiceService(
         string Date(DateTimeOffset at) => TimeZoneInfo.ConvertTime(at, zone).ToString("d MMMM yyyy", CultureInfo.InvariantCulture);
         string Money(decimal amount) => i.Currency + " " + amount.ToString("N2", CultureInfo.InvariantCulture);
         var rate = i.VatRatePercent.ToString("0.##", CultureInfo.InvariantCulture);
+        var (sellerLogo, buyerLogo) = await LogosAsync(cancellationToken);
+        string[] numbers =
+        [
+            .. i.BuyerTaxNumber is null ? Array.Empty<string>() : ["VAT number " + i.BuyerTaxNumber],
+            .. i.BuyerRegistrationNumber is null ? Array.Empty<string>() : ["Registration " + i.BuyerRegistrationNumber],
+        ];
         return new InvoiceData(
             i.IsTaxInvoice ? "Tax invoice" : "Invoice",
             i.Number,
@@ -182,6 +193,14 @@ internal sealed class InvoiceService(
             i.VatNumber is null ? string.Empty : "VAT number " + i.VatNumber,
             i.BuyerName,
             i.BuyerEmail ?? string.Empty,
+            i.BuyerContact is null ? string.Empty : "Attention: " + i.BuyerContact,
+            i.BuyerAddress ?? string.Empty,
+            i.BuyerPhone ?? string.Empty,
+            string.Join(" · ", numbers),
+            sellerLogo ?? BlankImage,
+            sellerLogo is null ? "logo is-empty" : "logo",
+            buyerLogo ?? BlankImage,
+            buyerLogo is null ? "buyer-logo is-empty" : "buyer-logo",
             Date(i.PaidAt),
             gateways.FirstOrDefault(g => string.Equals(g.Code, i.Gateway, StringComparison.OrdinalIgnoreCase))?.Name ?? i.Gateway,
             i.PaymentReference,
@@ -194,14 +213,64 @@ internal sealed class InvoiceService(
             i.Footer ?? string.Empty);
     }
 
+    /// <summary>
+    /// The logos as data URIs, so the document stands alone (preview, PDF, saved file): the platform's own logo as the
+    /// seller's, and the organisation's logo beside its name when it has one of its own.
+    /// </summary>
+    private async Task<(string? Seller, string? Buyer)> LogosAsync(CancellationToken cancellationToken)
+    {
+        var buyer = await DataUriAsync(branding, cancellationToken);
+        var platformId = await platform.GetIdAsync(cancellationToken);
+        if (platformId == tenant.TenantId)
+        {
+            return (buyer, null);
+        }
+
+        await using var scope = scopes.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(platformId, null);
+        var seller = await DataUriAsync(scope.ServiceProvider.GetRequiredService<IBrandingService>(), cancellationToken);
+        return (seller, string.Equals(seller, buyer, StringComparison.Ordinal) ? null : buyer);
+    }
+
+    private static async Task<string?> DataUriAsync(IBrandingService source, CancellationToken cancellationToken)
+    {
+        var logo = await source.OpenLogoAsync(cancellationToken);
+        if (logo is null)
+        {
+            return null;
+        }
+
+        await using (logo.Content)
+        {
+            using var bytes = new MemoryStream();
+            await logo.Content.CopyToAsync(bytes, cancellationToken);
+            return $"data:{logo.ContentType};base64,{Convert.ToBase64String(bytes.GetBuffer(), 0, (int)bytes.Length)}";
+        }
+    }
+
+    /// <summary>A transparent pixel for a missing logo (hidden by its class), so the image never shows as broken.</summary>
+    private const string BlankImage = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+
     private sealed record InvoiceData(
         string InvoiceTitle, string InvoiceNumber, string IssuedOn, string SellerName, string SellerAddress, string VatLine, string BuyerName, string BuyerEmail,
-        string PaidOn, string PaidWith, string PaymentReference, string Description, string SubtotalLabel, string Subtotal, string VatLabel, string VatAmount,
+        string BuyerContact, string BuyerAddress, string BuyerPhone, string BuyerNumbers, string SellerLogo, string SellerLogoClass, string BuyerLogo,
+        string BuyerLogoClass, string PaidOn, string PaidWith, string PaymentReference, string Description, string SubtotalLabel, string Subtotal, string VatLabel, string VatAmount,
         string Total, string Footer);
 }
 
+/// <summary>
+/// Invoice numbers: one run across the platform without gaps (a database sequence skips numbers it had cached when the
+/// server restarts, and ones taken by a failed save).
+/// </summary>
+public interface IInvoiceNumbers
+{
+    /// <summary>The next number. Call inside the transaction that saves the invoice: it holds the number until then.</summary>
+    Task<long> NextAsync(CancellationToken cancellationToken);
+}
+
 /// <summary>Issues a payment's invoice once, frozen with today's seller details and the organisation as buyer.</summary>
-internal sealed class InvoiceIssuer(IUnitOfWork unitOfWork, IApplicationSettingService settings, TimeProvider time) : IDomainEventHandler<PaymentSucceeded>
+internal sealed class InvoiceIssuer(IUnitOfWork unitOfWork, IInvoiceNumbers numbers, IApplicationSettingService settings, TimeProvider time)
+    : IDomainEventHandler<PaymentSucceeded>
 {
     public async Task HandleAsync(PaymentSucceeded domainEvent, CancellationToken cancellationToken)
     {
@@ -228,18 +297,18 @@ internal sealed class InvoiceIssuer(IUnitOfWork unitOfWork, IApplicationSettingS
         }
 
         var rate = decimal.TryParse(await settings.GetAsync(SettingCodes.Invoices.VatRatePercent, cancellationToken), NumberStyles.Number, CultureInfo.InvariantCulture, out var r) ? r : 0m;
-        var invoice = new Invoice(
-            payment,
-            seller,
-            await settings.GetAsync(SettingCodes.Invoices.SellerAddress, cancellationToken),
-            await settings.GetAsync(SettingCodes.Invoices.VatNumber, cancellationToken),
-            rate,
-            owner?.Name ?? "Organisation",
-            owner?.ContactEmail,
-            await settings.GetAsync(SettingCodes.Invoices.Footer, cancellationToken),
-            time.GetUtcNow());
-        await invoices.AddAsync(invoice, cancellationToken);
-        await unitOfWork.SaveAsync(cancellationToken);
-        return invoice;
+        var sellerAddress = await settings.GetAsync(SettingCodes.Invoices.SellerAddress, cancellationToken);
+        var vatNumber = await settings.GetAsync(SettingCodes.Invoices.VatNumber, cancellationToken);
+        var footer = await settings.GetAsync(SettingCodes.Invoices.Footer, cancellationToken);
+        var buyer = Tenancy.BillingDetails.BuyerFor(owner);
+        return await unitOfWork.ExecuteInTransactionAsync(
+            async ct =>
+            {
+                var invoice = new Invoice(payment, await numbers.NextAsync(ct), seller, sellerAddress, vatNumber, rate, buyer, footer, time.GetUtcNow());
+                await invoices.AddAsync(invoice, ct);
+                await unitOfWork.SaveAsync(ct);
+                return invoice;
+            },
+            cancellationToken);
     }
 }

@@ -16,26 +16,39 @@
 }
 else
 {
-    <section class="panel">
-        <div class="table-responsive">
-            <table class="table table-app mb-0">
-                <thead><tr><th>Payment</th><th>Reference</th><th>Paid with</th><th>Date</th><th class="text-end">Amount</th><th>Status</th><th><span class="visually-hidden">Invoice</span></th></tr></thead>
-                <tbody>
-                    @foreach (var p in Model.Items)
-                    {
-                        <tr>
-                            <td><a asp-action="Payment" asp-route-reference="@p.Reference">@p.Description</a><div class="small text-muted">@(p.IsRenewal ? "Automatic renewal" : "By " + p.RequestedByName)@(p.SetsUpRenewal ? " · set up automatic renewal" : "")@(p.IsUpgrade ? " · upgrade" : "")</div></td>
-                            <td class="mono">@p.Reference</td>
-                            <td>@p.GatewayName</td>
-                            <td><local-time value="p.CreatedAt" format="d MMM yyyy, HH:mm" /></td>
-                            <td class="text-end fw-semibold">@Display.Money(p.Amount, p.Currency)</td>
-                            <td><span class="badge text-bg-@Display.Tone(p.Status)">@Display.Status(p.Status)</span></td>
-                            <td class="text-end">@if (p.Status == Base.Domain.Payments.PaymentStatus.Succeeded) {<a class="btn btn-ghost btn-sm" asp-action="PaymentInvoice" asp-route-reference="@p.Reference"><icon name="file-text" class="icon-sm" /> Invoice</a>}</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+    <table class="table table-entity align-middle">
+        <thead><tr><th>Payment</th><th>Reference</th><th>Paid with</th><th>Date</th><th class="text-end">Amount</th><th>Status</th><th><span class="visually-hidden">Invoice</span></th></tr></thead>
+        <tbody>
+            @foreach (var p in Model.Items)
+            {
+                <tr>
+                    <td>
+                        <a class="entity text-decoration-none" asp-action="Payment" asp-route-reference="@p.Reference">
+                            <span class="file-tile" aria-hidden="true"><icon name="@(p.IsRenewal ? "refresh-cw" : p.IsUpgrade ? "arrow-up-right" : "receipt")" /></span>
+                            <span class="entity-text">
+                                <span class="entity-name">@p.Description</span>
+                                <span class="entity-sub">@(p.IsRenewal ? "Automatic renewal" : "By " + p.RequestedByName)@(p.SetsUpRenewal ? " · set up automatic renewal" : "")@(p.IsUpgrade ? " · upgrade" : "")</span>
+                            </span>
+                        </a>
+                    </td>
+                    <td class="mono small">@p.Reference</td>
+                    <td>@p.GatewayName</td>
+                    <td class="text-muted text-nowrap"><local-time value="p.CreatedAt" format="d MMM yyyy, HH:mm" /></td>
+                    <td class="text-end fw-semibold text-nowrap">@Display.Money(p.Amount, p.Currency)</td>
+                    <td><span class="badge text-bg-@Display.Tone(p.Status)">@Display.Status(p.Status)</span></td>
+                    <td class="text-end cell-actions">@if (p.Status == Base.Domain.Payments.PaymentStatus.Succeeded) {<a class="btn btn-ghost btn-sm" asp-action="PaymentInvoice" asp-route-reference="@p.Reference"><icon name="file-text" class="icon-sm" /> Invoice</a>}</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    @if (Model.TotalPages > 1)
+    {
+        <div class="d-flex justify-content-between align-items-center">
+            <span class="text-muted small">Page @Model.Page of @Model.TotalPages</span>
+            <nav class="btn-group btn-group-sm" aria-label="Pages">
+                <a class="btn btn-outline-secondary @(Model.HasPrevious ? "" : "disabled")" asp-route-page="@(Model.Page - 1)">Previous</a>
+                <a class="btn btn-outline-secondary @(Model.HasNext ? "" : "disabled")" asp-route-page="@(Model.Page + 1)">Next</a>
+            </nav>
         </div>
-        <partial name="_Pager" model="Model" />
-    </section>
+    }
 }

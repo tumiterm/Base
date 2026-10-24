@@ -3,6 +3,10 @@ using Base.Domain.Common;
 
 namespace Base.Domain.Payments;
 
+/// <summary>Who an invoice is made out to, copied from the organisation when it is issued.</summary>
+public sealed record InvoiceBuyer(
+    string Name, string? Email, string? Contact = null, string? Phone = null, string? Address = null, string? TaxNumber = null, string? RegistrationNumber = null);
+
 /// <summary>
 /// The invoice for a paid <see cref="Payment"/>: numbered in sequence across the platform (<see cref="Number"/>) and
 /// frozen when issued. Seller, buyer and amounts are copied in, so changing a setting or an organisation's details
@@ -19,16 +23,19 @@ public sealed class Invoice : ITenantOwned
     }
 
     public Invoice(
-        Payment payment, string sellerName, string? sellerAddress, string? vatNumber, decimal vatRatePercent,
-        string buyerName, string? buyerEmail, string? footer, DateTimeOffset issuedAt)
+        Payment payment, long sequence, string sellerName, string? sellerAddress, string? vatNumber, decimal vatRatePercent,
+        InvoiceBuyer buyer, string? footer, DateTimeOffset issuedAt)
     {
         ArgumentNullException.ThrowIfNull(payment);
+        ArgumentNullException.ThrowIfNull(buyer);
         if (payment.Status != PaymentStatus.Succeeded)
         {
             throw new InvalidOperationException("Only a paid payment has an invoice.");
         }
 
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(sequence);
         Id = SequentialGuid.Next();
+        Sequence = sequence;
         TenantId = payment.TenantId;
         PaymentId = payment.Id;
         PaymentReference = payment.Reference;
@@ -38,8 +45,13 @@ public sealed class Invoice : ITenantOwned
         SellerName = Limit(sellerName, NameMaxLength)!;
         SellerAddress = Limit(sellerAddress, TextMaxLength);
         VatNumber = Limit(vatNumber, 50);
-        BuyerName = Limit(buyerName, NameMaxLength)!;
-        BuyerEmail = Limit(buyerEmail, NameMaxLength);
+        BuyerName = Limit(buyer.Name, NameMaxLength) ?? "Organisation";
+        BuyerEmail = Limit(buyer.Email, NameMaxLength);
+        BuyerContact = Limit(buyer.Contact, NameMaxLength);
+        BuyerPhone = Limit(buyer.Phone, 50);
+        BuyerAddress = Limit(buyer.Address, TextMaxLength);
+        BuyerTaxNumber = Limit(buyer.TaxNumber, 50);
+        BuyerRegistrationNumber = Limit(buyer.RegistrationNumber, 50);
         Description = payment.Description;
         Currency = payment.Currency;
         Total = payment.Amount;
@@ -52,7 +64,7 @@ public sealed class Invoice : ITenantOwned
 
     public Guid TenantId { get; set; }
 
-    /// <summary>Given by the database from a sequence, on insert.</summary>
+    /// <summary>The next number across the platform when it was issued: numbers have no gaps.</summary>
     public long Sequence { get; private set; }
 
     public string Number => NumberPrefix + Sequence.ToString("D6", CultureInfo.InvariantCulture);
@@ -76,6 +88,16 @@ public sealed class Invoice : ITenantOwned
     public string BuyerName { get; private set; } = string.Empty;
 
     public string? BuyerEmail { get; private set; }
+
+    public string? BuyerContact { get; private set; }
+
+    public string? BuyerPhone { get; private set; }
+
+    public string? BuyerAddress { get; private set; }
+
+    public string? BuyerTaxNumber { get; private set; }
+
+    public string? BuyerRegistrationNumber { get; private set; }
 
     public string Description { get; private set; } = string.Empty;
 

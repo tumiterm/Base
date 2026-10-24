@@ -57,6 +57,8 @@ internal sealed partial class YocoGateway(IOptions<YocoOptions> options, IHttpCl
 
     public string Name => _options.IsTest ? "Yoco (test)" : "Yoco";
 
+    public bool IsTestMode => _options.IsTest;
+
     public IReadOnlyList<string> Methods => _options.Methods.Count > 0 ? [.. _options.Methods] : YocoOptions.DefaultMethods;
 
     public IReadOnlyList<string> Currencies { get; } = ["ZAR"];

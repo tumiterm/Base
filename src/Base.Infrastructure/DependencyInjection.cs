@@ -123,6 +123,7 @@ public static class DependencyInjection
     {
         services.AddScoped<AuditingInterceptor>();
         services.AddScoped<Payments.BillingLedgerInterceptor>();
+        services.AddScoped<Application.Payments.IInvoiceNumbers, Payments.InvoiceNumbers>();
         services.AddScoped<DomainEventOutboxInterceptor>();
         services.AddScoped<AuditTrailInterceptor>();
         services.AddSingleton<SlowQueryInterceptor>();

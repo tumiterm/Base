@@ -26,16 +26,24 @@
         .totals td { border: 0; padding: 4px 0; }
         .totals .grand td { border-top: 2px solid #1a1a1a; padding-top: 8px; font-size: 12pt; font-weight: bold; }
         .paid { display: inline-block; margin-top: 18px; padding: 4px 10px; border: 1.5px solid #1f7a4d; color: #1f7a4d; border-radius: 4px; font-weight: bold; letter-spacing: .06em; }
+        .brand { display: flex; align-items: flex-start; gap: 14px; }
+        .logo { max-height: 18mm; max-width: 50mm; object-fit: contain; }
+        .buyer { display: flex; gap: 12px; align-items: flex-start; }
+        .buyer-logo { max-height: 12mm; max-width: 30mm; object-fit: contain; }
+        .is-empty { display: none; }
         footer { margin-top: 28px; padding-top: 10px; border-top: 1px solid #e3e6ea; }
     </style>
 </head>
 <body>
 <div class="sheet">
     <header>
-        <div>
-            <div class="seller">{{ SellerName }}</div>
-            <div class="muted small pre">{{ SellerAddress }}</div>
-            <div class="muted small">{{ VatLine }}</div>
+        <div class="brand">
+            <img class="{{ SellerLogoClass }}" src="{{ SellerLogo }}" alt="">
+            <div>
+                <div class="seller">{{ SellerName }}</div>
+                <div class="muted small pre">{{ SellerAddress }}</div>
+                <div class="muted small">{{ VatLine }}</div>
+            </div>
         </div>
         <div>
             <h1>{{ InvoiceTitle }}</h1>
@@ -44,10 +52,17 @@
     </header>
 
     <div class="parties">
-        <div>
-            <div class="label">Billed to</div>
-            <div><strong>{{ BuyerName }}</strong></div>
-            <div class="muted">{{ BuyerEmail }}</div>
+        <div class="buyer">
+            <img class="{{ BuyerLogoClass }}" src="{{ BuyerLogo }}" alt="">
+            <div>
+                <div class="label">Billed to</div>
+                <div><strong>{{ BuyerName }}</strong></div>
+                <div>{{ BuyerContact }}</div>
+                <div class="pre">{{ BuyerAddress }}</div>
+                <div class="muted">{{ BuyerEmail }}</div>
+                <div class="muted">{{ BuyerPhone }}</div>
+                <div class="muted small">{{ BuyerNumbers }}</div>
+            </div>
         </div>
         <div class="right">
             <div class="label">Payment</div>

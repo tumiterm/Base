@@ -39,6 +39,9 @@ public sealed class Payment : EntityBase, ITenantOwned
     public const int NameMaxLength = 200;
     public const int CheckoutUrlMaxLength = 2000;
 
+    /// <summary>The built-in gateway that takes no money, for trying payments out.</summary>
+    public const string TestGateway = "Test";
+
     private const string ReferenceAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
     private Payment()
@@ -63,6 +66,7 @@ public sealed class Payment : EntityBase, ITenantOwned
         RequestedByName = Limit(requestedByName, NameMaxLength);
         Status = PaymentStatus.Pending;
         ExpiresAt = now + expiresIn;
+        IsTest = string.Equals(gateway, TestGateway, StringComparison.OrdinalIgnoreCase);
     }
 
     public Guid TenantId { get; set; }
@@ -116,6 +120,11 @@ public sealed class Payment : EntityBase, ITenantOwned
     public bool IsUpgrade { get; private set; }
 
     public void PaysForUpgrade() => IsUpgrade = true;
+
+    /// <summary>Made through a sandbox or test account: no real money moved, so it isn't counted as received.</summary>
+    public bool IsTest { get; private set; }
+
+    public void InTestMode() => IsTest = true;
 
     /// <summary>The first payment of an automatic renewal.</summary>
     public void SetsUp(RecurringPayment recurring)

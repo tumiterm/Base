@@ -56,5 +56,6 @@ internal sealed class UpdateTenantRequestValidator : AbstractValidator<UpdateTen
     {
         RuleFor(r => r.Name).NotEmpty().MaximumLength(INamedEntity.NameMaxLength);
         RuleFor(r => r.ContactEmail).MaximumLength(Tenant.ContactEmailMaxLength).EmailAddress().When(r => !string.IsNullOrWhiteSpace(r.ContactEmail));
+        RuleFor(r => r.Billing!).SetValidator(new BillingDetailsValidator()).When(r => r.Billing is not null);
     }
 }

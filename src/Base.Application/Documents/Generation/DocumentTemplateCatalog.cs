@@ -41,7 +41,8 @@ public static class DocumentTemplateCatalog
     [
         new(DocumentTemplates.Letter, "Letter", "A one-page letter with a subject and body.", DocumentTypes.Letter, ["RecipientName", "Subject", "Body"]),
         new(DocumentTemplates.Invoice, "Invoice", "The invoice for a paid subscription payment.", DocumentTypes.General,
-            ["InvoiceTitle", "InvoiceNumber", "IssuedOn", "SellerName", "SellerAddress", "VatLine", "BuyerName", "BuyerEmail", "PaidOn", "PaidWith",
+            ["InvoiceTitle", "InvoiceNumber", "IssuedOn", "SellerName", "SellerAddress", "VatLine", "BuyerName", "BuyerEmail", "BuyerContact", "BuyerAddress", "BuyerPhone",
+             "BuyerNumbers", "SellerLogo", "SellerLogoClass", "BuyerLogo", "BuyerLogoClass", "PaidOn", "PaidWith",
              "PaymentReference", "Description", "SubtotalLabel", "Subtotal", "VatLabel", "VatAmount", "Total", "Footer"], IsSystem: true),
     ];
 

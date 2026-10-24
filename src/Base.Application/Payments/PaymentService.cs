@@ -8,6 +8,7 @@ using Base.Application.Messaging;
 using Base.Application.Notifications;
 using Base.Application.Operations;
 using Base.Application.Security;
+using Base.Application.Settings;
 using Base.Application.Subscriptions;
 using Base.Domain.Payments;
 using Base.Domain.Subscriptions;
@@ -27,7 +28,8 @@ public sealed class PaymentOptions
 }
 
 public sealed record PaymentGatewayView(
-    string Code, string Name, IReadOnlyList<string> Methods, bool SupportsRecurring = false, decimal MinimumCharge = 0m, decimal? MaximumRecurringCharge = null);
+    string Code, string Name, IReadOnlyList<string> Methods, bool SupportsRecurring = false, decimal MinimumCharge = 0m, decimal? MaximumRecurringCharge = null,
+    bool IsTestMode = false);
 
 /// <param name="ReturnBase">Absolute URL the person comes back to; the payment reference is appended.</param>
 /// <param name="NotifyBase">Absolute URL gateways post notifications to; the gateway code is appended.</param>
@@ -56,7 +58,8 @@ public sealed record PaymentView(
     bool IsRenewal = false,
     bool SetsUpRenewal = false,
     bool CanShareLink = false,
-    bool IsUpgrade = false);
+    bool IsUpgrade = false,
+    bool IsTest = false);
 
 /// <param name="StopError">Why the gateway couldn't be told to stop it, while it may still be charging.</param>
 public sealed record RecurringPaymentView(
@@ -80,10 +83,31 @@ public sealed record RecurringPaymentView(
 /// <param name="Status">The payment's status, to explain why not (null when there is no such payment).</param>
 public sealed record PaymentForward(Uri? CheckoutUrl, PaymentStatus? Status, string? Description, decimal Amount, string? Currency);
 
-public sealed record PaymentQuery(PaymentStatus? Status = null, int Page = 1, int PageSize = PageRequest.DefaultPageSize);
+/// <param name="Search">Part of a reference, description or (platform only) organisation name.</param>
+/// <param name="Test">True for test and sandbox payments only, false for real ones only, null for both.</param>
+public sealed record PaymentQuery(
+    PaymentStatus? Status = null, int Page = 1, int PageSize = PageRequest.DefaultPageSize, string? Search = null, bool? Test = null, string? Gateway = null);
 
-/// <summary>Totals for the platform's payments page.</summary>
-public sealed record PaymentTotals(decimal ReceivedThisMonth, string? Currency, int SucceededThisMonth, int FailedThisMonth, int Pending, int AutomaticRenewals = 0);
+/// <summary>Money in one currency, and how many payments made it up.</summary>
+public sealed record MoneyTotal(string Currency, decimal Amount, int Count);
+
+/// <summary>
+/// Totals for the platform's payments page. Months are calendar months in the <c>General.DisplayTimeZone</c>, by when
+/// the payment completed. Received money counts real payments only; test and sandbox payments are counted apart.
+/// </summary>
+public sealed record PaymentTotals(
+    DateTimeOffset MonthStart,
+    IReadOnlyList<MoneyTotal> ReceivedThisMonth,
+    IReadOnlyList<MoneyTotal> ReceivedLastMonth,
+    IReadOnlyList<MoneyTotal> TestThisMonth,
+    int FailedThisMonth,
+    int Pending,
+    int AutomaticRenewals)
+{
+    public int SucceededThisMonth => ReceivedThisMonth.Sum(t => t.Count);
+
+    public int TestPaidThisMonth => TestThisMonth.Sum(t => t.Count);
+}
 
 /// <summary>What to answer a gateway's notification with.</summary>
 public sealed record NotificationReply(int StatusCode, string Body)
@@ -141,13 +165,14 @@ internal sealed partial class PaymentService(
     ISubscriptionService subscriptions,
     IServiceScopeFactory scopes,
     IOptions<PaymentOptions> options,
+    IApplicationSettingService settings,
     TimeProvider time,
     ILogger<PaymentService> logger) : IPaymentService
 {
     public IReadOnlyList<PaymentGatewayView> Gateways(string? currency = null) =>
         gateways
             .Where(g => currency is null || g.Currencies.Contains(currency, StringComparer.OrdinalIgnoreCase))
-            .Select(g => new PaymentGatewayView(g.Code, g.Name, g.Methods, g.SupportsRecurring, g.MinimumCharge, g.MaximumRecurringCharge))
+            .Select(g => new PaymentGatewayView(g.Code, g.Name, g.Methods, g.SupportsRecurring, g.MinimumCharge, g.MaximumRecurringCharge, g.IsTestMode))
             .ToList();
 
     public async Task<ValidationResponse<CheckoutRedirect>> StartAsync(PayRequest request, PaymentUrls urls, CancellationToken cancellationToken = default)
@@ -246,6 +271,11 @@ internal sealed partial class PaymentService(
         if (upgrade)
         {
             payment.PaysForUpgrade();
+        }
+
+        if (gateway.IsTestMode)
+        {
+            payment.InTestMode();
         }
 
         if (renew)
@@ -355,7 +385,11 @@ internal sealed partial class PaymentService(
 
         using (tenant.BeginSystemScope())
         {
-            var page = await PageAsync(query, cancellationToken);
+            var term = query.Search?.Trim();
+            var named = string.IsNullOrEmpty(term)
+                ? null
+                : await unitOfWork.Repository<Tenant>().GetAllAsync(t => t.Id, t => t.Name.Contains(term) || t.Code.Contains(term), cancellationToken: cancellationToken);
+            var page = await PageAsync(query, cancellationToken, named);
             var ids = page.Items.Select(p => p.TenantId).Distinct().ToList();
             var names = (await unitOfWork.Repository<Tenant>().GetAllAsync(t => new { t.Id, t.Name }, t => ids.Contains(t.Id), cancellationToken: cancellationToken))
                 .ToDictionary(t => t.Id, t => t.Name);
@@ -371,26 +405,41 @@ internal sealed partial class PaymentService(
             return ValidationResponse.Forbidden().As<PaymentTotals>();
         }
 
-        var now = time.GetUtcNow();
-        var monthStart = new DateTimeOffset(now.Year, now.Month, 1, 0, 0, 0, TimeSpan.Zero);
+        var (monthStart, lastMonthStart) = await MonthsAsync(cancellationToken);
         using (tenant.BeginSystemScope())
         {
-            var month = await unitOfWork.Repository<Payment>().GetAllAsync(
-                p => new { p.Status, p.Amount, p.Currency },
-                p => p.CompletedAt >= monthStart && (p.Status == PaymentStatus.Succeeded || p.Status == PaymentStatus.Failed),
+            var completed = await unitOfWork.Repository<Payment>().GetAllAsync(
+                p => new { p.Status, p.Amount, p.Currency, p.CompletedAt, Test = p.IsTest || p.Gateway == Payment.TestGateway },
+                p => p.CompletedAt >= lastMonthStart && (p.Status == PaymentStatus.Succeeded || p.Status == PaymentStatus.Failed),
                 cancellationToken: cancellationToken);
             var pending = await unitOfWork.Repository<Payment>().CountAsync(p => p.Status == PaymentStatus.Pending, cancellationToken);
             var renewing = await unitOfWork.Repository<RecurringPayment>().CountAsync(r => r.Status == RecurringPaymentStatus.Active, cancellationToken);
-            var paid = month.Where(p => p.Status == PaymentStatus.Succeeded).ToList();
-            var currency = paid.Select(p => p.Currency).Distinct(StringComparer.Ordinal).ToList() is [var only] ? only : null;
+            var thisMonth = completed.Where(p => p.CompletedAt >= monthStart).ToList();
+            static List<MoneyTotal> Sum(IEnumerable<(string Currency, decimal Amount)> paid) => paid
+                .GroupBy(p => p.Currency, StringComparer.Ordinal)
+                .Select(g => new MoneyTotal(g.Key, g.Sum(p => p.Amount), g.Count()))
+                .OrderByDescending(t => t.Amount)
+                .ToList();
             return ValidationResponse.Success(new PaymentTotals(
-                currency is null ? 0 : paid.Sum(p => p.Amount),
-                currency,
-                paid.Count,
-                month.Count(p => p.Status == PaymentStatus.Failed),
+                monthStart,
+                Sum(thisMonth.Where(p => p is { Status: PaymentStatus.Succeeded, Test: false }).Select(p => (p.Currency, p.Amount))),
+                Sum(completed.Where(p => p is { Status: PaymentStatus.Succeeded, Test: false } && p.CompletedAt < monthStart).Select(p => (p.Currency, p.Amount))),
+                Sum(thisMonth.Where(p => p is { Status: PaymentStatus.Succeeded, Test: true }).Select(p => (p.Currency, p.Amount))),
+                thisMonth.Count(p => p is { Status: PaymentStatus.Failed, Test: false }),
                 pending,
                 renewing));
         }
+    }
+
+    /// <summary>The start of this month and of last month, as the platform's display time zone counts them.</summary>
+    private async Task<(DateTimeOffset This, DateTimeOffset Last)> MonthsAsync(CancellationToken cancellationToken)
+    {
+        var zoneId = await settings.GetAsync(SettingCodes.General.DisplayTimeZone, cancellationToken);
+        var zone = zoneId is not null && TimeZoneInfo.TryFindSystemTimeZoneById(zoneId, out var found) ? found : TimeZoneInfo.Utc;
+        var local = TimeZoneInfo.ConvertTime(time.GetUtcNow(), zone);
+        DateTimeOffset Start(DateTime day) => new(day, zone.GetUtcOffset(day));
+        var first = new DateTime(local.Year, local.Month, 1, 0, 0, 0, DateTimeKind.Unspecified);
+        return (Start(first), Start(first.AddMonths(-1)));
     }
 
     public async Task<NotificationReply> ReceiveAsync(string gateway, InboundNotification notification, CancellationToken cancellationToken = default)
@@ -470,6 +519,11 @@ internal sealed partial class PaymentService(
             case GatewayNotificationKind.Paid when recurring is not null && target.Status == PaymentStatus.Succeeded
                 && !string.Equals(read.GatewayReference, target.GatewayReference, StringComparison.Ordinal):
                 var renewal = Payment.Renewal(recurring, target.Description, read.GatewayReference, now);
+                if (provider.IsTestMode)
+                {
+                    renewal.InTestMode();
+                }
+
                 await work.Repository<Payment>().AddAsync(renewal, cancellationToken);
                 recurring.Charged(now);
                 reference = renewal.Reference;
@@ -603,13 +657,23 @@ internal sealed partial class PaymentService(
     private IPaymentGateway? Gateway(string code) =>
         gateways.FirstOrDefault(g => string.Equals(g.Code, code, StringComparison.OrdinalIgnoreCase));
 
-    private Task<PagedResult<Payment>> PageAsync(PaymentQuery query, CancellationToken cancellationToken) =>
-        unitOfWork.Repository<Payment>().GetPagedAsync(
+    private Task<PagedResult<Payment>> PageAsync(PaymentQuery query, CancellationToken cancellationToken, IReadOnlyCollection<Guid>? tenantIds = null)
+    {
+        var status = query.Status;
+        var test = query.Test;
+        var gateway = string.IsNullOrWhiteSpace(query.Gateway) ? null : query.Gateway.Trim();
+        var term = string.IsNullOrWhiteSpace(query.Search) ? null : query.Search.Trim();
+        var owners = (tenantIds ?? []).ToArray();
+        return unitOfWork.Repository<Payment>().GetPagedAsync(
             new PageRequest(query.Page, query.PageSize),
             p => p,
             q => q.OrderByDescending(p => p.DateCreated),
-            query.Status is { } status ? p => p.Status == status : null,
+            p => (status == null || p.Status == status)
+                && (test == null || (p.IsTest || p.Gateway == Payment.TestGateway) == test)
+                && (gateway == null || p.Gateway == gateway)
+                && (term == null || p.Reference.Contains(term) || p.Description.Contains(term) || owners.Contains(p.TenantId)),
             cancellationToken);
+    }
 
     private PaymentView View(Payment p, string? tenantName) => new(
         p.Id,
@@ -631,7 +695,8 @@ internal sealed partial class PaymentService(
         p.IsRenewal,
         p.RecurringPaymentId is not null && !p.IsRenewal,
         p.CanForward && p.ExpiresAt > time.GetUtcNow(),
-        p.IsUpgrade);
+        p.IsUpgrade,
+        p.IsTest || string.Equals(p.Gateway, Payment.TestGateway, StringComparison.OrdinalIgnoreCase));
 
     private static string Fingerprint(string body) => "sha256:" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(body)));
 

@@ -147,7 +147,16 @@ public sealed partial class WebTests
         var client = Client();
         await SignInAsync(client);
         (await client.GetStringAsync("/platform/payments", TestContext.Current.CancellationToken)).ShouldContain("Test payments");
+        (await client.GetStringAsync("/platform/payments?mode=test&search=nobody&status=Failed", TestContext.Current.CancellationToken)).ShouldContain("No payments match");
         (await client.GetStringAsync("/subscription", TestContext.Current.CancellationToken)).ShouldContain("No subscription needed");
+
+        // The organisation keeps the details its invoices are made out to.
+        (await client.GetStringAsync("/subscription/details", TestContext.Current.CancellationToken)).ShouldContain("On your invoices");
+        var token = await GetMetaTokenAsync(client);
+        (await PostFormAsync(client, "/subscription/details", token, ("LegalName", "Base Platform (Pty) Ltd"), ("Address", "1 Main Road"), ("Phone", "021 555 0100")))
+            .StatusCode.ShouldBe(HttpStatusCode.Redirect);
+        (await client.GetStringAsync("/subscription/details", TestContext.Current.CancellationToken)).ShouldContain("Base Platform (Pty) Ltd");
+        (await PostFormAsync(client, "/subscription/details", token, ("Phone", "not a number"))).StatusCode.ShouldBe(HttpStatusCode.OK, "shown again with the problem");
     }
 
     [Fact]

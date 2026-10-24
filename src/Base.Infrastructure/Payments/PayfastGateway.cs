@@ -177,6 +177,8 @@ internal sealed partial class PayfastGateway(IOptions<PayfastOptions> options, I
 
     public string Name => _options.Sandbox ? "Payfast (sandbox)" : "Payfast";
 
+    public bool IsTestMode => _options.Sandbox;
+
     public IReadOnlyList<string> Methods => _options.Methods.Count > 0 ? [.. _options.Methods] : PayfastOptions.DefaultMethods;
 
     public IReadOnlyList<string> Currencies { get; } = ["ZAR"];

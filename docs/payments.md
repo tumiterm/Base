@@ -274,8 +274,15 @@ A waiting change can be withdrawn from the tenant's page. API: `GET
 ## Invoices
 
 - Every paid payment gets one invoice, issued as it is paid (or the first time a paid payment's invoice is opened, for
-  payments from before invoices). Numbered from one database sequence (`INV-000123`) and **frozen**: seller, buyer and
+  payments from before invoices). Numbered in one run across the platform without gaps (`INV-000123`: the highest
+  number plus one, taken under a lock in the transaction that saves the invoice) and **frozen**: seller, buyer and
   amounts are copied in, so later changes to settings or the organisation don't alter an issued invoice.
+- **Billed to** comes from the organisation's billing details: registered name (else its name), contact person, billing
+  email, phone, address, VAT and registration numbers. The organisation keeps them on Subscription → Billing →
+  **Billing details** (`Subscription.Pay`); the platform can edit them on the tenant's page (Invoice details).
+- **Logos**: the platform tenant's logo (Appearance) heads every invoice as the seller's; an organisation with its own
+  logo (plans with custom branding) has it beside its name. They are embedded in the document, so the preview, PDF
+  and saved file stand alone; they are the logos at the time it is shown, not frozen.
 - Settings → Invoices: seller name (empty uses the application name), address, footer, and **VAT number** plus
   **VAT rate**. With a VAT number the invoice is a *Tax invoice* showing the VAT included in the price.
 - Subscription → Billing → **Invoice** (or the payment's page): a preview, **Download PDF**, and **Send by email** to
@@ -294,6 +301,11 @@ A waiting change can be withdrawn from the tenant's page. API: `GET
 - **Audit trail**: field-by-field changes of payments, renewals, subscriptions and plans. `Audit.RetentionDays`
   doesn't apply to these types: financial records must be kept for years (in South Africa at least five, under the
   Tax Administration Act).
+- **Test payments**: a payment through the Test gateway, a Payfast sandbox or a Yoco test key is marked `IsTest` when
+  it starts (the gateway's `IsTestMode`). It moves the subscription on like any other, but Platform → Payments counts
+  it apart from money received. Received this month counts real payments completed in the calendar month of
+  `General.DisplayTimeZone`, per currency. Payments made before the mark existed count as real unless they went
+  through the Test gateway, so on a developer's database older sandbox payments may show as received.
 - **Gateway notifications** (`PaymentNotification`): every notification received, applied or not, and why.
 - **Logs**: gateway errors and refusals, with the trace id that the billing history also stores. Ship logs to a
   central store in production ([go-live.md](go-live.md)); the local file keeps 14 days.

@@ -106,8 +106,12 @@ public sealed class PlatformTenantsController(
 
     [HttpPost("{id:guid}")]
     [HasPermission(PermissionCodes.Platform.TenantsManage)]
-    public Task<IActionResult> Update(Guid id, string name, string? contactEmail, CancellationToken cancellationToken) =>
-        Run(id, tenants.UpdateAsync(id, new UpdateTenantRequest(name, contactEmail), cancellationToken));
+    public async Task<IActionResult> Update(Guid id, string name, string? contactEmail, BillingDetails? billing, CancellationToken cancellationToken)
+    {
+        var result = await tenants.UpdateAsync(id, new UpdateTenantRequest(name, contactEmail, billing), cancellationToken);
+        this.Flash(result.IsSuccess || result.Errors.Count == 0 ? result : ValidationResponse.Failure(string.Join(" ", result.Errors.Select(e => e.Message))));
+        return RedirectToAction(nameof(Details), new { id });
+    }
 
     [HttpPost("{id:guid}/active")]
     [HasPermission(PermissionCodes.Platform.TenantsManage)]

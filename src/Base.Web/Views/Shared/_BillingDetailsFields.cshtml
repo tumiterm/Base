@@ -1,0 +1,42 @@
+@model (Base.Application.Tenancy.BillingDetails Details, string Prefix, bool WithEmail, bool Compact)
+@{
+    var d = Model.Details;
+    var p = string.IsNullOrEmpty(Model.Prefix) ? string.Empty : Model.Prefix + ".";
+    var id = string.IsNullOrEmpty(Model.Prefix) ? "billing" : Model.Prefix;
+    var half = Model.Compact ? "col-12" : "col-md-6";
+}
+<div class="row g-3">
+    <div class="@half">
+        <label class="form-label" for="@id-legal">Registered name</label>
+        <input class="form-control" id="@id-legal" name="@(p)LegalName" value="@d.LegalName" maxlength="@Base.Domain.Tenancy.Tenant.BillingNameMaxLength" autocomplete="organization" />
+        <div class="form-text">If it isn't the organisation's name. Invoices are made out to it.</div>
+    </div>
+    <div class="@half">
+        <label class="form-label" for="@id-contact">Contact person</label>
+        <input class="form-control" id="@id-contact" name="@(p)ContactName" value="@d.ContactName" maxlength="@Base.Domain.Tenancy.Tenant.BillingNameMaxLength" autocomplete="name" />
+    </div>
+    @if (Model.WithEmail)
+    {
+        <div class="@half">
+            <label class="form-label" for="@id-email">Billing email</label>
+            <input class="form-control" id="@id-email" name="@(p)Email" type="email" value="@d.Email" maxlength="@Base.Domain.Tenancy.Tenant.ContactEmailMaxLength" autocomplete="email" placeholder="accounts@example.com" />
+            <div class="form-text">Invoices and payment notices go here.</div>
+        </div>
+    }
+    <div class="@half">
+        <label class="form-label" for="@id-phone">Phone</label>
+        <input class="form-control" id="@id-phone" name="@(p)Phone" type="tel" value="@d.Phone" maxlength="@Base.Domain.Tenancy.Tenant.PhoneMaxLength" autocomplete="tel" />
+    </div>
+    <div class="col-12">
+        <label class="form-label" for="@id-address">Address</label>
+        <textarea class="form-control" id="@id-address" name="@(p)Address" rows="3" maxlength="@Base.Domain.Tenancy.Tenant.AddressMaxLength" autocomplete="street-address">@d.Address</textarea>
+    </div>
+    <div class="@half">
+        <label class="form-label" for="@id-vat">VAT number</label>
+        <input class="form-control" id="@id-vat" name="@(p)TaxNumber" value="@d.TaxNumber" maxlength="@Base.Domain.Tenancy.Tenant.NumberMaxLength" />
+    </div>
+    <div class="@half">
+        <label class="form-label" for="@id-reg">Registration number</label>
+        <input class="form-control" id="@id-reg" name="@(p)RegistrationNumber" value="@d.RegistrationNumber" maxlength="@Base.Domain.Tenancy.Tenant.NumberMaxLength" />
+    </div>
+</div>

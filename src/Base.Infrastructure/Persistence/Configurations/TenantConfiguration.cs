@@ -10,6 +10,12 @@ internal sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
     {
         builder.HasIndex(t => t.Code).IsUnique();
         builder.Property(t => t.ContactEmail).HasMaxLength(Tenant.ContactEmailMaxLength);
+        builder.Property(t => t.LegalName).HasMaxLength(Tenant.BillingNameMaxLength);
+        builder.Property(t => t.BillingContactName).HasMaxLength(Tenant.BillingNameMaxLength);
+        builder.Property(t => t.Phone).HasMaxLength(Tenant.PhoneMaxLength);
+        builder.Property(t => t.Address).HasMaxLength(Tenant.AddressMaxLength);
+        builder.Property(t => t.TaxNumber).HasMaxLength(Tenant.NumberMaxLength);
+        builder.Property(t => t.RegistrationNumber).HasMaxLength(Tenant.NumberMaxLength);
         builder.Property(t => t.ReleaseVersion).HasMaxLength(Tenant.ReleaseVersionMaxLength).IsRequired().HasDefaultValue(Tenant.NoRelease);
         builder.HasMany(t => t.Domains).WithOne().HasForeignKey(d => d.TenantId).OnDelete(DeleteBehavior.Cascade);
         builder.Navigation(t => t.Domains).UsePropertyAccessMode(PropertyAccessMode.Field);

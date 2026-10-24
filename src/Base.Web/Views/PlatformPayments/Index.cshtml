@@ -4,21 +4,58 @@
     ViewData["Title"] = "Payments";
     var results = Model.Payments;
     var t = Model.Totals;
+    var month = t.MonthStart.ToString("MMMM", System.Globalization.CultureInfo.CurrentCulture);
     var filters = new (PaymentStatus? Status, string Label)[] { (null, "All"), (PaymentStatus.Succeeded, "Paid"), (PaymentStatus.Pending, "Waiting"), (PaymentStatus.Failed, "Declined"), (PaymentStatus.Cancelled, "Cancelled"), (PaymentStatus.Expired, "Expired") };
+    var main = t.ReceivedThisMonth.FirstOrDefault();
+    var last = main is null ? null : t.ReceivedLastMonth.FirstOrDefault(m => m.Currency == main.Currency);
 }
 <div class="page-header">
     <div>
         <h1 class="page-title">Payments</h1>
         <p class="page-subtitle">Online payments organisations make for their subscriptions. A paid payment moves the subscription on by itself.</p>
     </div>
+    <div class="page-actions" role="group" aria-label="Ways to pay">
+        @if (Model.Gateways.Count == 0)
+        {
+            <span class="badge text-bg-warning">No payment provider configured</span>
+        }
+        @foreach (var g in Model.Gateways)
+        {
+            <span class="chip"><icon name="credit-card" /> @g.Name@if (g.IsTestMode) {<span class="badge text-bg-warning ms-1">Test</span>}</span>
+        }
+    </div>
 </div>
 
-<div class="stat-grid">
-    <div class="panel stat-tile"><span class="file-tile is-code" aria-hidden="true"><icon name="receipt" /></span><div class="stat"><span class="stat-label">Received this month</span><span class="stat-value">@(t.Currency is null ? (t.SucceededThisMonth == 0 ? "0" : "Mixed") : Display.Money(t.ReceivedThisMonth, t.Currency))</span><span class="stat-sub">@t.SucceededThisMonth paid</span></div></div>
-    <div class="panel stat-tile @(t.FailedThisMonth > 0 ? "is-warning" : "")"><span class="file-tile" aria-hidden="true"><icon name="circle-x" /></span><div class="stat"><span class="stat-label">Declined</span><span class="stat-value">@t.FailedThisMonth</span><span class="stat-sub">This month</span></div></div>
-    <div class="panel stat-tile"><span class="file-tile" aria-hidden="true"><icon name="clock" /></span><div class="stat"><span class="stat-label">Waiting</span><span class="stat-value">@t.Pending</span><span class="stat-sub">For the provider to confirm</span></div></div>
-    <div class="panel stat-tile"><span class="file-tile" aria-hidden="true"><icon name="refresh-cw" /></span><div class="stat"><span class="stat-label">Automatic renewals</span><span class="stat-value">@t.AutomaticRenewals</span><span class="stat-sub">Charged by the provider each period</span></div></div>
-    <div class="panel stat-tile @(Model.Gateways.Count == 0 ? "is-warning" : "")"><span class="file-tile" aria-hidden="true"><icon name="credit-card" /></span><div class="stat"><span class="stat-label">Ways to pay</span><span class="stat-value">@Model.Gateways.Count</span><span class="stat-sub">@(Model.Gateways.Count == 0 ? "None configured" : string.Join(", ", Model.Gateways.Select(g => g.Name)))</span></div></div>
+<div class="stat-grid is-compact">
+    <div class="panel stat-tile">
+        <span class="file-tile is-code" aria-hidden="true"><icon name="receipt" /></span>
+        <div class="stat">
+            <span class="stat-label">Received in @month</span>
+            <span class="stat-value">@(main is null ? "Nothing yet" : Display.Money(main.Amount, main.Currency))</span>
+            @foreach (var other in t.ReceivedThisMonth.Skip(1)) {<span class="stat-sub">+ @Display.Money(other.Amount, other.Currency)</span>}
+            <span class="stat-sub">@t.SucceededThisMonth real @(t.SucceededThisMonth == 1 ? "payment" : "payments")@(main is not null && last is not null ? $" · {Display.Money(last.Amount, last.Currency)} last month" : "")</span>
+        </div>
+    </div>
+    <a class="panel stat-tile" asp-action="Index" asp-route-mode="test" asp-route-status="@PaymentStatus.Succeeded">
+        <span class="file-tile" aria-hidden="true"><icon name="flask-conical" /></span>
+        <div class="stat">
+            <span class="stat-label">Test payments</span>
+            <span class="stat-value">@t.TestPaidThisMonth</span>
+            <span class="stat-sub">@(t.TestThisMonth.Count == 0 ? $"None in {month}" : string.Join(" + ", t.TestThisMonth.Select(m => Display.Money(m.Amount, m.Currency))) + " · not counted")</span>
+        </div>
+    </a>
+    <a class="panel stat-tile @(t.FailedThisMonth > 0 ? "is-warning" : "")" asp-action="Index" asp-route-status="@PaymentStatus.Failed" asp-route-mode="live">
+        <span class="file-tile" aria-hidden="true"><icon name="circle-x" /></span>
+        <div class="stat"><span class="stat-label">Declined</span><span class="stat-value">@t.FailedThisMonth</span><span class="stat-sub">Real payments in @month</span></div>
+    </a>
+    <a class="panel stat-tile" asp-action="Index" asp-route-status="@PaymentStatus.Pending">
+        <span class="file-tile" aria-hidden="true"><icon name="clock" /></span>
+        <div class="stat"><span class="stat-label">Waiting</span><span class="stat-value">@t.Pending</span><span class="stat-sub">For the provider to confirm</span></div>
+    </a>
+    <div class="panel stat-tile">
+        <span class="file-tile" aria-hidden="true"><icon name="refresh-cw" /></span>
+        <div class="stat"><span class="stat-label">Automatic renewals</span><span class="stat-value">@t.AutomaticRenewals</span><span class="stat-sub">Charged by the provider each period</span></div>
+    </div>
 </div>
 
 <div class="toolbar">
@@ -26,45 +63,89 @@
         @foreach (var f in filters)
         {
             var active = f.Status == Model.Status;
-            <a class="@(active ? "is-active" : "")" aria-current="@(active ? "page" : null)" asp-action="Index" asp-route-status="@f.Status">@f.Label</a>
+            <a class="@(active ? "is-active" : "")" aria-current="@(active ? "page" : null)" asp-action="Index" asp-all-route-data="Model.Route(f.Status)">@f.Label</a>
         }
     </nav>
     <span class="toolbar-spacer"></span>
-    <span class="text-muted small">@results.Total @(results.Total == 1 ? "payment" : "payments")</span>
+    <form method="get" class="d-flex flex-wrap gap-2 toolbar-search has-filters" role="search">
+        <input type="hidden" name="status" value="@Model.Status" />
+        <select class="form-select w-auto" name="mode" aria-label="Real or test" data-autosubmit>
+            <option value="">Real and test</option>
+            <option value="live" selected="@(Model.Mode == "live")">Real only</option>
+            <option value="test" selected="@(Model.Mode == "test")">Test only</option>
+        </select>
+        @if (Model.Gateways.Count > 1 || Model.Gateway is not null)
+        {
+            <select class="form-select w-auto" name="gateway" aria-label="Provider" data-autosubmit>
+                <option value="">All providers</option>
+                @foreach (var g in Model.Gateways) {<option value="@g.Code" selected="@(string.Equals(g.Code, Model.Gateway, StringComparison.OrdinalIgnoreCase))">@g.Name</option>}
+            </select>
+        }
+        <label class="input-affix flex-grow-1">
+            <icon name="search" class="icon-sm" />
+            <input class="form-control" type="search" name="search" value="@Model.Search" placeholder="Organisation, reference or plan" aria-label="Search payments" />
+        </label>
+    </form>
 </div>
 
 @if (results.Total == 0)
 {
     <div class="empty-state">
         <icon name="receipt" />
-        <div class="empty-state-title">@(Model.Status is null ? "No payments yet" : "Nothing here")</div>
-        <p class="mb-0">@(Model.Gateways.Count == 0 ? "Configure a payment provider under Payments:Gateways so organisations can pay from their Subscription page." : "Organisations pay from their Subscription page; payments show here as they come in.")</p>
+        <div class="empty-state-title">@(Model.IsFiltered ? "No payments match" : "No payments yet")</div>
+        <p class="mb-2">@(Model.IsFiltered ? "Try another search or filter." : Model.Gateways.Count == 0 ? "Configure a payment provider under Payments:Gateways so organisations can pay from their Subscription page." : "Organisations pay from their Subscription page; payments show here as they come in.")</p>
+        @if (Model.IsFiltered) {<a class="btn btn-secondary btn-sm" asp-action="Index">Clear filters</a>}
     </div>
 }
 else
 {
-    <ul class="panel item-list">
-        @foreach (var p in results.Items)
+    <table class="table table-entity align-middle">
+        <thead>
+            <tr>
+                <th>Organisation</th>
+                <th>Reference</th>
+                <th>Provider</th>
+                <th>Date</th>
+                <th class="text-end">Amount</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var p in results.Items)
+            {
+                <tr>
+                    <td>
+                        <a class="entity text-decoration-none" asp-controller="PlatformTenants" asp-action="Details" asp-route-id="@p.TenantId">
+                            <span class="file-tile" aria-hidden="true"><icon name="@(p.IsRenewal ? "refresh-cw" : p.IsUpgrade ? "arrow-up-right" : "receipt")" /></span>
+                            <span class="entity-text">
+                                <span class="entity-name">@(p.TenantName ?? "Unknown organisation")</span>
+                                <span class="entity-sub">@p.Description</span>
+                            </span>
+                        </a>
+                    </td>
+                    <td>
+                        <span class="mono small">@p.Reference</span>
+                        <div class="small text-muted">@(p.IsRenewal ? "Automatic renewal" : "By " + p.RequestedByName)@(p.SetsUpRenewal ? " · sets up renewal" : "")</div>
+                    </td>
+                    <td class="text-nowrap">@p.GatewayName@if (p.IsTest) {<span class="badge text-bg-warning ms-1">Test</span>}</td>
+                    <td class="text-muted text-nowrap"><local-time value="p.CompletedAt ?? p.CreatedAt" format="d MMM yyyy, HH:mm" /></td>
+                    <td class="text-end fw-semibold text-nowrap @(p.IsTest ? "text-muted" : "")">@Display.Money(p.Amount, p.Currency)</td>
+                    <td>
+                        <span class="badge text-bg-@Display.Tone(p.Status)">@Display.Status(p.Status)</span>
+                        @if (p.FailureReason is not null && p.Status != PaymentStatus.Succeeded) {<div class="small text-muted">@p.FailureReason</div>}
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <div class="d-flex justify-content-between align-items-center">
+        <span class="text-muted small">@results.Total @(results.Total == 1 ? "payment" : "payments")@(results.TotalPages > 1 ? $" · page {results.Page} of {results.TotalPages}" : "")</span>
+        @if (results.TotalPages > 1)
         {
-            <li>
-                <span class="file-tile" aria-hidden="true"><icon name="receipt" /></span>
-                <div class="item-main">
-                    <div class="item-title">@(p.TenantName ?? "Unknown organisation") · @p.Description</div>
-                    <div class="item-sub"><span class="mono">@p.Reference</span> · @p.GatewayName · @(p.IsRenewal ? "automatic renewal" : "by " + p.RequestedByName)@(p.SetsUpRenewal ? " · set up automatic renewal" : "")@(p.FailureReason is not null && p.Status != PaymentStatus.Succeeded ? " · " + p.FailureReason : "")</div>
-                </div>
-                <div class="item-aside text-end">
-                    <div class="fw-semibold">@Display.Money(p.Amount, p.Currency)</div>
-                    <span class="badge text-bg-@Display.Tone(p.Status)">@Display.Status(p.Status)</span>
-                    <div class="small text-muted mt-1"><local-time value="p.CreatedAt" format="d MMM, HH:mm" /></div>
-                </div>
-            </li>
+            <nav class="btn-group btn-group-sm" aria-label="Pages">
+                <a class="btn btn-outline-secondary @(results.HasPrevious ? "" : "disabled")" asp-action="Index" asp-all-route-data="Model.Route(Model.Status, results.Page - 1)">Previous</a>
+                <a class="btn btn-outline-secondary @(results.HasNext ? "" : "disabled")" asp-action="Index" asp-all-route-data="Model.Route(Model.Status, results.Page + 1)">Next</a>
+            </nav>
         }
-    </ul>
-    <div class="d-flex justify-content-between align-items-center mt-3">
-        <span class="text-muted small">Page @results.Page of @results.TotalPages</span>
-        <nav class="btn-group btn-group-sm" aria-label="Pages">
-            <a class="btn btn-outline-secondary @(results.HasPrevious ? "" : "disabled")" asp-route-page="@(results.Page - 1)" asp-route-status="@Model.Status">Previous</a>
-            <a class="btn btn-outline-secondary @(results.HasNext ? "" : "disabled")" asp-route-page="@(results.Page + 1)" asp-route-status="@Model.Status">Next</a>
-        </nav>
     </div>
 }

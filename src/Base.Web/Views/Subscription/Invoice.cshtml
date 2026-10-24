@@ -58,6 +58,7 @@
                     <dt>VAT included</dt><dd>@Display.Money(Model.VatAmount, Model.Currency)</dd>
                     <dt>Payment</dt><dd><a class="mono" asp-action="Payment" asp-route-reference="@Model.PaymentReference">@Model.PaymentReference</a></dd>
                 </dl>
+                <p class="text-muted small mt-3 mb-0">An invoice keeps the details it was issued with. <a asp-action="Details">Billing details</a> set who and where new ones are made out to.</p>
             </div>
         </section>
     </div>

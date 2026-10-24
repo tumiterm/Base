@@ -1,0 +1,54 @@
+@model Base.Application.Tenancy.BillingDetails
+@inject ICurrentUser CurrentUser
+@{
+    ViewData["Title"] = "Billing details";
+    var canEdit = CurrentUser.HasPermission(PermissionCodes.Subscription.Pay);
+}
+<nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-action="Index">Subscription</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">Billing details</span></nav>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Billing</h1>
+        <p class="page-subtitle">Who and where invoices are made out to. New invoices use these; ones already issued keep the details they had.</p>
+    </div>
+</div>
+<partial name="_BillingTabs" model="@("details")" />
+<div class="billing-details-layout">
+    <section class="panel" aria-labelledby="details-title">
+        <div class="panel-header"><h2 class="panel-title" id="details-title">On your invoices</h2></div>
+        @if (canEdit)
+        {
+            <form method="post" asp-action="Details">
+                <div class="panel-body">
+                    <div asp-validation-summary="All" class="text-danger small"></div>
+                    <partial name="_BillingDetailsFields" model="(Model, string.Empty, true, false)" />
+                </div>
+                <div class="panel-footer"><button class="btn btn-primary" type="submit">Save details</button></div>
+            </form>
+        }
+        else
+        {
+            <div class="panel-body">
+                <dl class="kv mb-0">
+                    <dt>Registered name</dt><dd>@(Model.LegalName ?? "—")</dd>
+                    <dt>Contact person</dt><dd>@(Model.ContactName ?? "—")</dd>
+                    <dt>Billing email</dt><dd>@(Model.Email ?? "—")</dd>
+                    <dt>Phone</dt><dd>@(Model.Phone ?? "—")</dd>
+                    <dt>Address</dt><dd class="text-pre">@(Model.Address ?? "—")</dd>
+                    <dt>VAT number</dt><dd>@(Model.TaxNumber ?? "—")</dd>
+                    <dt>Registration number</dt><dd>@(Model.RegistrationNumber ?? "—")</dd>
+                </dl>
+                <p class="text-muted small mt-3 mb-0">Someone who can pay for the subscription can change these.</p>
+            </div>
+        }
+    </section>
+    <aside class="panel" aria-labelledby="logo-title">
+        <div class="panel-header"><h2 class="panel-title" id="logo-title">Logo</h2></div>
+        <div class="panel-body stack">
+            <p class="mb-0 small">Your organisation's logo shows beside your name on invoices: it's the logo set under Appearance, on plans with custom branding.</p>
+            @if (CurrentUser.HasPermission(PermissionCodes.Settings.Edit))
+            {
+                <div><a class="btn btn-secondary btn-sm" asp-controller="Appearance" asp-action="Index" asp-feature="@FeatureCodes.CustomBranding"><icon name="image" class="icon-sm" /> Appearance</a></div>
+            }
+        </div>
+    </aside>
+</div>

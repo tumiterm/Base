@@ -150,11 +150,38 @@ public sealed record PlanChangeViewModel(
 /// <summary>The operator's review of a change of plan: impact, timing, reason.</summary>
 public sealed record OperatorPlanChangeViewModel(TenantDetails Tenant, PlanChangePreview Change, PlanChangeTiming When, string? Reason);
 
+/// <param name="Mode"><c>live</c>, <c>test</c> or null for both.</param>
 public sealed record PlatformPaymentsViewModel(
     PagedResult<Base.Application.Payments.PaymentView> Payments,
     Base.Application.Payments.PaymentTotals Totals,
     Base.Domain.Payments.PaymentStatus? Status,
-    IReadOnlyList<Base.Application.Payments.PaymentGatewayView> Gateways);
+    IReadOnlyList<Base.Application.Payments.PaymentGatewayView> Gateways,
+    string? Search = null,
+    string? Mode = null,
+    string? Gateway = null)
+{
+    public bool IsFiltered => Status is not null || Search is not null || Mode is not null || Gateway is not null;
+
+    /// <summary>The current filters with some changed, for links that keep the rest.</summary>
+    public IDictionary<string, string> Route(Base.Domain.Payments.PaymentStatus? status, int? page = null)
+    {
+        var route = new Dictionary<string, string>(StringComparer.Ordinal);
+        void Add(string key, string? value)
+        {
+            if (!string.IsNullOrEmpty(value))
+            {
+                route[key] = value;
+            }
+        }
+
+        Add("status", status?.ToString());
+        Add("search", Search);
+        Add("mode", Mode);
+        Add("gateway", Gateway);
+        Add("page", page is > 1 ? page.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : null);
+        return route;
+    }
+}
 
 /// <summary>Plans side by side. Offered plans come first; retired ones keep their subscribers and stay editable.</summary>
 public sealed record PlanMatrixViewModel(IReadOnlyList<PlanSummary> Plans)
