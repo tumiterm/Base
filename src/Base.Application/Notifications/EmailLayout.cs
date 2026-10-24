@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Base.Application.Notifications;
 
@@ -93,77 +94,155 @@ public sealed record EmailBrand(
 /// The frame every email is sent in: heading, the message, a table of details, one button (with its address written
 /// out for clients that block buttons), and who it is from. Templates hold words; this holds the markup.
 /// </summary>
-public static class EmailLayout
+public static partial class EmailLayout
 {
+    // One palette, light by default; the <style> block swaps it for dark where the client supports it.
+    private const string Page = "#f3f4f6";
+    private const string Card = "#ffffff";
+    private const string Ink = "#111827";
+    private const string Muted = "#6b7280";
+    private const string Line = "#e5e7eb";
+    private const string Panel = "#f9fafb";
+    private const string Font = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+
+    private const string Head =
+        "<style>" +
+        ":root{color-scheme:light dark;supported-color-schemes:light dark}" +
+        "body{margin:0;padding:0;width:100%!important;-webkit-text-size-adjust:100%}" +
+        "a{color:inherit}" +
+        "@media (max-width:620px){.email-card{padding:28px 22px!important}.email-pad{padding:0 12px!important}.email-h1{font-size:22px!important}}" +
+        "@media (prefers-color-scheme:dark){" +
+        ".email-page{background:#0b0d12!important}.email-card{background:#161a22!important}" +
+        ".email-ink,.email-ink p,.email-ink li,.email-h1,.email-ink td.email-value{color:#f3f4f6!important}" +
+        ".email-muted,.email-muted a,.email-ink .email-muted,.email-ink .email-muted a,.email-ink td.email-label{color:#9ca3af!important}" +
+        ".email-panel{background:#1e232d!important}.email-line{border-color:#2a303c!important}.email-ink td.email-total{border-color:#f3f4f6!important}}" +
+        "</style>";
+
     public static string Html(EmailParts email, EmailBrand brand)
     {
         ArgumentNullException.ThrowIfNull(email);
         ArgumentNullException.ThrowIfNull(brand);
-        var html = new StringBuilder();
-        html.Append("<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">")
-            .Append("<title>").Append(E(email.Subject)).Append("</title></head>")
-            .Append("<body style=\"margin:0;padding:24px;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;font-size:15px;line-height:1.5\">");
+        var html = new StringBuilder(8192);
+        html.Append("<!DOCTYPE html><html lang=\"en\" xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta charset=\"utf-8\">")
+            .Append("<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta name=\"x-apple-disable-message-reformatting\">")
+            .Append("<meta name=\"color-scheme\" content=\"light dark\"><meta name=\"supported-color-schemes\" content=\"light dark\">")
+            .Append("<title>").Append(E(email.Subject)).Append("</title>").Append(Head).Append("</head>")
+            .Append("<body class=\"email-page\" style=\"margin:0;padding:0;background:").Append(Page).Append(";\">");
+
+        // The inbox preview line, padded so the start of the email doesn't run on after it.
         if (email.Preheader is { } preheader)
         {
-            html.Append("<div style=\"display:none;max-height:0;overflow:hidden\">").Append(E(preheader)).Append("</div>");
+            html.Append("<div style=\"display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all\">")
+                .Append(E(preheader)).Append(string.Concat(Enumerable.Repeat("&#847;&zwnj;&nbsp;", 80))).Append("</div>");
         }
 
-        html.Append("<div style=\"max-width:600px;margin:0 auto;background:#ffffff;border-radius:8px;padding:32px\">")
-            .Append("<div style=\"border-top:4px solid ").Append(brand.Colour).Append(";margin:-32px -32px 24px;border-radius:8px 8px 0 0\"></div>");
+        html.Append("<table role=\"presentation\" class=\"email-page\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background:").Append(Page).Append(";\">")
+            .Append("<tr><td align=\"center\" class=\"email-pad\" style=\"padding:32px 16px;\">")
+            .Append("<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"max-width:600px;\">");
+
+        // Who it's from: the logo, or the name in the brand colour.
+        html.Append("<tr><td style=\"padding:0 4px 20px;\">");
         if (brand.LogoUrl is { } logo)
         {
-            html.Append("<img src=\"").Append(E(logo)).Append("\" alt=\"").Append(E(brand.Name)).Append("\" height=\"40\" style=\"display:block;height:40px;max-width:200px;margin-bottom:16px\">");
+            html.Append("<img src=\"").Append(E(logo)).Append("\" alt=\"").Append(E(brand.Name)).Append("\" height=\"36\" style=\"display:block;height:36px;width:auto;max-width:220px;border:0;outline:none;\">");
         }
         else
         {
-            html.Append("<div style=\"font-weight:bold;color:#5b6470;margin-bottom:16px\">").Append(E(brand.Name)).Append("</div>");
+            html.Append("<span style=\"font-family:").Append(Font).Append(";font-size:18px;font-weight:700;letter-spacing:-0.01em;color:").Append(brand.Colour).Append(";\">").Append(E(brand.Name)).Append("</span>");
         }
+
+        html.Append("</td></tr>");
+
+        // The card: a line of the brand colour, then the message.
+        html.Append("<tr><td style=\"background:").Append(brand.Colour).Append(";height:4px;line-height:4px;font-size:4px;border-radius:12px 12px 0 0;\">&nbsp;</td></tr>")
+            .Append("<tr><td class=\"email-card email-ink\" style=\"background:").Append(Card).Append(";border-radius:0 0 12px 12px;padding:40px 40px 36px;font-family:").Append(Font)
+            .Append(";font-size:16px;line-height:1.6;color:").Append(Ink).Append(";\">");
         if (email.Heading is { } heading)
         {
-            html.Append("<h1 style=\"font-size:22px;margin:0 0 16px\">").Append(E(heading)).Append("</h1>");
+            html.Append("<h1 class=\"email-h1\" style=\"margin:0 0 20px;font-family:").Append(Font).Append(";font-size:26px;line-height:1.25;font-weight:700;letter-spacing:-0.02em;color:").Append(Ink).Append(";\">")
+                .Append(E(heading)).Append("</h1>");
         }
 
-        html.Append(email.BodyHtml);
+        html.Append(Styled(email.BodyHtml, brand.Colour));
+
         if (email.Details.Count > 0)
         {
-            html.Append("<table role=\"presentation\" style=\"width:100%;border-collapse:collapse;margin:16px 0\">");
-            foreach (var d in email.Details)
+            html.Append("<table role=\"presentation\" class=\"email-panel\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"margin:24px 0 8px;background:").Append(Panel)
+                .Append(";border-radius:10px;\"><tr><td style=\"padding:8px 20px;\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">");
+            for (var i = 0; i < email.Details.Count; i++)
             {
-                var weight = d.IsTotal ? "font-weight:bold;border-top:2px solid #1a1a1a;" : "border-top:1px solid #e3e6ea;";
-                html.Append("<tr><td style=\"padding:8px 0;").Append(weight).Append("color:").Append(d.IsTotal ? "#1a1a1a" : "#5b6470").Append("\">").Append(E(d.Label))
-                    .Append("</td><td style=\"padding:8px 0;text-align:right;").Append(weight).Append("\">").Append(E(d.Value)).Append("</td></tr>");
+                var d = email.Details[i];
+                var border = i == 0 ? "border-top:0;" : d.IsTotal ? "border-top:2px solid " + Ink + ";" : "border-top:1px solid " + Line + ";";
+                var size = d.IsTotal ? "font-size:17px;font-weight:700;" : "font-size:15px;";
+                var cell = "email-line" + (d.IsTotal ? " email-total" : string.Empty);
+                html.Append("<tr><td class=\"").Append(cell).Append(d.IsTotal ? " email-value" : " email-label").Append("\" style=\"padding:12px 12px 12px 0;").Append(border).Append(size)
+                    .Append("color:").Append(d.IsTotal ? Ink : Muted).Append(";\">").Append(E(d.Label)).Append("</td>")
+                    .Append("<td class=\"").Append(cell).Append(" email-value\" align=\"right\" style=\"padding:12px 0;").Append(border).Append(size).Append("color:").Append(Ink)
+                    .Append(";text-align:right;white-space:nowrap;\">").Append(E(d.Value)).Append("</td></tr>");
             }
 
-            html.Append("</table>");
+            html.Append("</table></td></tr></table>");
         }
 
+        // One button, drawn with a table so Outlook shows it too, and its address written out below.
         if (email.HasButton)
         {
-            html.Append("<p style=\"margin:24px 0\"><a href=\"").Append(E(email.ButtonUrl!)).Append("\" style=\"background:").Append(brand.Colour).Append(";color:").Append(brand.ColourText).Append(";padding:12px 20px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block\">")
-                .Append(E(email.ButtonLabel!)).Append("</a></p>")
-                .Append("<p style=\"color:#5b6470;font-size:12px\">If the button doesn't work, copy this address into your browser:<br>").Append(E(email.ButtonUrl!)).Append("</p>");
+            html.Append("<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"margin:32px 0 8px;\"><tr>")
+                .Append("<td align=\"center\" bgcolor=\"").Append(brand.Colour).Append("\" style=\"border-radius:8px;background:").Append(brand.Colour).Append(";\">")
+                .Append("<a href=\"").Append(E(email.ButtonUrl!)).Append("\" target=\"_blank\" style=\"display:inline-block;padding:14px 28px;font-family:").Append(Font)
+                .Append(";font-size:16px;font-weight:600;line-height:1.2;color:").Append(brand.ColourText).Append(";text-decoration:none;border-radius:8px;\">")
+                .Append(E(email.ButtonLabel!)).Append("</a></td></tr></table>")
+                .Append("<p class=\"email-muted\" style=\"margin:20px 0 0;font-size:13px;line-height:1.5;color:").Append(Muted).Append(";\">If the button doesn't work, copy this address into your browser:<br>")
+                .Append("<a href=\"").Append(E(email.ButtonUrl!)).Append("\" style=\"color:").Append(Muted).Append(";word-break:break-all;\">").Append(E(email.ButtonUrl!)).Append("</a></p>");
         }
 
-        html.Append("</div><div style=\"max-width:600px;margin:16px auto 0;color:#5b6470;font-size:12px;text-align:center\">");
+        html.Append("</td></tr>");
+
+        // Who sent it, and why.
+        html.Append("<tr><td class=\"email-muted\" align=\"center\" style=\"padding:24px 24px 0;font-family:").Append(Font).Append(";font-size:12px;line-height:1.6;color:").Append(Muted).Append(";\">");
         if (brand.Company is { } company)
         {
-            html.Append("<p style=\"margin:0 0 4px\">").Append(E(company)).Append("</p>");
+            html.Append("<p style=\"margin:0 0 6px;\">").Append(E(company)).Append("</p>");
         }
 
         if (brand.Reason is { } reason)
         {
-            html.Append("<p style=\"margin:0\">").Append(E(reason));
+            html.Append("<p style=\"margin:0;\">").Append(E(reason));
             if (brand.PreferencesUrl is { } preferences)
             {
-                html.Append(" <a href=\"").Append(E(preferences)).Append("\" style=\"color:#5b6470\">Choose which emails you get</a>.");
+                html.Append(" <a href=\"").Append(E(preferences)).Append("\" style=\"color:").Append(Muted).Append(";text-decoration:underline;\">Choose which emails you get</a>.");
             }
 
             html.Append("</p>");
         }
 
-        html.Append("</div></body></html>");
+        html.Append("</td></tr></table></td></tr></table></body></html>");
         return html.ToString();
     }
+
+    /// <summary>
+    /// The body's simple HTML with its styles written on each element, as mail clients need (many ignore a style
+    /// sheet). The body is cleaned HTML and its values are encoded, so its tags are only the allowed ones.
+    /// </summary>
+    private static string Styled(string body, string colour) =>
+        BodyTag().Replace(body, match =>
+        {
+            var style = match.Groups["tag"].Value.ToLowerInvariant() switch
+            {
+                "p" => "margin:0 0 16px;",
+                "ul" or "ol" => "margin:0 0 16px;padding-left:24px;",
+                "li" => "margin:0 0 8px;",
+                "h2" => "margin:24px 0 12px;font-size:20px;line-height:1.3;font-weight:700;",
+                "h3" => "margin:20px 0 8px;font-size:17px;line-height:1.3;font-weight:700;",
+                "blockquote" => "margin:0 0 16px;padding:4px 0 4px 16px;border-left:3px solid " + Line + ";color:" + Muted + ";",
+                "a" => "color:" + colour + ";text-decoration:underline;font-weight:600;",
+                _ => string.Empty,
+            };
+            return "<" + match.Groups["tag"].Value + " style=\"" + style + "\"" + match.Groups["rest"].Value;
+        });
+
+    [GeneratedRegex(@"<(?<tag>p|ul|ol|li|h2|h3|blockquote|a)(?<rest>(\s[^>]*)?>)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture, matchTimeoutMilliseconds: 1000)]
+    private static partial Regex BodyTag();
 
     /// <summary>The plain-text version: <paramref name="bodyText"/> is the body already turned into text.</summary>
     public static string Text(EmailParts email, string bodyText, EmailBrand brand)

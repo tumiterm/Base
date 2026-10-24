@@ -16,6 +16,10 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ### Added
 
+- **A modern layout for every email**: the sender's logo, a card with the heading and message, the details set out in
+  a panel (totals stand out), one clear button that works in Outlook too (its address written out underneath), and a
+  footer saying who sent it and why. It reads well on phones, follows dark mode where the mail app supports it, and
+  sets the inbox preview line. Built from tables with styles on each element, as mail apps need.
 - **Emails look like whoever sends them.** What the platform sends organisations (billing, invoices, plan changes,
   the welcome) carries the platform's name, logo, colour and company details (Settings → Invoices); an
   organisation's own emails carry its name, and its logo and colour on plans with custom branding, with its billing

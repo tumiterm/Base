@@ -152,7 +152,8 @@ public sealed class EmailLayoutTests
             h => h.ShouldContain("Go &lt;now&gt;"),
             h => h.ShouldContain("href=\"https://example.com/?a=1&amp;b=2\""),
             h => h.ShouldContain("Acme &amp; Co"),
-            h => h.ShouldContain("<p>Body</p>"),
+            h => h.ShouldContain(">Body</p>"),
+            h => h.ShouldContain("<p style=\"margin:0 0 16px;\">", Case.Sensitive, "body tags get their styles inline"),
             h => h.ShouldNotContain("<news>"));
         EmailLayout.Text(email, "Body", new EmailBrand("Acme")).ShouldContain("Go <now>:\nhttps://example.com/?a=1&b=2");
     }
