@@ -1,0 +1,43 @@
+@model PlanChangeViewModel
+@{
+    var c = Model.Change;
+    ViewData["Title"] = "Pay for " + c.To.Name;
+    var until = c.ToCycle == BillingCycle.Annual ? c.EffectiveAt.AddYears(1) : c.EffectiveAt.AddMonths(1);
+}
+<nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-action="Index">Subscription</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">Pay</span></nav>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Pay for @c.To.Name</h1>
+        <p class="page-subtitle">On the payment provider's secure page. Card details never reach this app.</p>
+    </div>
+</div>
+
+<form method="post" asp-action="Pay" class="stack plan-change">
+    <input type="hidden" name="PlanId" value="@c.To.Id" />
+    <input type="hidden" name="BillingCycle" value="@c.ToCycle" />
+    <section class="panel" aria-labelledby="pay-title">
+        <div class="panel-header"><h2 class="panel-title" id="pay-title">Payment</h2></div>
+        <div class="panel-body stack">
+            <div class="amount-due">
+                <span class="text-muted">@c.To.Name, @(c.ToCycle == BillingCycle.Annual ? "1 year" : "1 month"): today to <local-time value="until" format="d MMM yyyy" /></span>
+                <span class="amount-due-value">@Display.Money(c.AmountDueNow, c.Currency)</span>
+            </div>
+            @if (c.FeaturesLost.Count > 0)
+            {
+                <p class="text-muted small mb-0">Compared with @c.From.Name you lose: @string.Join(", ", c.FeaturesLost). What you made with them is kept.</p>
+            }
+            @if (Model.Gateways.Count > 0)
+            {
+                <partial name="_PayWith" model="(Model.Gateways, Model.Gateway, true)" />
+            }
+            else
+            {
+                <p class="mb-0">None of the payment options here can take @Display.Money(c.AmountDueNow, c.Currency). Contact us to pay.</p>
+            }
+        </div>
+        <div class="panel-footer d-flex flex-wrap gap-2">
+            @if (Model.Gateways.Count > 0) {<button type="submit" class="btn btn-primary"><icon name="lock" class="icon-sm" /> Pay @Display.Money(c.AmountDueNow, c.Currency)</button>}
+            <a class="btn btn-ghost" asp-action="Index">Back</a>
+        </div>
+    </section>
+</form>

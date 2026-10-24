@@ -33,7 +33,7 @@ public sealed class SubscriptionController(
         var mine = await subscriptions.GetMineAsync(cancellationToken);
         var currency = mine.Subscription?.Currency ?? (mine.Plans.Count > 0 ? mine.Plans[0].Currency : null);
         var canView = currentUser.HasPermission(PermissionCodes.Subscription.View);
-        var history = canView ? (await payments.ListMineAsync(new PaymentQuery(PageSize: 10), cancellationToken)).Data?.Items ?? [] : [];
+        var history = canView ? (await payments.ListMineAsync(new PaymentQuery(PageSize: 3), cancellationToken)).Data?.Items ?? [] : [];
         var recurring = canView ? (await payments.RecurringMineAsync(cancellationToken)).Data : null;
 
         // What choosing each plan on the current billing cycle would do, shown on its card before anyone clicks.
@@ -117,12 +117,18 @@ public sealed class SubscriptionController(
         }
 
         var change = preview.Data!;
-        if (!change.IsBlocked && change.Kind is PlanChangeKind.Start or PlanChangeKind.Extend)
+        var all = payments.Gateways(change.Currency);
+        if (!change.IsBlocked && change.Kind is PlanChangeKind.Start)
         {
-            return await Pay(form, cancellationToken);
+            return View("Checkout", new PlanChangeViewModel(change, all.Where(g => g.MinimumCharge <= change.AmountDueNow).ToList(), form.Gateway, false, false));
         }
 
-        var all = payments.Gateways(change.Currency);
+        if (change.Kind is PlanChangeKind.Extend)
+        {
+            // Already on this plan: say so; paying ahead is an explicit choice, and pointless while renewal is on.
+            return View("Current", new PlanChangeViewModel(change, all.Where(g => g.MinimumCharge <= change.AmountDueNow).ToList(), form.Gateway, false, false));
+        }
+
         var nothingToPay = change.Kind == PlanChangeKind.Upgrade && (all.Count == 0 || change.AmountDueNow < all.Min(g => g.MinimumCharge));
         return View("Change", new PlanChangeViewModel(
             change,
@@ -172,6 +178,14 @@ public sealed class SubscriptionController(
         }
 
         return Redirect(url.Data!.AbsoluteUri);
+    }
+
+    /// <summary>Every payment for this organisation's subscription.</summary>
+    [HttpGet("payments")]
+    public async Task<IActionResult> Payments(int page = 1, CancellationToken cancellationToken = default)
+    {
+        var result = await payments.ListMineAsync(new PaymentQuery(Page: page, PageSize: 25), cancellationToken);
+        return result.IsError ? result.ToActionResult(this) : View(result.Data);
     }
 
     /// <summary>Where the gateway sends the person back to; the gateway's own notification decides the outcome.</summary>

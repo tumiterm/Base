@@ -103,6 +103,11 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ### Changed
 
+- **Subscription** deals only with the subscription and fits on one screen: the plan's facts in a row, usage and
+  recent payments beside it, plans side by side with their features folded away, and the billing cycle and Continue
+  in the plans' header. How to pay (provider, automatic renewal) is on the next page, only when something is due.
+  Choosing your own plan says you're already on it (and offers paying ahead unless it renews automatically). All
+  payments are on a new **Payment history** page.
 - `PUT /api/platform/tenants/{id}/subscription/plan` needs a `reason` and refuses a plan the tenant is over the
   limits of unless `allowOverLimits` is set; `when` (`Now` or `AtPeriodEnd`) defaults to now. Paying online for a
   cheaper plan or another cycle during a paid period is refused: it is scheduled instead.

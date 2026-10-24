@@ -1,0 +1,48 @@
+@model Base.Application.Common.Persistence.PagedResult<Base.Application.Payments.PaymentView>
+@{
+    ViewData["Title"] = "Payment history";
+}
+<nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-action="Index">Subscription</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">Payment history</span></nav>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Payment history</h1>
+        <p class="page-subtitle">Every payment for this organisation's subscription, newest first.</p>
+    </div>
+</div>
+@if (Model.Items.Count == 0)
+{
+    <div class="empty-state"><icon name="receipt" /><div class="empty-state-title">No payments yet</div></div>
+}
+else
+{
+    <section class="panel">
+        <div class="table-responsive">
+            <table class="table table-app mb-0">
+                <thead><tr><th>Payment</th><th>Reference</th><th>Paid with</th><th>Date</th><th class="text-end">Amount</th><th>Status</th></tr></thead>
+                <tbody>
+                    @foreach (var p in Model.Items)
+                    {
+                        <tr>
+                            <td><a asp-action="Payment" asp-route-reference="@p.Reference">@p.Description</a><div class="small text-muted">@(p.IsRenewal ? "Automatic renewal" : "By " + p.RequestedByName)@(p.SetsUpRenewal ? " · set up automatic renewal" : "")@(p.IsUpgrade ? " · upgrade" : "")</div></td>
+                            <td class="mono">@p.Reference</td>
+                            <td>@p.GatewayName</td>
+                            <td><local-time value="p.CreatedAt" format="d MMM yyyy, HH:mm" /></td>
+                            <td class="text-end fw-semibold">@Display.Money(p.Amount, p.Currency)</td>
+                            <td><span class="badge text-bg-@Display.Tone(p.Status)">@Display.Status(p.Status)</span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        @if (Model.Total > Model.PageSize)
+        {
+            <div class="panel-footer d-flex justify-content-between align-items-center">
+                <span class="text-muted small">Page @Model.Page of @((Model.Total + Model.PageSize - 1) / Model.PageSize)</span>
+                <div class="d-flex gap-2">
+                    @if (Model.Page > 1) {<a class="btn btn-secondary btn-sm" asp-action="Payments" asp-route-page="@(Model.Page - 1)">Newer</a>}
+                    @if (Model.Page * Model.PageSize < Model.Total) {<a class="btn btn-secondary btn-sm" asp-action="Payments" asp-route-page="@(Model.Page + 1)">Older</a>}
+                </div>
+            </div>
+        }
+    </section>
+}

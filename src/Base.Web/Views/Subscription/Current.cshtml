@@ -1,0 +1,61 @@
+@model PlanChangeViewModel
+@{
+    var c = Model.Change;
+    ViewData["Title"] = "Your plan";
+    var next = c.FromCycle == BillingCycle.Annual ? c.PeriodEnd.AddYears(1) : c.PeriodEnd.AddMonths(1);
+    var period = c.FromCycle == BillingCycle.Annual ? "year" : "month";
+    var selected = Model.Gateways.FirstOrDefault(g => g.Code == Model.Gateway) ?? Model.Gateways.FirstOrDefault();
+}
+<nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-action="Index">Subscription</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">Your plan</span></nav>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">You're already on @c.From.Name</h1>
+        <p class="page-subtitle">@Display.Money(c.FromPrice, c.From.Currency)@Display.PerCycle(c.FromCycle), paid up to <local-time value="c.PeriodEnd" format="d MMMM yyyy" />.</p>
+    </div>
+</div>
+
+<div class="stack plan-change">
+    <section class="panel" aria-labelledby="current-title">
+        <div class="panel-header"><h2 class="panel-title" id="current-title">@(c.RenewsAutomatically ? "Nothing to do" : "Pay ahead?")</h2></div>
+        <div class="panel-body stack">
+            @if (c.RenewsAutomatically)
+            {
+                <div class="status-callout is-ok">
+                    <icon name="circle-check" />
+                    <div>
+                        <div class="status-callout-title">It renews automatically on <local-time value="c.PeriodEnd" format="d MMMM yyyy" /></div>
+                        <div class="small">The payment provider charges @Display.Money(c.FromPrice, c.From.Currency) then by itself, so there's no need to pay ahead. To change plan, choose another one.</div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <p class="mb-0">There's nothing you need to do now. If you like, pay for the next @period in advance: you stay on @c.From.Name and are paid up to <local-time value="next" format="d MMMM yyyy" />.</p>
+                @if (c.Scheduled is { } waiting)
+                {
+                    <div class="status-callout is-warning">
+                        <icon name="calendar" />
+                        <div class="small">Paying ahead keeps @c.From.Name: it cancels the move to @waiting.PlanName waiting for <local-time value="waiting.At" format="d MMMM yyyy" />.</div>
+                    </div>
+                }
+            }
+        </div>
+
+        @if (!c.RenewsAutomatically && selected is not null)
+        {
+            <form method="post" asp-action="Pay" class="panel-footer stack">
+                <input type="hidden" name="PlanId" value="@c.To.Id" />
+                <input type="hidden" name="BillingCycle" value="@c.ToCycle" />
+                <partial name="_PayWith" model="(Model.Gateways, Model.Gateway, true)" />
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="submit" class="btn btn-primary"><icon name="lock" class="icon-sm" /> Pay ahead @Display.Money(c.AmountDueNow, c.Currency)</button>
+                    <a class="btn btn-ghost" asp-action="Index">Back</a>
+                </div>
+            </form>
+        }
+        else
+        {
+            <div class="panel-footer"><a class="btn btn-secondary" asp-action="Index">Back to subscription</a></div>
+        }
+    </section>
+</div>

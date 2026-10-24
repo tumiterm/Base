@@ -109,20 +109,7 @@
                 <form method="post" asp-action="Pay" class="panel-footer stack">
                     <input type="hidden" name="PlanId" value="@c.To.Id" />
                     <input type="hidden" name="BillingCycle" value="@c.ToCycle" />
-                    <div>
-                        <div class="form-label">Pay with</div>
-                        <div class="choice-grid" role="radiogroup" aria-label="Payment provider">
-                            @foreach (var g in Model.Gateways)
-                            {
-                                <label class="choice-card">
-                                    <input type="radio" name="Gateway" value="@g.Code" checked="@(g == selected)" />
-                                    <span class="choice-check"><icon name="check" /></span>
-                                    <span class="choice-title"><icon name="credit-card" class="icon-sm" /> @g.Name</span>
-                                    <span class="chip-group">@foreach (var m in g.Methods) {<span class="chip">@m</span>}</span>
-                                </label>
-                            }
-                        </div>
-                    </div>
+                    <partial name="_PayWith" model="(Model.Gateways, Model.Gateway, false)" />
                     <div class="d-flex flex-wrap gap-2">
                         <button type="submit" class="btn btn-primary"><icon name="lock" class="icon-sm" /> Pay @Display.Money(c.AmountDueNow, c.Currency)</button>
                         <a class="btn btn-ghost" asp-action="Index">Cancel</a>

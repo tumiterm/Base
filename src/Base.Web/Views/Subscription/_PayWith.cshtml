@@ -1,0 +1,25 @@
+@model (IReadOnlyList<Base.Application.Payments.PaymentGatewayView> Gateways, string? Selected, bool OfferRenewal)
+@{
+    var selected = Model.Gateways.FirstOrDefault(g => g.Code == Model.Selected) ?? Model.Gateways.FirstOrDefault();
+}
+<div>
+    <div class="form-label">Pay with</div>
+    <div class="choice-grid" role="radiogroup" aria-label="Payment provider">
+        @foreach (var g in Model.Gateways)
+        {
+            <label class="choice-card">
+                <input type="radio" name="Gateway" value="@g.Code" checked="@(g == selected)" data-recurring="@(Model.OfferRenewal && g.SupportsRecurring ? "true" : "false")" />
+                <span class="choice-check"><icon name="check" /></span>
+                <span class="choice-title"><icon name="credit-card" class="icon-sm" /> @g.Name</span>
+                <span class="chip-group">@foreach (var m in g.Methods) {<span class="chip">@m</span>}</span>
+            </label>
+        }
+    </div>
+</div>
+@if (Model.OfferRenewal && Model.Gateways.Any(g => g.SupportsRecurring))
+{
+    <label class="form-check form-switch mb-0" data-renew-option>
+        <input class="form-check-input" type="checkbox" role="switch" name="RenewAutomatically" value="true" checked />
+        <span class="form-check-label"><strong>Renew automatically.</strong> The payment provider charges this amount every month or year, until you turn it off on Subscription.@foreach (var capped in Model.Gateways.Where(g => g.SupportsRecurring && g.MaximumRecurringCharge is not null)) {<span class="d-block text-muted small">@capped.Name renews automatically up to @capped.MaximumRecurringCharge!.Value.ToString("N2", System.Globalization.CultureInfo.InvariantCulture); pay larger amounts once.</span>}</span>
+    </label>
+}

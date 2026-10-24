@@ -564,6 +564,17 @@ a.chip:hover, button.chip:hover { border-color: var(--border-strong); color: var
 .choice-card:has(> input:focus-visible) { box-shadow: var(--focus-ring); }
 .choice-card.is-current { border-style: dashed; }
 .choice-card:has(input:disabled) { opacity: .55; cursor: not-allowed; }
+/* Subscription: a row of facts, the renewal line, plans side by side with their features folded away. */
+.fact-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr)); gap: var(--s-3); margin: 0; }
+.fact-row dt { font-size: var(--text-xs); font-weight: 500; color: var(--text-3); text-transform: uppercase; letter-spacing: .04em; }
+.fact-row dd { margin: 0; font-weight: 600; color: var(--text); }
+.fact-row dd small { font-weight: 400; color: var(--text-3); margin-left: 2px; }
+.renewal-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); padding: var(--s-3) var(--s-4); border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); }
+.renewal-row > .icon { color: var(--text-3); }
+.plan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: var(--s-3); }
+.plan-details { margin-top: auto; font-size: var(--text-sm); }
+.plan-details > summary { cursor: pointer; color: var(--text-2); font-weight: 500; padding-top: var(--s-1); }
+.plan-details[open] > summary { margin-bottom: var(--s-2); }
 .choice-note { display: block; font-size: var(--text-xs); font-weight: 500; line-height: 1.4; color: var(--accent-subtle-text); background: var(--accent-subtle); border-radius: var(--radius); padding: var(--s-1) var(--s-2); }
 .choice-note > .icon { vertical-align: -2px; margin-right: 2px; }
 .choice-check { position: absolute; top: var(--s-3); right: var(--s-3); display: grid; place-items: center; width: 1.125rem; height: 1.125rem; border: 1px solid var(--border-strong); border-radius: 50%; color: transparent; transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease); }
