@@ -279,6 +279,18 @@ public static class DependencyInjection
             origins.Add("https://" + payfast.Host);
         }
 
+        if (configuration.GetSection(Payments.YocoOptions.SectionName).Get<Payments.YocoOptions>() is { Enabled: true })
+        {
+            services.AddOptions<Payments.YocoOptions>().BindConfiguration(Payments.YocoOptions.SectionName)
+                .Validate(o => o.SecretKey.StartsWith("sk_", StringComparison.Ordinal), "Payments:Gateways:Yoco needs SecretKey (sk_test_... or sk_live_...).")
+                .Validate(o => o.WebhookSecret.StartsWith("whsec_", StringComparison.Ordinal), "Payments:Gateways:Yoco needs WebhookSecret (whsec_...), from registering the webhook.")
+                .ValidateOnStart();
+            services.AddHttpClient(Payments.YocoGateway.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(20));
+            services.AddScoped<Application.Payments.IPaymentGateway, Payments.YocoGateway>();
+
+            // Yoco's checkout is a plain redirect, sent from a page (not a form post), so it needs no form-action entry.
+        }
+
         services.AddSingleton(new Application.Payments.PaymentCheckoutOrigins(origins));
     }
 
@@ -320,6 +332,11 @@ public static class DependencyInjection
         if (configuration.GetSection(Payments.PayfastOptions.SectionName).Get<Payments.PayfastOptions>() is { Enabled: true })
         {
             checks.AddCheck<Payments.PayfastHealthCheck>("payfast", tags: dependency, timeout: timeout);
+        }
+
+        if (configuration.GetSection(Payments.YocoOptions.SectionName).Get<Payments.YocoOptions>() is { Enabled: true })
+        {
+            checks.AddCheck<Payments.YocoHealthCheck>("yoco", tags: dependency, timeout: timeout);
         }
 
         if (!string.IsNullOrWhiteSpace(configuration[ClamAvOptions.SectionName + ":" + nameof(ClamAvOptions.Host)]))

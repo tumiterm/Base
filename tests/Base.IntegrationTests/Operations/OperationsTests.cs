@@ -175,7 +175,9 @@ public sealed class OperationsTests(SqlServerFixture sql) : IAsyncLifetime
     [Fact]
     public async Task Slow_commands_are_counted()
     {
+        // The meter is process-wide and other tests run alongside: count only what this test's own flow records.
         var slow = 0L;
+        var ours = new AsyncLocal<bool> { Value = true };
         using var listener = new MeterListener();
         listener.InstrumentPublished = (instrument, l) =>
         {
@@ -184,7 +186,13 @@ public sealed class OperationsTests(SqlServerFixture sql) : IAsyncLifetime
                 l.EnableMeasurementEvents(instrument);
             }
         };
-        listener.SetMeasurementEventCallback<long>((_, value, _, _) => Interlocked.Add(ref slow, value));
+        listener.SetMeasurementEventCallback<long>((_, value, _, _) =>
+        {
+            if (ours.Value)
+            {
+                Interlocked.Add(ref slow, value);
+            }
+        });
         listener.Start();
 
         await _app.InScopeAsync(null, sp => sp.GetRequiredService<AppDbContext>().Database.ExecuteSqlAsync($"WAITFOR DELAY '00:00:00.300'"));

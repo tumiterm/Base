@@ -6,11 +6,18 @@
     <icon name="lock" />
     <div class="empty-state-title">Taking you to the secure payment page…</div>
     <p class="mb-3">If nothing happens in a few seconds, continue yourself.</p>
-    <form method="post" action="@Model.Url.AbsoluteUri" data-submit-on-load>
-        @foreach (var field in Model.FormFields!)
-        {
-            <input type="hidden" name="@field.Key" value="@field.Value" />
-        }
-        <button type="submit" class="btn btn-primary"><icon name="lock" class="icon-sm" /> Continue to payment</button>
-    </form>
+    @if (Model.IsFormPost)
+    {
+        <form method="post" action="@Model.Url.AbsoluteUri" data-submit-on-load>
+            @foreach (var field in Model.FormFields!)
+            {
+                <input type="hidden" name="@field.Key" value="@field.Value" />
+            }
+            <button type="submit" class="btn btn-primary"><icon name="lock" class="icon-sm" /> Continue to payment</button>
+        </form>
+    }
+    else
+    {
+        <a class="btn btn-primary" href="@Model.Url.AbsoluteUri" data-navigate-on-load><icon name="lock" class="icon-sm" /> Continue to payment</a>
+    }
 </div>

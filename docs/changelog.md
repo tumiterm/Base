@@ -27,6 +27,8 @@ Add a line under **Unreleased** with every change. A release moves those lines u
   - **Payfast** gateway (`Payments:Gateways:Payfast`): card, Instant EFT, QR codes, Apple Pay, Samsung Pay and the
     rest of the merchant account's methods on Payfast's page; ITNs verified by signature, source, amount and
     Payfast's confirmation. Sandbox or live. Setup in `docs/payments.md`.
+  - **Yoco** gateway (`Payments:Gateways:Yoco`): Yoco's Checkout API with its hosted payment page; webhooks verified
+    by Standard Webhooks signature and timestamp. Once-off payments. Setup in `docs/payments.md`.
   - **Automatic renewal**: "Renew automatically" when paying (Payfast Subscriptions, and the Test gateway). The gateway
     charges every month or year; each charge renews the subscription and sends a receipt. Subscription shows the
     renewal with Update card and Turn off; it stops by itself when the plan changes or the subscription ends, and the

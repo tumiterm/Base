@@ -61,8 +61,11 @@ public sealed class SubscriptionController(
             return RedirectToAction(nameof(Index), null, null, "pay");
         }
 
+        // Another site is reached from a page rather than by redirecting this form post, so the CSP's form-action
+        // (which also covers redirects after a post) needs no entry for gateways that only redirect.
         var redirect = started.Data!;
-        return redirect.IsFormPost ? View("GatewayRedirect", redirect) : Redirect(redirect.Url.AbsoluteUri);
+        var sameSite = string.Equals(redirect.Url.Authority, Request.Host.Value, StringComparison.OrdinalIgnoreCase);
+        return redirect.IsFormPost || !sameSite ? View("GatewayRedirect", redirect) : Redirect(redirect.Url.AbsoluteUri);
     }
 
     /// <summary>Turns automatic renewal off, at the gateway too.</summary>

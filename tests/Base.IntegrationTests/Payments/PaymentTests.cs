@@ -110,6 +110,16 @@ public sealed class PaymentTests(SqlServerFixture sql) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_notification_that_names_only_the_gateways_checkout_still_finds_its_payment()
+    {
+        var reference = await PendingReferenceAsync("Scripted");
+        var form = Form("ignored", "paid", "c1");
+        form["checkout"] = "CHK-" + reference;
+        (await ReceiveAsync("scripted", form)).StatusCode.ShouldBe(200);
+        (await StatusAsync(reference)).ShouldBe(PaymentStatus.Succeeded);
+    }
+
+    [Fact]
     public async Task Leaving_the_gateway_cancels_but_a_late_success_still_counts_and_unanswered_payments_expire()
     {
         var left = await PendingReferenceAsync("Scripted");
@@ -306,7 +316,7 @@ public sealed class PaymentTests(SqlServerFixture sql) : IAsyncLifetime
         public Task<GatewayResult> CancelRecurringAsync(string token, CancellationToken cancellationToken) => Task.FromResult(GatewayResult.Failed("Unreachable."));
 
         public Task<CheckoutStart> StartCheckoutAsync(CheckoutRequest request, CancellationToken cancellationToken) =>
-            Task.FromResult(CheckoutStart.Go(new CheckoutRedirect(new Uri("https://scripted.example.com/pay"), new Dictionary<string, string>(StringComparer.Ordinal) { ["reference"] = request.Reference })));
+            Task.FromResult(CheckoutStart.Go(new CheckoutRedirect(new Uri("https://scripted.example.com/pay"), new Dictionary<string, string>(StringComparer.Ordinal) { ["reference"] = request.Reference }), "CHK-" + request.Reference));
 
         public Task<GatewayNotification> ReadNotificationAsync(InboundNotification notification, CancellationToken cancellationToken)
         {
@@ -317,9 +327,10 @@ public sealed class PaymentTests(SqlServerFixture sql) : IAsyncLifetime
             }
 
             var kind = f["status"] == "paid" ? GatewayNotificationKind.Paid : GatewayNotificationKind.Failed;
+            var byCheckout = f.GetValueOrDefault("checkout") is { Length: > 0 } checkout ? checkout : null;
             return Task.FromResult(new GatewayNotification(
-                true, f["event"], f["reference"], "SCR-" + f["event"], kind, decimal.Parse(f["amount"], CultureInfo.InvariantCulture),
-                kind == GatewayNotificationKind.Failed ? "Card declined." : null, f.GetValueOrDefault("token") is { Length: > 0 } t ? t : null));
+                true, f["event"], byCheckout is null ? f["reference"] : null, "SCR-" + f["event"], kind, decimal.Parse(f["amount"], CultureInfo.InvariantCulture),
+                kind == GatewayNotificationKind.Failed ? "Card declined." : null, f.GetValueOrDefault("token") is { Length: > 0 } t ? t : null, byCheckout));
         }
     }
 }

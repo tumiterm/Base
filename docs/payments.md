@@ -9,7 +9,8 @@ This page is how to set a gateway up.
 | Code | What it is | Configure under |
 | --- | --- | --- |
 | `Test` | A pretend checkout page in the app (Pay / Decline / Cancel). On in Development. **Never in production.** | `Payments:Gateways:Test:Enabled` |
-| `Payfast` | Payfast's hosted checkout: card, Instant EFT, QR codes (SnapScan, Zapper, Scan to Pay), Apple Pay, Samsung Pay and others the merchant account has switched on. Rand only, R5.00 minimum. | `Payments:Gateways:Payfast` |
+| `Payfast` | Payfast's hosted checkout: card, Instant EFT, QR codes (SnapScan, Zapper, Scan to Pay), Apple Pay, Samsung Pay and others the merchant account has switched on. Rand only, R5.00 minimum. Automatic renewal. | `Payments:Gateways:Payfast` |
+| `Yoco` | Yoco's Checkout API: Yoco's hosted payment page (cards and the wallets Yoco offers there). Rand only. Once-off payments (no automatic renewal). | `Payments:Gateways:Yoco` |
 
 A gateway appears on the Subscription page once it is enabled, for plans in a currency it accepts.
 
@@ -81,6 +82,60 @@ configured Payfast host automatically.
 Switch to live credentials, set `Sandbox` to `false`, check `General.PublicBaseUrl`, and make one small real payment
 (Payfast's minimum is R5.00; its fees on test payments aren't refunded).
 
+## Yoco
+
+Yoco's **Checkout API**: the server creates a checkout (`POST https://payments.yoco.com/api/checkouts` with the secret
+key), the person pays on Yoco's page, and Yoco reports the outcome with a webhook. (Yoco's *payment links* are a
+different API, the Yoco Business API with app tokens; they aren't used here.)
+
+### 1. Keys
+
+In the Yoco App, open **Manage → Connect → Checkout API → How to connect** and copy the **Test secret key**
+(`sk_test_...`). Live keys (`sk_live_...`) unlock once your domain is verified under **Verified Domains**. Keys are
+secrets: user-secrets or environment variables only.
+
+```bash
+cd src/Base.Web
+dotnet user-secrets set "Payments:Gateways:Yoco:Enabled" "true"
+dotnet user-secrets set "Payments:Gateways:Yoco:SecretKey" "<sk_test_...>"
+dotnet user-secrets set "Payments:Gateways:Yoco:WebhookSecret" "<whsec_...>"
+```
+
+### 2. Register the webhook (once per key)
+
+Yoco sends webhooks to an address registered for your account, not per checkout. Register
+`{public address}/payments/notify/yoco` with your secret key; the answer contains the signing secret (`whsec_...`)
+for `WebhookSecret`:
+
+```bash
+curl -X POST https://payments.yoco.com/api/webhooks \
+  -H "Authorization: Bearer <sk_test_...>" -H "Content-Type: application/json" \
+  -d '{"name": "base", "url": "https://<your public address>/payments/notify/yoco"}'
+```
+
+The public address follows the same rules as Payfast's (a public HTTPS address that reaches the app; a tunnel on a
+developer machine). Register again with the live key when going live, and use that secret in production.
+
+### 3. What is checked on every webhook
+
+- **Signature** (Standard Webhooks): HMAC-SHA256 of `webhook-id.webhook-timestamp.body` with the `whsec_` secret,
+  compared with each `v1,` entry in `webhook-signature`.
+- **Freshness**: `webhook-timestamp` within 5 minutes, against replays.
+- **Amount**: the payment's amount in cents equals the payment's.
+- **Which payment**: our reference from the checkout's metadata, or else Yoco's checkout ID.
+
+`payment.succeeded` marks the payment paid; `payment.failed` declined; anything else is logged and ignored.
+Repeats (same `webhook-id`) change nothing.
+
+### 4. Testing
+
+Pay on Yoco's test page with the **test card** shown in the Yoco App (*How to connect → Test card details*). Test
+payments move no money.
+
+### 5. Going live
+
+Verify your domain in the Yoco App, switch to the live secret key, register the webhook with it and set its secret.
+
 ## Automatic renewal
 
 When the chosen gateway can charge by itself (Payfast, and the Test gateway), the pay form offers **Renew
@@ -111,4 +166,4 @@ would at the end of the period.
 
 ## Not yet
 
-Refunds, invoices and Yoco.
+Refunds and invoices; automatic renewal through Yoco (its Checkout API takes once-off payments).

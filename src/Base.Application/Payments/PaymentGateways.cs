@@ -102,6 +102,8 @@ public enum GatewayNotificationKind
 /// <param name="Reference">Our payment reference, read from the notification.</param>
 /// <param name="Amount">The amount the gateway says was paid, checked against the payment.</param>
 /// <param name="RecurringToken">The gateway's id for the automatic renewal the notification is about, if any.</param>
+/// <param name="CheckoutId">The gateway's id for the checkout, given when it was started: finds the payment when the
+/// notification doesn't carry our reference.</param>
 public sealed record GatewayNotification(
     bool Verified,
     string? EventId,
@@ -110,7 +112,8 @@ public sealed record GatewayNotification(
     GatewayNotificationKind Kind,
     decimal? Amount,
     string? Detail,
-    string? RecurringToken = null)
+    string? RecurringToken = null,
+    string? CheckoutId = null)
 {
     public static GatewayNotification Rejected(string detail) => new(false, null, null, null, GatewayNotificationKind.Other, null, detail);
 }

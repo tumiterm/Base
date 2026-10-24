@@ -338,6 +338,10 @@ internal sealed partial class PaymentService(
             payment = read.Reference is null
                 ? null
                 : await unitOfWork.Repository<Payment>().GetAsync(p => p.Reference == read.Reference && p.Gateway == provider.Code, cancellationToken: cancellationToken);
+            if (payment is null && read.CheckoutId is { Length: > 0 } checkoutId)
+            {
+                payment = await unitOfWork.Repository<Payment>().GetAsync(p => p.GatewayReference == checkoutId && p.Gateway == provider.Code, cancellationToken: cancellationToken);
+            }
             if (payment is null || read.Kind == GatewayNotificationKind.Other)
             {
                 await log.AddAsync(new PaymentNotification(provider.Code, eventId, read.Reference, PaymentNotificationOutcome.Ignored, read.Detail ?? "Not about a payment of ours.", now), cancellationToken);
