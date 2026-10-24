@@ -199,9 +199,20 @@ internal sealed partial class PayfastGateway(IOptions<PayfastOptions> options, I
             return Task.FromResult(CheckoutStart.Failed("Automatic renewal through Payfast needs the merchant passphrase to be configured."));
         }
 
-        var fields = CheckoutFields(_options, request);
+        // Posted exactly as signed: trimmed, blanks left out (Payfast signs what it receives).
+        var fields = CheckoutFields(_options, request)
+            .Select(f => new KeyValuePair<string, string>(f.Key, f.Value.Trim()))
+            .Where(f => f.Value.Length > 0)
+            .ToList();
         fields.Add(new("signature", PayfastSignature.ForCheckout(fields, _options.Passphrase)));
-        var form = fields.Where(f => f.Value.Length > 0).ToDictionary(f => f.Key, f => f.Value, StringComparer.Ordinal);
+        if (logger.IsEnabled(LogLevel.Debug))
+        {
+            var signed = string.Join('&', fields.Select(f => f.Key + "=" + (f.Key is "merchant_key" ? "***" : f.Value)));
+            var withPassphrase = !string.IsNullOrEmpty(_options.Passphrase);
+            LogSigned(logger, request.Reference, signed, withPassphrase);
+        }
+
+        var form = fields.ToDictionary(f => f.Key, f => f.Value, StringComparer.Ordinal);
         return Task.FromResult(CheckoutStart.Go(new CheckoutRedirect(new Uri($"https://{_options.Host}/eng/process"), form)));
     }
 
@@ -422,6 +433,9 @@ internal sealed partial class PayfastGateway(IOptions<PayfastOptions> options, I
     }
 
     private static string Limit(string? value, int max) => value is null ? string.Empty : value.Length > max ? value[..max] : value;
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Payfast checkout {Reference} signed over {Fields} (passphrase included: {WithPassphrase})")]
+    private static partial void LogSigned(ILogger logger, string reference, string fields, bool withPassphrase);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Couldn't look up {Host} to check where a Payfast ITN came from")]
     private static partial void LogLookupFailed(ILogger logger, string host, Exception exception);

@@ -117,6 +117,9 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ### Fixed
 
+- Payfast checkouts post exactly the values they are signed over (trimmed, blanks left out). A description cut at
+  100 characters on a space was signed without the space but posted with it, which Payfast refused as a signature
+  mismatch. In Development the signed fields are logged (merchant key masked) to diagnose a mismatch.
 - Paying for a large plan with **Renew automatically** through Payfast ended on Payfast's "400 Bad Request" page
   when the account's subscription limit was lower. Payfast's `MaxRecurringAmount` and `MaxAmount` now set the
   account's limits; larger payments are refused with a clear message before leaving the app, and a renewal that a

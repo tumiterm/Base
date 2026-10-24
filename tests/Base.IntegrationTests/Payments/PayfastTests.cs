@@ -67,6 +67,21 @@ public sealed class PayfastTests
     }
 
     [Fact]
+    public async Task What_is_posted_is_exactly_what_was_signed_even_when_a_long_name_is_cut_at_a_space()
+    {
+        // An upgrade's description; cut at 100 characters it ends in a space, which must not be posted unsigned.
+        var description = "Upgrade to Enterprise until 21 Feb 2027 (" + new string('x', 58) + " Holdings)";
+        description[..100].ShouldEndWith(" ");
+        var form = (await Gateway(Options(sandbox: true), "VALID").StartCheckoutAsync(Checkout with { Description = description, Amount = 17426.02m }, CancellationToken.None))
+            .Redirect!.FormFields!;
+
+        form["item_name"].ShouldBe(description[..100].Trim());
+        var posted = form.Where(f => f.Key != "signature").ToList();
+        posted.ShouldAllBe(f => f.Value.Length > 0 && f.Value == f.Value.Trim());
+        PayfastSignature.ForCheckout(posted, Passphrase).ShouldBe(form["signature"], "Payfast signs the fields it receives, in the order they arrive");
+    }
+
+    [Fact]
     public async Task A_genuine_itn_is_read_after_payfast_confirms_it()
     {
         var gateway = Gateway(Options(), "VALID");
