@@ -16,6 +16,9 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ### Added
 
+- **Payments work locally out of the box**: in Development, Payfast (its shared sandbox merchant) and Yoco are on
+  next to Test payments. Yoco needs only your own test key, once; no webhook. A payment still waiting when the person
+  comes back is confirmed by asking the gateway (Yoco), server to server, in Development and production alike.
 - **Changing plan properly** (docs/payments.md, Changing plan).
   - An upgrade applies at once and the organisation pays only the difference for the time already paid for. A
     downgrade or change of billing cycle waits for the end of the paid period, with nothing to pay now, and can be

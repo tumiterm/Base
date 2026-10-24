@@ -39,6 +39,8 @@ public sealed partial class PaymentTests(SqlServerFixture sql) : IAsyncLifetime
                 services.AddScoped<IPaymentGateway, ScriptedGateway>();
                 services.AddScoped<IPaymentGateway, LinkedGateway>();
                 services.AddScoped<IPaymentGateway, RigidGateway>();
+                services.AddSingleton<AskedGateway>();
+                services.AddSingleton<IPaymentGateway>(sp => sp.GetRequiredService<AskedGateway>());
             },
             new Dictionary<string, string?>(StringComparer.Ordinal) { ["Payments:Gateways:Test:Enabled"] = "true" });
         _starter = await PlanAsync("starter", 100m, 1000m);

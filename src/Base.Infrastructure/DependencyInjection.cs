@@ -37,6 +37,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
@@ -59,7 +60,7 @@ public static class DependencyInjection
         services.AddOptions<DatabaseOptions>().BindConfiguration(DatabaseOptions.SectionName);
         services.AddOptions<SeedOptions>().BindConfiguration(SeedOptions.SectionName);
         services.AddOptions<Application.Flags.FeatureFlagOptions>().BindConfiguration(Application.Flags.FeatureFlagOptions.SectionName);
-        AddPaymentGateways(services, configuration);
+        AddPaymentGateways(services, configuration, environment);
         services.AddOptions<TenancyOptions>().BindConfiguration(TenancyOptions.SectionName).ValidateDataAnnotations().ValidateOnStart();
         services.AddOptions<OutboxOptions>().BindConfiguration(OutboxOptions.SectionName).ValidateDataAnnotations().ValidateOnStart();
 
@@ -95,7 +96,7 @@ public static class DependencyInjection
         services.AddScoped<IStartupTask, SamplePlansSeedTask>();
         services.AddScoped<IStartupTask, LookupDefaultsSeedTask>();
 
-        AddHealthChecks(services, configuration);
+        AddHealthChecks(services, configuration, environment);
 
         return services;
     }
@@ -258,7 +259,7 @@ public static class DependencyInjection
     /// through <see cref="IRunAsUser"/>.
     /// </summary>
     /// <summary>Each gateway is registered only when switched on under <c>Payments:Gateways:{Code}</c>.</summary>
-    private static void AddPaymentGateways(IServiceCollection services, IConfiguration configuration)
+    private static void AddPaymentGateways(IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
         services.AddOptions<Application.Payments.PaymentOptions>().BindConfiguration(Application.Payments.PaymentOptions.SectionName);
         var origins = new List<string>();
@@ -279,11 +280,14 @@ public static class DependencyInjection
             origins.Add("https://" + payfast.Host);
         }
 
-        if (configuration.GetSection(Payments.YocoOptions.SectionName).Get<Payments.YocoOptions>() is { Enabled: true })
+        if (YocoIsOn(configuration, environment))
         {
+            // On a developer's machine Yoco's webhook can't arrive, so payments are confirmed by asking Yoco instead and
+            // the webhook secret isn't needed there.
+            var development = environment.IsDevelopment();
             services.AddOptions<Payments.YocoOptions>().BindConfiguration(Payments.YocoOptions.SectionName)
                 .Validate(o => o.SecretKey.StartsWith("sk_", StringComparison.Ordinal), "Payments:Gateways:Yoco needs SecretKey (sk_test_... or sk_live_...).")
-                .Validate(o => o.WebhookSecret.StartsWith("whsec_", StringComparison.Ordinal), "Payments:Gateways:Yoco needs WebhookSecret (whsec_...), from registering the webhook.")
+                .Validate(o => development || o.WebhookSecret.StartsWith("whsec_", StringComparison.Ordinal), "Payments:Gateways:Yoco needs WebhookSecret (whsec_...), from registering the webhook.")
                 .ValidateOnStart();
             services.AddHttpClient(Payments.YocoGateway.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(20));
             services.AddScoped<Application.Payments.IPaymentGateway, Payments.YocoGateway>();
@@ -293,6 +297,15 @@ public static class DependencyInjection
 
         services.AddSingleton(new Application.Payments.PaymentCheckoutOrigins(origins));
     }
+
+    /// <summary>
+    /// Yoco is used when switched on. In Development it is switched on in appsettings but has no key until the developer
+    /// adds their own test key (Yoco has no shared test account): until then it stays out of the chooser and the system
+    /// page says how to add it.
+    /// </summary>
+    private static bool YocoIsOn(IConfiguration configuration, IHostEnvironment environment) =>
+        configuration.GetSection(Payments.YocoOptions.SectionName).Get<Payments.YocoOptions>() is { Enabled: true } yoco
+        && (!environment.IsDevelopment() || !string.IsNullOrWhiteSpace(yoco.SecretKey));
 
     private static void AddRunAs(IServiceCollection services)
     {
@@ -312,7 +325,7 @@ public static class DependencyInjection
     /// The database gates readiness (<c>/health/ready</c>). Everything else is a <see cref="HealthTags.Dependency"/>:
     /// shown on the system page, but the app keeps serving when one is down.
     /// </summary>
-    private static void AddHealthChecks(IServiceCollection services, IConfiguration configuration)
+    private static void AddHealthChecks(IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
         var timeout = TimeSpan.FromSeconds(10);
         string[] dependency = [HealthTags.Dependency];
@@ -334,9 +347,15 @@ public static class DependencyInjection
             checks.AddCheck<Payments.PayfastHealthCheck>("payfast", tags: dependency, timeout: timeout);
         }
 
-        if (configuration.GetSection(Payments.YocoOptions.SectionName).Get<Payments.YocoOptions>() is { Enabled: true })
+        if (YocoIsOn(configuration, environment))
         {
             checks.AddCheck<Payments.YocoHealthCheck>("yoco", tags: dependency, timeout: timeout);
+        }
+        else if (configuration.GetSection(Payments.YocoOptions.SectionName).Get<Payments.YocoOptions>() is { Enabled: true })
+        {
+            checks.AddCheck("yoco", () => HealthCheckResult.Degraded(
+                "Yoco is switched on for Development but has no test key yet. Add yours once (Yoco App → Checkout API → Test keys): "
+                + "dotnet user-secrets set \"Payments:Gateways:Yoco:SecretKey\" \"sk_test_...\" --project src/Base.Web"), dependency);
         }
 
         if (!string.IsNullOrWhiteSpace(configuration[ClamAvOptions.SectionName + ":" + nameof(ClamAvOptions.Host)]))

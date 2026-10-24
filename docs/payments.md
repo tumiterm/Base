@@ -14,6 +14,32 @@ This page is how to set a gateway up.
 
 A gateway appears on the Subscription page once it is enabled, for plans in a currency it accepts.
 
+## On your machine
+
+In Development all three are switched on in `appsettings.Development.json`, so payments can be tried and tested
+locally without touching configuration; production credentials are only set when you ship
+([go-live.md](go-live.md)).
+
+- **Test payments**: works as it is, including automatic renewals (**Simulate the next charge**).
+- **Payfast (sandbox)**: uses Payfast's shared sandbox merchant, which Payfast publishes for testing (they are not
+  secrets and take no real money). The checkout opens and you pay from the sandbox wallet. Payfast's ITN can't reach
+  `localhost`, so to see the payment marked paid on your machine, expose the app with a tunnel and point
+  `General.PublicBaseUrl` (Administration → Settings) at it, e.g. `cloudflared tunnel --url http://localhost:5080`
+  (no account needed) or `ngrok http 5080`. To use your own sandbox account instead, override the three values in
+  user-secrets.
+- **Yoco (test)**: Yoco has no shared test account, so add your own test secret key once (Yoco App → Checkout API →
+  Test keys); until then the System page says so and Yoco isn't offered:
+
+  ```bash
+  dotnet user-secrets set "Payments:Gateways:Yoco:SecretKey" "sk_test_..." --project src/Base.Web
+  ```
+
+  No webhook is needed on your machine: when you come back from Yoco's page, the app asks Yoco how the checkout went
+  (`GET checkouts/{id}` with your key) and applies its answer like a verified webhook. Pay with Yoco's test card.
+
+Asking the gateway is also used outside Development, whenever the person comes back before the webhook arrives; the
+return page alone still never marks anything paid.
+
 ## Payfast
 
 ### 1. Credentials
@@ -30,7 +56,7 @@ dotnet user-secrets set "Payments:Gateways:Payfast:MerchantKey" "<merchant key>"
 dotnet user-secrets set "Payments:Gateways:Payfast:Passphrase" "<salt passphrase>"
 ```
 
-For the sandbox, use the merchant ID, key and passphrase from your own sandbox account (sandbox.payfast.co.za →
+In Development the shared sandbox merchant is already set (see *On your machine*). For your own sandbox, use the merchant ID, key and passphrase from your own sandbox account (sandbox.payfast.co.za →
 Settings, where you also set the "Salt Passphrase"), or the shared test credentials in Payfast's documentation
 (*Testing and Tools → Test transaction setup*). The sandbox buyer pays from a test wallet. In production set
 `Payments__Gateways__Payfast__...` environment variables and `Sandbox` to `false`.

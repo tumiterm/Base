@@ -302,6 +302,18 @@ internal sealed partial class PaymentService(
             await unitOfWork.SaveAsync(cancellationToken);
         }
 
+        // Still waiting: ask the gateway, which needs no notification to reach us (a developer's machine, a late webhook).
+        // Its answer is applied like a verified notification; coming back here alone never marks a payment paid.
+        if (!cancelled && payment.Status is PaymentStatus.Pending or PaymentStatus.Expired && Gateway(payment.Gateway) is { SupportsStatusCheck: true } provider)
+        {
+            var read = await CheckQuietlyAsync(provider, payment, cancellationToken);
+            if (read is { Verified: true, Kind: GatewayNotificationKind.Paid or GatewayNotificationKind.Failed })
+            {
+                await ApplyAsync(provider, read, read.EventId ?? $"check:{payment.Reference}:{read.Kind}", cancellationToken);
+                payment = await unitOfWork.Repository<Payment>().GetAsync(p => p.Reference == reference, asNoTracking: true, cancellationToken: cancellationToken) ?? payment;
+            }
+        }
+
         return ValidationResponse.Success(View(payment, null));
     }
 
@@ -375,7 +387,15 @@ internal sealed partial class PaymentService(
         }
 
         var read = await provider.ReadNotificationAsync(notification, cancellationToken);
-        var eventId = read.EventId ?? Fingerprint(notification.Body);
+        return await ApplyAsync(provider, read, read.EventId ?? Fingerprint(notification.Body), cancellationToken);
+    }
+
+    /// <summary>
+    /// Records what the gateway said (a notification it sent, or its answer when asked) once per event, and applies a
+    /// verified one to the payment it names, in the payment's own tenant.
+    /// </summary>
+    private async Task<NotificationReply> ApplyAsync(IPaymentGateway provider, GatewayNotification read, string eventId, CancellationToken cancellationToken)
+    {
         var now = time.GetUtcNow();
         Payment? payment;
         using (tenant.BeginSystemScope())
@@ -548,6 +568,19 @@ internal sealed partial class PaymentService(
         return new PaymentForward(usable ? new Uri(payment.CheckoutUrl!) : null, payment.Status, payment.Description, payment.Amount, payment.Currency);
     }
 
+    private async Task<GatewayNotification?> CheckQuietlyAsync(IPaymentGateway provider, Payment payment, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await provider.CheckAsync(payment.Reference, payment.GatewayReference, cancellationToken);
+        }
+        catch (HttpRequestException ex)
+        {
+            LogCheckFailed(logger, provider.Code, payment.Reference, ex);
+            return null;
+        }
+    }
+
     private Task<bool> HasWaitingPaymentAsync(Guid recurringId, CancellationToken cancellationToken) =>
         unitOfWork.Repository<Payment>().ExistsAsync(p => p.RecurringPaymentId == recurringId && p.Status == PaymentStatus.Pending, cancellationToken);
 
@@ -588,6 +621,9 @@ internal sealed partial class PaymentService(
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Payment gateway {Gateway} couldn't be reached to start payment {Reference}")]
     private static partial void LogGatewayUnreachable(ILogger logger, string gateway, string reference, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Couldn't ask {Gateway} how payment {Reference} went")]
+    private static partial void LogCheckFailed(ILogger logger, string gateway, string reference, Exception exception);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Rejected a {Gateway} notification: {Detail}")]
     private static partial void LogRejected(ILogger logger, string gateway, string? detail);

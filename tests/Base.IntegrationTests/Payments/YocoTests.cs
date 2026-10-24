@@ -95,6 +95,27 @@ public sealed class YocoTests
         (await Gateway().ReadNotificationAsync(Webhook(other, signed), CancellationToken.None)).Kind.ShouldBe(GatewayNotificationKind.Other);
     }
 
+    [Fact]
+    public async Task Without_a_webhook_yoco_is_asked_how_the_checkout_went()
+    {
+        var clients = new Capture(HttpStatusCode.OK, """{"id":"ch_QmZ3","status":"completed","amount":49900,"currency":"ZAR","paymentId":"p_8Wx","metadata":{"reference":"P7K2M9QX4T3B"}}""");
+        var read = await Gateway(clients).CheckAsync("P7K2M9QX4T3B", "ch_QmZ3", CancellationToken.None);
+        read.ShouldSatisfyAllConditions(
+            r => r.Verified.ShouldBeTrue(),
+            r => r.Kind.ShouldBe(GatewayNotificationKind.Paid),
+            r => r.Reference.ShouldBe("P7K2M9QX4T3B"),
+            r => r.Amount.ShouldBe(499m),
+            r => r.EventId.ShouldBe("checkout:ch_QmZ3:completed"));
+        clients.Last!.Method.ShouldBe(HttpMethod.Get);
+        clients.Last.RequestUri!.AbsoluteUri.ShouldBe("https://payments.yoco.com/api/checkouts/ch_QmZ3");
+        clients.Last.Headers.Authorization!.ToString().ShouldBe("Bearer sk_test_base_tests");
+
+        (await Gateway(new Capture(HttpStatusCode.OK, """{"id":"ch_QmZ3","status":"started"}""")).CheckAsync("P7K2M9QX4T3B", "ch_QmZ3", CancellationToken.None))
+            .Kind.ShouldBe(GatewayNotificationKind.Other, "still waiting");
+        (await Gateway(new Capture(HttpStatusCode.NotFound, "{}")).CheckAsync("P7K2M9QX4T3B", "ch_QmZ3", CancellationToken.None)).Verified.ShouldBeFalse();
+        (await Gateway().CheckAsync("P7K2M9QX4T3B", null, CancellationToken.None)).Verified.ShouldBeFalse();
+    }
+
     private static InboundNotification Webhook(string body, string signature) =>
         new(
             body,

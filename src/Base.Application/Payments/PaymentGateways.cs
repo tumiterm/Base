@@ -30,6 +30,17 @@ public interface IPaymentGateway
     Task<GatewayResult> CancelRecurringAsync(string token, CancellationToken cancellationToken) =>
         Task.FromResult(GatewayResult.Failed($"{Name} has no automatic renewals to stop."));
 
+    /// <summary>Whether <see cref="CheckAsync"/> can ask the gateway how a payment went.</summary>
+    bool SupportsStatusCheck => false;
+
+    /// <summary>
+    /// Asks the gateway, server to server with our credentials, how the payment with this reference (and the gateway's
+    /// own <paramref name="gatewayReference"/>) went. As trustworthy as a verified notification, and how payments are
+    /// confirmed when notifications can't reach the app (on a developer's machine) or are late.
+    /// </summary>
+    Task<GatewayNotification> CheckAsync(string reference, string? gatewayReference, CancellationToken cancellationToken) =>
+        Task.FromResult(GatewayNotification.Rejected($"{Name} can't be asked how a payment went."));
+
     /// <summary>The smallest amount it takes in one payment (Payfast R5.00, Yoco R2.00).</summary>
     decimal MinimumCharge => 0m;
 

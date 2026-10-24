@@ -18,7 +18,10 @@ public sealed class YocoOptions
     /// <summary>From the Yoco App (Checkout API → How to connect): <c>sk_test_...</c> for testing, <c>sk_live_...</c> live.</summary>
     public string SecretKey { get; set; } = string.Empty;
 
-    /// <summary>The <c>whsec_...</c> secret Yoco returns when the webhook is registered (see docs/payments.md).</summary>
+    /// <summary>
+    /// The <c>whsec_...</c> secret Yoco returns when the webhook is registered (see docs/payments.md). Required outside
+    /// Development; without it, payments are confirmed only by asking Yoco when the person comes back.
+    /// </summary>
     public string WebhookSecret { get; set; } = string.Empty;
 
     /// <summary>What the chooser shows; empty shows <see cref="DefaultMethods"/>.</summary>
@@ -102,6 +105,58 @@ internal sealed partial class YocoGateway(IOptions<YocoOptions> options, IHttpCl
             : CheckoutStart.Failed("Yoco's answer had no checkout page to go to.");
     }
 
+    public bool SupportsStatusCheck => true;
+
+    /// <summary>
+    /// Asks Yoco for the checkout (<c>GET checkouts/{id}</c> with the secret key): <c>completed</c> means paid. This is
+    /// how payments are confirmed where Yoco's webhook can't reach the app, such as a developer's machine.
+    /// </summary>
+    public async Task<GatewayNotification> CheckAsync(string reference, string? gatewayReference, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(gatewayReference))
+        {
+            return GatewayNotification.Rejected("No Yoco checkout to ask about.");
+        }
+
+        using var message = new HttpRequestMessage(HttpMethod.Get, new Uri(new Uri(_options.ApiBaseUrl), "checkouts/" + Uri.EscapeDataString(gatewayReference)));
+        message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.SecretKey);
+        using var response = await httpClients.CreateClient(HttpClientName).SendAsync(message, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            LogCheckRefused(logger, (int)response.StatusCode, Trim(body));
+            return GatewayNotification.Rejected($"Yoco didn't answer about the checkout ({(int)response.StatusCode}).");
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+            var root = document.RootElement;
+            var status = Text(root, "status");
+            var kind = status switch
+            {
+                "completed" => GatewayNotificationKind.Paid,
+                "failed" => GatewayNotificationKind.Failed,
+                _ => GatewayNotificationKind.Other,
+            };
+            var metadata = root.TryGetProperty("metadata", out var m) ? m : default;
+            decimal? amount = root.TryGetProperty("amount", out var cents) && cents.TryGetInt64(out var c) ? c / 100m : null;
+            return new GatewayNotification(
+                true,
+                $"checkout:{gatewayReference}:{status}",
+                Text(metadata, "reference") ?? reference,
+                Text(root, "paymentId") ?? gatewayReference,
+                kind,
+                amount,
+                kind == GatewayNotificationKind.Failed ? "Yoco reported the payment as failed." : $"Yoco checkout {status}",
+                CheckoutId: gatewayReference);
+        }
+        catch (JsonException)
+        {
+            return GatewayNotification.Rejected("Yoco's answer isn't JSON.");
+        }
+    }
+
     public Task<GatewayNotification> ReadNotificationAsync(InboundNotification notification, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(notification);
@@ -157,6 +212,9 @@ internal sealed partial class YocoGateway(IOptions<YocoOptions> options, IHttpCl
         element.ValueKind == JsonValueKind.Object && element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
 
     private static string Trim(string body) => body.Length > 300 ? body[..300] : body;
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Yoco wouldn't say how a checkout went: {Status} {Body}")]
+    private static partial void LogCheckRefused(ILogger logger, int status, string body);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Yoco refused to create a checkout: {Status} {Body}")]
     private static partial void LogCheckoutRefused(ILogger logger, int status, string body);

@@ -16,7 +16,8 @@ The [checklist](#launch-checklist) at the end gathers every step.
   runs as a non-root user on port **8080** and caps the heap at 75% of the container's memory, so give the container
   a memory limit.
 - **Environment:** set `ASPNETCORE_ENVIRONMENT=Production`. Never use Development in production: that would turn on
-  the Test gateway, the sample plans, the seeded admin password and the public API docs.
+  the Test gateway, Payfast's shared sandbox merchant, the sample plans, the seeded admin password and the public
+  API docs.
 - **HTTPS:** terminate TLS at a reverse proxy or load balancer (nginx, Caddy, Traefik, Azure Front Door, an AWS ALB)
   and forward to port 8080. Outside Development the app sends HSTS, redirects to HTTPS and issues secure-only cookies.
 - **Proxy:** list the proxy's IP addresses in `ForwardedHeaders:KnownProxies`. The app trusts `X-Forwarded-For`,
