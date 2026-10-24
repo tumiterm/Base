@@ -166,6 +166,8 @@ Verify your domain in the Yoco App, switch to the live secret key, register the 
 Then make a small real payment (over R2.00) through a payment link sent to yourself by email or WhatsApp, opened on a
 phone, to confirm the domain check passes.
 
+The rest of a production launch is in [go-live.md](go-live.md).
+
 ## Automatic renewal
 
 When the chosen gateway can charge by itself (Payfast, and the Test gateway), the pay form offers **Renew

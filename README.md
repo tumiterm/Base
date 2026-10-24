@@ -221,6 +221,9 @@ scripts/new-project.cs  Creates a renamed copy for a new project.
 
 ## Configuration
 
+For production (hosting, secrets, database, services, payments and a launch checklist) see
+[docs/go-live.md](docs/go-live.md).
+
 | Section | Purpose |
 | --- | --- |
 | `ConnectionStrings:Default` | SQL Server. Development points at the docker-compose container; elsewhere use secrets/env. |

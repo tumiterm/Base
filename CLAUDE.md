@@ -9,6 +9,7 @@ cross-cutting feature or adding a package:
 - [docs/vertical-slice.md](docs/vertical-slice.md): a new module copies the People sample, file by file
 - [docs/api.md](docs/api.md): API keys, idempotency, limits, versions and CORS
 - [docs/payments.md](docs/payments.md): setting up payment gateways (Payfast, Yoco, the Test gateway) and what is verified
+- [docs/go-live.md](docs/go-live.md): putting an app into production (hosting, secrets, database, services, payments, checklist)
 - [docs/changelog.md](docs/changelog.md): what changed in each Base version (add to Unreleased with every change)
 
 ## Commands

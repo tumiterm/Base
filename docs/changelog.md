@@ -16,6 +16,8 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ### Added
 
+- **Go-live guide** (`docs/go-live.md`): hosting, secrets, database, tenancy, keys, services, monitoring, live
+  payments and a launch checklist.
 - **Online payments** for subscriptions (ADR 0026).
   - Administrators pay from Subscription: choose a plan, a month or a year, and how to pay, then pay on the payment
     provider's secure page. Paying for the same plan adds a period; another plan or period switches to it today.
