@@ -116,6 +116,7 @@ public static class DependencyInjection
         services.TryAddScoped<IDocumentAccessPolicy, DefaultDocumentAccessPolicy>();
 
         services.AddScoped<NotificationComposer>();
+        services.AddScoped<EmailBrandReader>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IDomainEventHandler<NotificationQueued>, NotificationDispatcher>();
         services.AddScoped<INotificationInbox, NotificationInbox>();

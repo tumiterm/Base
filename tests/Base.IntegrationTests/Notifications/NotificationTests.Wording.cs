@@ -112,12 +112,47 @@ public sealed partial class NotificationTests
         sent.Where(m => m.To.StartsWith("y@", StringComparison.Ordinal)).Select(m => m.Subject).ShouldAllBe(s => s == "Last days of your trial");
     }
 
+    [Fact]
+    public async Task What_the_platform_sends_carries_the_platforms_name_and_an_organisations_own_messages_its_brand()
+    {
+        var plan = await PlanAsync("branded", wording: true, branding: true);
+        var acme = await TenantAsync("acme", plan);
+        await _app.InScopeAsync(acme, async sp =>
+        {
+            var settings = sp.GetRequiredService<Base.Application.Settings.IApplicationSettingService>();
+            (await settings.SetAsync(Base.Application.Settings.SettingCodes.General.ApplicationName, "Acme Portal")).IsSuccess.ShouldBeTrue();
+            return await settings.SetAsync(Base.Application.Settings.SettingCodes.Branding.PrimaryColor, "#0a7d4f");
+        }).ContinueWith(t => t.Result.IsSuccess.ShouldBeTrue(), TaskScheduler.Default);
+
+        _app.Sent.Clear();
+        await _app.InScopeAsync(acme, async sp =>
+        {
+            var notifications = sp.GetRequiredService<INotificationService>();
+            await notifications.SendAsync(new Notification(Changed, NotificationRecipient.ToEmail("own@acme.test"), Channels: [NotificationChannel.Email]));
+            return await notifications.SendAsync(new Notification(
+                NotificationTemplates.Subscriptions.TrialEnding, NotificationRecipient.ToEmail("billing@acme.test"), new { PlanName = "Branded", EndsOn = "1 May" }));
+        });
+        await DeliverAsync();
+
+        var sent = _app.Sent.On(NotificationChannel.Email);
+        sent.Single(m => m.To == "own@acme.test").ShouldSatisfyAllConditions(
+            m => m.Subject.ShouldBe("Your Acme Portal password was changed"),
+            m => m.HtmlBody!.ShouldContain("background:#0a7d4f"),
+            m => m.HtmlBody!.ShouldContain(">acme</p>", Case.Sensitive, "the organisation in the footer"),
+            m => m.HtmlBody!.ShouldContain("you have an account with Acme Portal"));
+        sent.Single(m => m.To == "billing@acme.test").ShouldSatisfyAllConditions(
+            m => m.Subject.ShouldBe("Your Base trial ends on 1 May", "the platform's name, not the organisation's"),
+            m => m.HtmlBody!.ShouldNotContain("#0a7d4f"),
+            m => m.HtmlBody!.ShouldContain("your organisation uses Base"),
+            m => m.Body!.ShouldContain("your organisation uses Base"));
+    }
+
     private static Dictionary<string, string?> Subject(string subject) => new(StringComparer.Ordinal) { [TemplateParts.EmailSubject] = subject };
 
-    private async Task<Guid> PlanAsync(string code, bool wording) =>
+    private async Task<Guid> PlanAsync(string code, bool wording, bool branding = false) =>
         (await _app.InScopeAsync(_app.DefaultTenantId, sp => sp.GetRequiredService<IPlanAdministration>().CreateAsync(
             new SavePlanRequest(code, code, null, "ZAR", 100m, 1000m, 0, 0,
-                new Dictionary<string, long?>(StringComparer.Ordinal) { [FeatureCodes.CustomEmailWording] = wording ? 1 : 0 })))).GetDataOrThrow();
+                new Dictionary<string, long?>(StringComparer.Ordinal) { [FeatureCodes.CustomEmailWording] = wording ? 1 : 0, [FeatureCodes.CustomBranding] = branding ? 1 : 0 })))).GetDataOrThrow();
 
     private async Task<Guid> TenantAsync(string code, Guid planId) =>
         (await _app.InScopeAsync(_app.DefaultTenantId, sp => sp.GetRequiredService<ITenantAdministration>().CreateAsync(

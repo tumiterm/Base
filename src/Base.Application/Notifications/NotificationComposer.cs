@@ -6,6 +6,7 @@ using Base.Application.Communications;
 using Base.Application.Settings;
 using Base.Application.Subscriptions;
 using Base.Domain.Notifications;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Base.Application.Notifications;
 
@@ -18,9 +19,20 @@ internal sealed class NotificationComposer(
     IPlatformTenant platform,
     ITenantEntitlements entitlements,
     ITenantAddress address,
-    IRichText richText)
+    IRichText richText,
+    EmailBrandReader brandReader,
+    Common.PlatformScope platformScope)
 {
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+
+    // Brand values travel with the placeholder values (so a fallback sent later looks the same). Their names can't be
+    // written in a template: a placeholder starts with a letter.
+    private const string BrandName = "_brand.name";
+    private const string BrandLogo = "_brand.logo";
+    private const string BrandAccent = "_brand.accent";
+    private const string BrandCompany = "_brand.company";
+    private const string BrandReason = "_brand.reason";
+    private const string BrandPreferences = "_brand.preferences";
 
     /// <summary>Null when the channel can be used; otherwise why not (recorded on a skipped message).</summary>
     public async Task<string?> UnavailableReasonAsync(
@@ -108,11 +120,11 @@ internal sealed class NotificationComposer(
     public async Task<Dictionary<string, string?>> ValuesAsync(NotificationTemplateDefinition template, object? data, NotificationRecipientSnapshot recipient, CancellationToken cancellationToken)
     {
         var values = TemplateValues.From(data);
-        values[NotificationCatalog.AppNameVariable] = await settings.GetAsync(SettingCodes.General.ApplicationName, cancellationToken);
         values[NotificationCatalog.PublicBaseUrlVariable] = tenant.IsResolved
             ? await address.BaseUrlAsync(cancellationToken)
             : (await settings.GetAsync(SettingCodes.General.PublicBaseUrl, cancellationToken))?.TrimEnd('/');
         values.TryAdd(NotificationCatalog.RecipientNameVariable, string.IsNullOrWhiteSpace(recipient.Name) ? "there" : recipient.Name);
+        await AddBrandAsync(template, values, cancellationToken);
 
         var missing = template.Variables.Where(v => !values.ContainsKey(v)).ToList();
         if (missing.Count > 0)
@@ -121,6 +133,32 @@ internal sealed class NotificationComposer(
         }
 
         return values;
+    }
+
+    /// <summary>
+    /// Whose name and look the message carries: the platform's for what the platform sends organisations, otherwise
+    /// the tenant's own. Also sets <c>{{AppName}}</c> to that name, and says in the footer why it was sent.
+    /// </summary>
+    public async Task AddBrandAsync(NotificationTemplateDefinition template, IDictionary<string, string?> values, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(template);
+        ArgumentNullException.ThrowIfNull(values);
+        var brand = template.Sender == NotificationSender.Platform && !await platform.IsCurrentAsync(cancellationToken)
+            ? await platformScope.RunAsync(sp => sp.GetRequiredService<EmailBrandReader>().ReadAsync(cancellationToken), cancellationToken)
+            : await brandReader.ReadAsync(cancellationToken);
+        values[NotificationCatalog.AppNameVariable] = brand.Name;
+        values[BrandName] = brand.Name;
+        values[BrandLogo] = brand.LogoUrl;
+        values[BrandAccent] = brand.Accent;
+        values[BrandCompany] = brand.Company;
+        values[BrandReason] = template.Sender == NotificationSender.Platform
+            ? $"You get this because your organisation uses {brand.Name}."
+            : template.IsMandatory
+                ? $"You get this because you have an account with {brand.Name}."
+                : $"You get this because of your notification settings in {brand.Name}.";
+        values[BrandPreferences] = template.IsMandatory ? null : values.TryGetValue(NotificationCatalog.PublicBaseUrlVariable, out var baseUrl) && baseUrl is { Length: > 0 }
+            ? baseUrl + "/notifications/preferences"
+            : null;
     }
 
     public RenderedContent Render(NotificationTemplateDefinition template, IReadOnlyDictionary<string, string> parts, NotificationChannel channel, IReadOnlyDictionary<string, string?> values)
@@ -153,7 +191,13 @@ internal sealed class NotificationComposer(
             EmailParts.ParseDetails(Text(TemplateParts.EmailDetails)),
             Text(TemplateParts.EmailButton),
             url is not null && Uri.TryCreate(url, UriKind.Absolute, out var link) && (string.Equals(link.Scheme, Uri.UriSchemeHttps, StringComparison.Ordinal) || string.Equals(link.Scheme, Uri.UriSchemeHttp, StringComparison.Ordinal)) ? url : null);
-        var brand = new EmailBrand(values.GetValueOrDefault(NotificationCatalog.AppNameVariable) ?? "Base");
+        var brand = new EmailBrand(
+            values.GetValueOrDefault(BrandName) ?? values.GetValueOrDefault(NotificationCatalog.AppNameVariable) ?? "Base",
+            values.GetValueOrDefault(BrandLogo),
+            values.GetValueOrDefault(BrandAccent) ?? EmailBrand.DefaultAccent,
+            values.GetValueOrDefault(BrandCompany),
+            values.GetValueOrDefault(BrandReason),
+            values.GetValueOrDefault(BrandPreferences));
         var text = Text(TemplateParts.EmailText) ?? EmailLayout.Text(email, richText.ToPlainText(email.BodyHtml), brand);
         return new RenderedContent(email.Subject, text, EmailLayout.Html(email, brand), null);
     }

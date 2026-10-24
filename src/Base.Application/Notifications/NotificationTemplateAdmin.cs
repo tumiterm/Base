@@ -5,7 +5,6 @@ using Base.Application.Common.Results;
 using Base.Application.Common.Text;
 using Base.Application.Communications;
 using Base.Application.Security;
-using Base.Application.Settings;
 using Base.Application.Subscriptions;
 using Base.Domain.Notifications;
 
@@ -98,8 +97,7 @@ internal sealed class NotificationTemplateAdmin(
     NotificationComposer composer,
     INotificationChannels channels,
     INotificationRecipientResolver recipients,
-    ITenantAddress address,
-    IApplicationSettingService settings) : INotificationTemplateAdmin
+    ITenantAddress address) : INotificationTemplateAdmin
 {
     public async Task<IReadOnlyList<NotificationTemplateView>> ListAsync(CancellationToken cancellationToken = default)
     {
@@ -455,8 +453,8 @@ internal sealed class NotificationTemplateAdmin(
     private async Task<Dictionary<string, string?>> SampleValuesAsync(NotificationTemplateDefinition template, CancellationToken cancellationToken)
     {
         var values = new Dictionary<string, string?>(NotificationSamples.For(template), StringComparer.Ordinal);
-        values[NotificationCatalog.AppNameVariable] = await settings.GetAsync(SettingCodes.General.ApplicationName, cancellationToken) ?? "Base";
         values[NotificationCatalog.PublicBaseUrlVariable] = await address.BaseUrlAsync(cancellationToken);
+        await composer.AddBrandAsync(template, values, cancellationToken);
         var me = currentUser.UserId is { } id ? await recipients.ResolveAsync(NotificationRecipient.ToUser(id), cancellationToken) : null;
         values[NotificationCatalog.RecipientNameVariable] = me?.Name is { Length: > 0 } name ? name : "Sam Sample";
         return values;

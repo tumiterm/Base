@@ -16,6 +16,11 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ### Added
 
+- **Emails look like whoever sends them.** What the platform sends organisations (billing, invoices, plan changes,
+  the welcome) carries the platform's name, logo, colour and company details (Settings → Invoices); an
+  organisation's own emails carry its name, and its logo and colour on plans with custom branding, with its billing
+  name and address in the footer. Every email says why it was sent, and messages people can switch off link to
+  their notification settings.
 - **Reword emails and messages**, with a live preview: Administration → Messages → Templates. Each email is set out
   for you (heading, message, details, one button); you change the words (subject, preview line, heading, message,
   button label, SMS and in-app text), see the email update as you type with sample values, and send yourself a test.
@@ -149,6 +154,8 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ### Fixed
 
+- Emails the platform sends an organisation named the organisation's own application ("Your Vodacom plan changes")
+  instead of the platform.
 - The invoice email named the organisation as the seller ("Vodacom's invoice for Vodacom") when no seller name was
   set: it now falls back to the platform's name. Links in emails open the organisation's own address, not the
   platform's.

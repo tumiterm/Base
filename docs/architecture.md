@@ -160,6 +160,10 @@ Business code calls `INotificationService.SendAsync(new Notification(template, r
   organisation rewords its own messages when its plan has `Feature.CustomEmailWording`; what the platform sends
   organisations (`Sender = Platform`) is worded by the platform tenant and applies in every tenant; sensitive
   templates (sign-in links) are never reworded. Links start from the tenant's own address (`ITenantAddress`).
+- **Brand.** `EmailBrandReader` gives an email its sender's name (`{{AppName}}`), logo (an absolute URL to
+  `/branding/logo`), colour and company line: the platform's for `Sender = Platform` (read as the platform tenant),
+  else the tenant's own (logo and colour only with `Feature.CustomBranding`). The footer says why it was sent and,
+  for optional messages, links to the person's notification settings.
 - **Queueing.** `SendAsync` resolves the recipient (from the user account or explicit addresses; phones are
   normalised to E.164), then picks the first usable channel in each chain (primary, then fallback). Channels that are
   off, have no address, or that the user opted out of are recorded as **Skipped**, with the reason. The rest are
