@@ -116,6 +116,16 @@ curl -X POST https://payments.yoco.com/api/webhooks \
 The public address follows the same rules as Payfast's (a public HTTPS address that reaches the app; a tunnel on a
 developer machine). Register again with the live key when going live, and use that secret in production.
 
+- Yoco shows the secret **only once**, in that answer: save it straight into your secret store.
+- Register **one** webhook per key; delete any you don't want with Yoco's delete-webhook endpoint.
+- Yoco expects a 2xx within 15 seconds. The app answers as soon as the event is recorded (the subscription is moved
+  on afterwards, in the background).
+- Without a 2xx, Yoco retries at once, then after 5 seconds, 5 minutes, 30 minutes, 2 hours, 5 hours and twice after
+  10 hours. **If no event succeeds for 5 days, Yoco turns the webhook off** and it must be registered again (with a
+  new secret): after a long outage, check it is still on.
+- Yoco sends every payment event on the account, including ones for other integrations. Events for checkouts that
+  aren't ours are answered 200 and logged as *Ignored*, so they never count as failures.
+
 ### 3. Verified domain and payment links
 
 Live Yoco payments must come from a website domain verified with Yoco (Yoco App → How to connect → Verified Domains):
@@ -139,7 +149,8 @@ keys skip the domain check.
   compared with each `v1,` entry in `webhook-signature`.
 - **Freshness**: `webhook-timestamp` within 5 minutes, against replays.
 - **Amount**: the payment's amount in cents equals the payment's.
-- **Which payment**: our reference from the checkout's metadata, or else Yoco's checkout ID.
+- **Which payment**: Yoco's `metadata.checkoutId`, matched against the checkout id kept when the checkout was created
+  (as Yoco recommends), or our own reference when the metadata carries it.
 
 `payment.succeeded` marks the payment paid; `payment.failed` declined; anything else is logged and ignored.
 Repeats (same `webhook-id`) change nothing.
