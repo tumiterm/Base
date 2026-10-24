@@ -66,6 +66,20 @@ else
                         <dt>Member since</dt><dd><local-time value="s.StartedAt" format="d MMMM yyyy" /></dd>
                         @if (s.StatusReason is not null) {<dt>Note</dt><dd>@s.StatusReason</dd>}
                     </dl>
+                    @if (s.Scheduled is { } next)
+                    {
+                        <div class="status-callout is-warning mt-3">
+                            <icon name="calendar" />
+                            <div class="flex-grow-1">
+                                <div class="status-callout-title">Moving to @next.PlanName on <local-time value="next.At" format="d MMMM yyyy" /></div>
+                                <div class="small">@Display.Money(next.Price, next.Currency)@Display.PerCycle(next.BillingCycle) from then. Until that date you keep @s.PlanName, but can't add more than @next.PlanName allows.</div>
+                            </div>
+                            @if (Model.CanPay)
+                            {
+                                <form method="post" asp-action="KeepPlan"><button type="submit" class="btn btn-secondary btn-sm">Keep @s.PlanName</button></form>
+                            }
+                        </div>
+                    }
                 </div>
             </section>
 
@@ -121,7 +135,7 @@ else
                         <h2 class="panel-title" id="pay-title">@(s.Status is SubscriptionStatus.Active ? "Pay ahead or change plan" : "Pay online")</h2>
                         <span class="text-muted small"><icon name="lock" class="icon-sm" /> On the payment provider's secure page</span>
                     </div>
-                    <form method="post" asp-action="Pay" class="panel-body stack">
+                    <form method="post" asp-action="Review" class="panel-body stack">
                         <div>
                             <div class="form-label">Plan</div>
                             <div class="choice-grid" role="radiogroup" aria-label="Plan">
@@ -166,8 +180,15 @@ else
                             <input class="form-check-input" type="checkbox" role="switch" name="RenewAutomatically" value="true" checked />
                             <span class="form-check-label"><strong>Renew automatically.</strong> The payment provider charges this amount every month or year, until you turn it off here.</span>
                         </label>
-                        <p class="text-muted small mb-0">The same plan and period adds time after your current period. Another plan or period switches to it today and starts a fresh period@(Model.Recurring is not null ? ", and replaces your automatic renewal" : ""). Your organisation is emailed a receipt.</p>
-                        <div><button type="submit" class="btn btn-primary"><icon name="lock" class="icon-sm" /> Continue to payment</button></div>
+                        @if (s.Status == SubscriptionStatus.Active)
+                        {
+                            <p class="text-muted small mb-0">The same plan and period adds time after your current period. A dearer plan starts today and you pay only the difference for the rest of the period. A cheaper plan, or paying yearly instead of monthly (or the other way), starts when your current period ends, with nothing to pay now. You'll see what changes before you confirm.</p>
+                        }
+                        else
+                        {
+                            <p class="text-muted small mb-0">Paying starts a fresh period on the plan you choose, from today. Your organisation is emailed a receipt.</p>
+                        }
+                        <div><button type="submit" class="btn btn-primary">Continue <icon name="arrow-right" class="icon-sm" /></button></div>
                     </form>
                 </section>
             }
@@ -187,7 +208,7 @@ else
                             </div>
                         }
                     </div>
-                    <p class="text-muted small mt-3 mb-0">@(Model.CanPay ? "Online payment isn't set up yet. To pay or change plan, contact us." : "To change plan, contact us; the change applies as soon as it's made.")</p>
+                    <p class="text-muted small mt-3 mb-0">@(Model.CanPay ? "Online payment isn't set up yet. To pay or change plan, contact us." : "To change plan, ask an administrator.")</p>
                 </section>
             }
 
@@ -202,7 +223,7 @@ else
                                 <span class="file-tile" aria-hidden="true"><icon name="receipt" /></span>
                                 <a class="item-main text-decoration-none" asp-action="Payment" asp-route-reference="@p.Reference">
                                     <div class="item-title">@p.Description</div>
-                                    <div class="item-sub"><span class="mono">@p.Reference</span> · @p.GatewayName · @(p.IsRenewal ? "automatic renewal" : "by " + p.RequestedByName)@(p.SetsUpRenewal ? " · set up automatic renewal" : "")</div>
+                                    <div class="item-sub"><span class="mono">@p.Reference</span> · @p.GatewayName · @(p.IsRenewal ? "automatic renewal" : "by " + p.RequestedByName)@(p.SetsUpRenewal ? " · set up automatic renewal" : "")@(p.IsUpgrade ? " · upgrade" : "")</div>
                                 </a>
                                 <div class="item-aside text-end">
                                     <div class="fw-semibold">@Display.Money(p.Amount, p.Currency)</div>

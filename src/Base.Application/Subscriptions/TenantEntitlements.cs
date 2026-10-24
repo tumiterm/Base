@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Globalization;
 using Base.Application.Common.Abstractions;
 using Base.Application.Common.Persistence;
 using Base.Application.Common.Results;
@@ -28,6 +29,8 @@ public interface ITenantEntitlements
 }
 
 /// <summary>The current tenant's plan and status as the rest of the application sees it.</summary>
+/// <param name="Scheduled">The plan it moves to when the period ends, if a change is waiting: until then the stricter of
+/// the two plans' limits on what is kept (users, storage) applies, so the change can still happen.</param>
 [ImmutableObject(true)]
 public sealed record TenantAccess(
     bool IsRestricted,
@@ -36,7 +39,8 @@ public sealed record TenantAccess(
     SubscriptionStatus? Status,
     DateTimeOffset? PeriodEnd,
     bool CancelAtPeriodEnd,
-    IReadOnlyDictionary<string, long?> Values)
+    IReadOnlyDictionary<string, long?> Values,
+    ScheduledAccess? Scheduled = null)
 {
     public static TenantAccess Unrestricted { get; } = new(false, null, null, null, null, false, new Dictionary<string, long?>(StringComparer.Ordinal));
 
@@ -46,11 +50,25 @@ public sealed record TenantAccess(
     public bool HasFeature(string featureCode) => !IsRestricted || Value(featureCode) == 1;
 
     /// <summary>The limit in its own units (MB for storage); null means unlimited.</summary>
-    public long? LimitOf(string limitCode) => IsRestricted ? Value(limitCode) : null;
+    public long? LimitOf(string limitCode) => IsRestricted ? Stricter(Value(limitCode), ScheduledLimitOf(limitCode)) : null;
+
+    /// <summary>Whether the plan it moves to sets the limit that applies now.</summary>
+    public bool IsLimitedByScheduledPlan(string limitCode) =>
+        IsRestricted && ScheduledLimitOf(limitCode) is { } next && (Value(limitCode) is not { } current || next < current);
+
+    private long? ScheduledLimitOf(string code) =>
+        Scheduled is null || EntitlementCatalog.Get(code).ResetsMonthly
+            ? null
+            : Scheduled.Values.TryGetValue(code, out var value) ? value : EntitlementCatalog.Get(code).DefaultValue;
+
+    private static long? Stricter(long? a, long? b) => a is null ? b : b is null ? a : Math.Min(a.Value, b.Value);
 
     private long? Value(string code) =>
         Values.TryGetValue(code, out var value) ? value : EntitlementCatalog.Get(code).DefaultValue;
 }
+
+/// <summary>The plan a tenant moves to at <paramref name="At"/>, and what it allows.</summary>
+public sealed record ScheduledAccess(string PlanName, DateTimeOffset At, IReadOnlyDictionary<string, long?> Values);
 
 internal sealed class TenantEntitlements(IUnitOfWork unitOfWork, ITenantContext tenant, ITenantUsageReader usage, HybridCache cache) : ITenantEntitlements
 {
@@ -87,11 +105,16 @@ internal sealed class TenantEntitlements(IUnitOfWork unitOfWork, ITenantContext 
         }
 
         var used = (await usage.MeasureAsync(tenant.TenantId, cancellationToken)).GetValueOrDefault(limitCode);
-        return used + adding <= limit * definition.UnitSize
-            ? ValidationResponse.Success()
-            : ValidationResponse.Failure(
-                $"Your {access.PlanName} plan allows {definition.Format(limit)} of {definition.Name.ToLowerInvariant()}. Upgrade the plan to add more.",
-                "plan.limit");
+        if (used + adding <= limit * definition.UnitSize)
+        {
+            return ValidationResponse.Success();
+        }
+
+        return ValidationResponse.Failure(
+            access.IsLimitedByScheduledPlan(limitCode)
+                ? string.Create(CultureInfo.InvariantCulture, $"Your plan changes to {access.Scheduled!.PlanName} on {access.Scheduled.At:d MMMM yyyy}, which allows {definition.Format(limit)} of {definition.Name.ToLowerInvariant()}. Keep your current plan to add more.")
+                : $"Your {access.PlanName} plan allows {definition.Format(limit)} of {definition.Name.ToLowerInvariant()}. Upgrade the plan to add more.",
+            "plan.limit");
     }
 
     public async Task InvalidateAsync(CancellationToken cancellationToken = default) =>
@@ -107,6 +130,13 @@ internal sealed class TenantEntitlements(IUnitOfWork unitOfWork, ITenantContext 
 
         var plan = await unitOfWork.Repository<Plan>().GetAsync(p => p.Id == subscription.PlanId, [p => p.Entitlements], asNoTracking: true, cancellationToken);
         var values = plan?.Entitlements.ToDictionary(e => e.Code, e => e.Value, StringComparer.Ordinal) ?? new Dictionary<string, long?>(StringComparer.Ordinal);
+        ScheduledAccess? scheduled = null;
+        if (subscription.ScheduledPlanId is { } nextId
+            && await unitOfWork.Repository<Plan>().GetAsync(p => p.Id == nextId, [p => p.Entitlements], asNoTracking: true, cancellationToken) is { } next)
+        {
+            scheduled = new ScheduledAccess(next.Name, subscription.ScheduledChangeAt!.Value, next.Entitlements.ToDictionary(e => e.Code, e => e.Value, StringComparer.Ordinal));
+        }
+
         return new TenantAccess(
             true,
             plan?.Code,
@@ -114,6 +144,7 @@ internal sealed class TenantEntitlements(IUnitOfWork unitOfWork, ITenantContext 
             subscription.Status,
             subscription.CurrentPeriodEnd,
             subscription.CancelAtPeriodEnd,
-            values);
+            values,
+            scheduled);
     }
 }

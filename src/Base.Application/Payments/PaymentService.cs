@@ -26,7 +26,7 @@ public sealed class PaymentOptions
     public TimeSpan PendingFor { get; set; } = TimeSpan.FromHours(2);
 }
 
-public sealed record PaymentGatewayView(string Code, string Name, IReadOnlyList<string> Methods, bool SupportsRecurring = false);
+public sealed record PaymentGatewayView(string Code, string Name, IReadOnlyList<string> Methods, bool SupportsRecurring = false, decimal MinimumCharge = 0m);
 
 /// <param name="ReturnBase">Absolute URL the person comes back to; the payment reference is appended.</param>
 /// <param name="NotifyBase">Absolute URL gateways post notifications to; the gateway code is appended.</param>
@@ -54,7 +54,8 @@ public sealed record PaymentView(
     bool Applied,
     bool IsRenewal = false,
     bool SetsUpRenewal = false,
-    bool CanShareLink = false);
+    bool CanShareLink = false,
+    bool IsUpgrade = false);
 
 /// <param name="StopError">Why the gateway couldn't be told to stop it, while it may still be charging.</param>
 public sealed record RecurringPaymentView(
@@ -136,6 +137,7 @@ internal sealed partial class PaymentService(
     ICurrentUser currentUser,
     IEnumerable<IPaymentGateway> gateways,
     RecurringPayments recurringPayments,
+    ISubscriptionService subscriptions,
     IServiceScopeFactory scopes,
     IOptions<PaymentOptions> options,
     TimeProvider time,
@@ -144,7 +146,7 @@ internal sealed partial class PaymentService(
     public IReadOnlyList<PaymentGatewayView> Gateways(string? currency = null) =>
         gateways
             .Where(g => currency is null || g.Currencies.Contains(currency, StringComparer.OrdinalIgnoreCase))
-            .Select(g => new PaymentGatewayView(g.Code, g.Name, g.Methods, g.SupportsRecurring))
+            .Select(g => new PaymentGatewayView(g.Code, g.Name, g.Methods, g.SupportsRecurring, g.MinimumCharge))
             .ToList();
 
     public async Task<ValidationResponse<CheckoutRedirect>> StartAsync(PayRequest request, PaymentUrls urls, CancellationToken cancellationToken = default)
@@ -163,9 +165,42 @@ internal sealed partial class PaymentService(
         }
 
         var amount = request.BillingCycle == BillingCycle.Annual ? plan.AnnualPrice : plan.MonthlyPrice;
+        var description = $"{plan.Name}, {(request.BillingCycle == BillingCycle.Annual ? "1 year" : "1 month")}";
+        var cycle = request.BillingCycle;
+        var upgrade = false;
+
+        // With a subscription, what is paid follows the plan-change rules: an upgrade pays the difference for the rest of
+        // the period, and a downgrade or change of cycle isn't paid now at all.
+        var preview = await subscriptions.PreviewMineAsync(plan.Id, request.BillingCycle, cancellationToken);
+        if (preview.IsSuccess)
+        {
+            var change = preview.Data!;
+            if (change.IsBlocked && change.Kind != PlanChangeKind.Extend)
+            {
+                return ValidationResponse.Failure(
+                    $"{plan.Name} allows less than you use: {string.Join(" ", change.OverLimits.Select(l => l.Describe()))}", "plan.over-limits").As<CheckoutRedirect>();
+            }
+
+            switch (change.Kind)
+            {
+                case PlanChangeKind.AtPeriodEnd:
+                    return ValidationResponse.Failure(
+                        string.Create(CultureInfo.InvariantCulture, $"There's nothing to pay now: {plan.Name} starts when your current period ends, on {change.EffectiveAt:d MMMM yyyy}."),
+                        "plan.at-period-end").As<CheckoutRedirect>();
+                case PlanChangeKind.Upgrade:
+                    amount = change.AmountDueNow;
+                    cycle = change.FromCycle;
+                    upgrade = true;
+                    description = string.Create(CultureInfo.InvariantCulture, $"Upgrade to {plan.Name} until {change.PeriodEnd:d MMM yyyy}");
+                    break;
+            }
+        }
+
         if (amount <= 0)
         {
-            return ValidationResponse.Failure(new ValidationError(nameof(request.PlanId), $"{plan.Name} is free {(request.BillingCycle == BillingCycle.Annual ? "yearly" : "monthly")}; there's nothing to pay.")).As<CheckoutRedirect>();
+            return ValidationResponse.Failure(new ValidationError(
+                nameof(request.PlanId),
+                upgrade ? "There's nothing to pay for this upgrade." : $"{plan.Name} is free {(request.BillingCycle == BillingCycle.Annual ? "yearly" : "monthly")}; there's nothing to pay.")).As<CheckoutRedirect>();
         }
 
         var gateway = gateways.FirstOrDefault(g => string.Equals(g.Code, request.Gateway, StringComparison.OrdinalIgnoreCase));
@@ -174,17 +209,30 @@ internal sealed partial class PaymentService(
             return ValidationResponse.Failure(new ValidationError(nameof(request.Gateway), "Choose how to pay.")).As<CheckoutRedirect>();
         }
 
-        if (request.RenewAutomatically && !gateway.SupportsRecurring)
+        if (amount < gateway.MinimumCharge)
+        {
+            return ValidationResponse.Failure(new ValidationError(
+                nameof(request.Gateway),
+                $"{gateway.Name} can't take payments under {plan.Currency} {gateway.MinimumCharge.ToString("N2", CultureInfo.InvariantCulture)}; choose another way to pay.")).As<CheckoutRedirect>();
+        }
+
+        // An upgrade's difference is paid once; an automatic renewal that is on follows the new plan by itself.
+        var renew = request.RenewAutomatically && !upgrade;
+        if (renew && !gateway.SupportsRecurring)
         {
             return ValidationResponse.Failure(new ValidationError(nameof(request.RenewAutomatically), $"{gateway.Name} can't renew automatically; pay without it.")).As<CheckoutRedirect>();
         }
 
         var owner = await unitOfWork.Repository<Tenant>().GetByIdAsync(tenant.TenantId, cancellationToken);
-        var description = $"{plan.Name}, {(request.BillingCycle == BillingCycle.Annual ? "1 year" : "1 month")}";
         var payment = new Payment(
-            tenant.TenantId, gateway.Code, amount, plan.Currency, description, plan.Id, request.BillingCycle,
+            tenant.TenantId, gateway.Code, amount, plan.Currency, description, plan.Id, cycle,
             currentUser.UserId, currentUser.AuditName, time.GetUtcNow(), options.Value.PendingFor);
-        if (request.RenewAutomatically)
+        if (upgrade)
+        {
+            payment.PaysForUpgrade();
+        }
+
+        if (renew)
         {
             var recurring = new RecurringPayment(tenant.TenantId, gateway.Code, plan.Id, request.BillingCycle, amount, plan.Currency, currentUser.AuditName);
             await unitOfWork.Repository<RecurringPayment>().AddAsync(recurring, cancellationToken);
@@ -205,7 +253,7 @@ internal sealed partial class PaymentService(
             returnUrl,
             new Uri(returnUrl.AbsoluteUri + "?cancelled=true"),
             new Uri(urls.NotifyBase.AbsoluteUri.TrimEnd('/') + "/" + gateway.Code.ToLowerInvariant()),
-            request.RenewAutomatically ? request.BillingCycle : null);
+            renew ? request.BillingCycle : null);
 
         CheckoutStart started;
         try
@@ -533,7 +581,8 @@ internal sealed partial class PaymentService(
         p.AppliedAt is not null,
         p.IsRenewal,
         p.RecurringPaymentId is not null && !p.IsRenewal,
-        p.CanForward && p.ExpiresAt > time.GetUtcNow());
+        p.CanForward && p.ExpiresAt > time.GetUtcNow(),
+        p.IsUpgrade);
 
     private static string Fingerprint(string body) => "sha256:" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(body)));
 
@@ -579,6 +628,15 @@ internal sealed class PaymentSucceededHandler(
         {
             subscription = TenantSubscription.Start(payment.TenantId, plan, payment.BillingCycle, now, withTrial: false);
             await subscriptions.AddAsync(subscription, cancellationToken);
+        }
+        else if (payment.IsRenewal)
+        {
+            // The gateway charged what the renewal was set to: it pays for the next period, and never switches plan.
+            subscription.RecordPayment(now, payment.Reference);
+        }
+        else if (payment.IsUpgrade)
+        {
+            subscription.Upgrade(plan, PlanChangeSource.Upgrade, payment.Reference);
         }
         else
         {

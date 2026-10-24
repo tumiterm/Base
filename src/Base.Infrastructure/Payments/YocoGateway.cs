@@ -58,6 +58,8 @@ internal sealed partial class YocoGateway(IOptions<YocoOptions> options, IHttpCl
 
     public IReadOnlyList<string> Currencies { get; } = ["ZAR"];
 
+    public decimal MinimumCharge => MinimumAmount;
+
     public async Task<CheckoutStart> StartCheckoutAsync(CheckoutRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);

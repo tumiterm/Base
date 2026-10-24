@@ -70,8 +70,9 @@ internal sealed class RecurringPaymentLifecycle(
     {
         ArgumentNullException.ThrowIfNull(domainEvent);
         var payment = await unitOfWork.Repository<Payment>().GetByIdAsync(domainEvent.PaymentId, cancellationToken);
-        if (payment is null || payment.RecurringPaymentId is not null)
+        if (payment is null || payment.RecurringPaymentId is not null || payment.IsUpgrade)
         {
+            // An upgrade's difference doesn't replace the renewal: the renewal follows the new plan (RenewalFollowsPlan).
             return;
         }
 
@@ -91,13 +92,19 @@ internal sealed class RecurringPaymentLifecycle(
     public async Task HandleAsync(RecurringPaymentStoppedByGateway domainEvent, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(domainEvent);
+        await TellStoppedAsync(domainEvent.TenantId, domainEvent.RecurringPaymentId, null, cancellationToken);
+    }
+
+    /// <summary>Emails the organisation's contact that its automatic renewal stopped, and why.</summary>
+    internal async Task TellStoppedAsync(Guid tenantId, Guid recurringPaymentId, string? reason, CancellationToken cancellationToken)
+    {
         RecurringPayment? recurring;
         Tenant? owner;
         Plan? plan;
         using (tenant.BeginSystemScope())
         {
-            recurring = await unitOfWork.Repository<RecurringPayment>().GetByIdAsync(domainEvent.RecurringPaymentId, cancellationToken);
-            owner = await unitOfWork.Repository<Tenant>().GetByIdAsync(domainEvent.TenantId, cancellationToken);
+            recurring = await unitOfWork.Repository<RecurringPayment>().GetByIdAsync(recurringPaymentId, cancellationToken);
+            owner = await unitOfWork.Repository<Tenant>().GetByIdAsync(tenantId, cancellationToken);
             plan = recurring is null ? null : await unitOfWork.Repository<Plan>().GetByIdAsync(recurring.PlanId, cancellationToken);
         }
 
@@ -106,6 +113,7 @@ internal sealed class RecurringPaymentLifecycle(
             return;
         }
 
+        var gateway = gateways.FirstOrDefault(g => string.Equals(g.Code, recurring.Gateway, StringComparison.OrdinalIgnoreCase))?.Name ?? recurring.Gateway;
         await notifications.SendAsync(
             new Notification(
                 NotificationTemplates.Subscriptions.AutoRenewalStopped,
@@ -113,8 +121,9 @@ internal sealed class RecurringPaymentLifecycle(
                 new
                 {
                     PlanName = plan?.Name ?? "current",
-                    Gateway = gateways.FirstOrDefault(g => string.Equals(g.Code, recurring.Gateway, StringComparison.OrdinalIgnoreCase))?.Name ?? recurring.Gateway,
+                    Gateway = gateway,
                     Amount = recurring.Currency + " " + recurring.Amount.ToString("N2", CultureInfo.InvariantCulture),
+                    Reason = reason ?? $"{gateway} stopped it",
                 }),
             cancellationToken);
     }
@@ -141,4 +150,104 @@ internal sealed class RecurringPaymentLifecycle(
             await unitOfWork.SaveAsync(cancellationToken);
         }
     }
+}
+
+/// <summary>
+/// Keeps an automatic renewal charging for the plan and cycle of the next period: after an upgrade or the operator's
+/// change, and when a change is scheduled for the end of the period (or withdrawn). The gateway is asked to change the
+/// amount and frequency; if it can't, the renewal is stopped there and the organisation told, so it is never charged
+/// the wrong amount. A payment for another plan already replaced the renewal (<see cref="RecurringPaymentLifecycle"/>).
+/// </summary>
+internal sealed partial class RenewalFollowsPlan(
+    IUnitOfWork unitOfWork,
+    ITenantContext tenant,
+    RecurringPayments recurringPayments,
+    RecurringPaymentLifecycle lifecycle,
+    IEnumerable<IPaymentGateway> gateways,
+    ILogger<RenewalFollowsPlan> logger)
+    : IDomainEventHandler<SubscriptionPlanChanged>, IDomainEventHandler<SubscriptionChangeScheduled>
+{
+    public async Task HandleAsync(SubscriptionPlanChanged domainEvent, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(domainEvent);
+        if (domainEvent.Source != PlanChangeSource.Payment)
+        {
+            await FollowAsync(domainEvent.TenantId, cancellationToken);
+        }
+    }
+
+    public async Task HandleAsync(SubscriptionChangeScheduled domainEvent, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(domainEvent);
+        if (domainEvent.Source != PlanChangeSource.Payment)
+        {
+            await FollowAsync(domainEvent.TenantId, cancellationToken);
+        }
+    }
+
+    private async Task FollowAsync(Guid tenantId, CancellationToken cancellationToken)
+    {
+        RecurringPayment? stopped = null;
+        string? why = null;
+        using (tenant.BeginSystemScope())
+        {
+            var recurring = await unitOfWork.Repository<RecurringPayment>().GetAsync(
+                r => r.TenantId == tenantId && r.Status == RecurringPaymentStatus.Active && r.Token != null, cancellationToken: cancellationToken);
+            var subscription = recurring is null ? null : await unitOfWork.Repository<TenantSubscription>().GetAsync(s => s.TenantId == tenantId, asNoTracking: true, cancellationToken: cancellationToken);
+            if (recurring is null || subscription is null)
+            {
+                return;
+            }
+
+            var planId = subscription.ScheduledPlanId ?? subscription.PlanId;
+            var cycle = subscription.ScheduledBillingCycle ?? subscription.BillingCycle;
+            var plan = await unitOfWork.Repository<Plan>().GetByIdAsync(planId, cancellationToken);
+            var amount = plan?.PriceFor(cycle) ?? 0m;
+            if (plan is not null && recurring.Matches(plan.Id, cycle, amount))
+            {
+                return;
+            }
+
+            var gateway = gateways.FirstOrDefault(g => string.Equals(g.Code, recurring.Gateway, StringComparison.OrdinalIgnoreCase));
+            GatewayResult updated;
+            if (plan is null || amount <= 0 || !string.Equals(plan.Currency, recurring.Currency, StringComparison.OrdinalIgnoreCase))
+            {
+                updated = GatewayResult.Failed("the new plan has nothing to charge in the same currency");
+            }
+            else if (gateway is not { SupportsRecurringUpdate: true })
+            {
+                updated = GatewayResult.Failed($"{gateway?.Name ?? recurring.Gateway} can't change what it charges");
+            }
+            else
+            {
+                updated = await gateway.UpdateRecurringAsync(recurring.Token!, amount, cycle, cancellationToken);
+            }
+
+            if (updated.Succeeded)
+            {
+                recurring.Follow(plan!.Id, cycle, amount);
+                LogFollowed(logger, recurring.Id, plan.Name, amount);
+            }
+            else
+            {
+                why = $"your plan changed to {plan?.Name ?? "another plan"} and {updated.Error?.TrimEnd('.')}";
+                LogCouldNotFollow(logger, recurring.Id, updated.Error);
+                var stop = await recurringPayments.StopAsync(recurring, "The plan changed and the renewal couldn't follow it.", cancellationToken);
+                stopped = stop.Succeeded ? recurring : null;
+            }
+
+            await unitOfWork.SaveAsync(cancellationToken);
+        }
+
+        if (stopped is not null)
+        {
+            await lifecycle.TellStoppedAsync(tenantId, stopped.Id, why, cancellationToken);
+        }
+    }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Automatic renewal {RecurringPaymentId} now charges {Amount} for {Plan}")]
+    private static partial void LogFollowed(ILogger logger, Guid recurringPaymentId, string plan, decimal amount);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Automatic renewal {RecurringPaymentId} couldn't follow the plan change ({Error}); stopping it")]
+    private static partial void LogCouldNotFollow(ILogger logger, Guid recurringPaymentId, string? error);
 }

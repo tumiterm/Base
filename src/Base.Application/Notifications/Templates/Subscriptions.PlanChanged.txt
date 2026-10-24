@@ -1,0 +1,12 @@
+--- email.subject
+Your {{AppName}} plan changes to {{PlanName}}
+--- email.html
+<p>Hello,</p>
+<p>Your organisation's plan changes from {{PreviousPlanName}} to <strong>{{PlanName}}</strong> ({{Price}}) {{When}}: {{Reason}}.</p>
+<p>See what it includes at <a href="{{PublicBaseUrl}}/subscription">{{PublicBaseUrl}}/subscription</a>, or reply to this email if you think this is a mistake.</p>
+--- email.text
+Hello,
+
+Your organisation's plan changes from {{PreviousPlanName}} to {{PlanName}} ({{Price}}) {{When}}: {{Reason}}.
+
+What it includes: {{PublicBaseUrl}}/subscription

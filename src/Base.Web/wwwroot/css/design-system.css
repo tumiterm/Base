@@ -563,6 +563,7 @@ a.chip:hover, button.chip:hover { border-color: var(--border-strong); color: var
 .choice-card:has(> input:checked) { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: color-mix(in srgb, var(--accent-subtle) 35%, var(--surface-1)); }
 .choice-card:has(> input:focus-visible) { box-shadow: var(--focus-ring); }
 .choice-card.is-current { border-style: dashed; }
+.choice-card:has(input:disabled) { opacity: .55; cursor: not-allowed; }
 .choice-check { position: absolute; top: var(--s-3); right: var(--s-3); display: grid; place-items: center; width: 1.125rem; height: 1.125rem; border: 1px solid var(--border-strong); border-radius: 50%; color: transparent; transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease); }
 .choice-check .icon { width: 0.75rem; height: 0.75rem; }
 .choice-card:has(> input:checked) .choice-check { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); }
@@ -818,6 +819,24 @@ a.record-link:focus-visible { box-shadow: var(--focus-ring); outline: 0; }
 .status-callout.is-ok > .icon { color: var(--success); }
 .status-callout.is-warning { border-color: color-mix(in srgb, var(--warning) 30%, transparent); background: var(--warning-subtle); }
 .status-callout.is-warning > .icon { color: var(--warning); }
+.status-callout.is-danger { border-color: color-mix(in srgb, var(--danger) 30%, transparent); background: var(--danger-subtle); }
+.status-callout.is-danger > .icon { color: var(--danger); }
+
+/* A change of plan: where the subscription is, and where it goes. */
+.plan-change { max-width: 48rem; }
+.plan-move { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: stretch; gap: var(--s-3); }
+.plan-move > .icon { align-self: center; color: var(--text-3); }
+.plan-move-side { padding: var(--s-3) var(--s-4); border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); min-width: 0; }
+.plan-move-side.is-next { border-color: var(--accent); background: var(--accent-subtle); }
+.plan-move-label { font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); }
+.plan-move-name { font-weight: 600; font-size: var(--text-lg); color: var(--text); }
+.plan-move-meta { color: var(--text-2); font-size: var(--text-sm); }
+.amount-due { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--s-2); padding: var(--s-3) var(--s-4); border-radius: var(--radius); background: var(--surface-sunken); }
+.amount-due-value { font-size: var(--text-2xl); font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+@media (max-width: 575.98px) {
+  .plan-move { grid-template-columns: minmax(0, 1fr); }
+  .plan-move > .icon { justify-self: center; transform: rotate(90deg); }
+}
 @media (max-width: 767.98px) {
   .setting-list > .setting-row { grid-template-columns: minmax(0, 1fr); }
   .setting-row.is-switch { grid-template-columns: minmax(0, 1fr) auto; }

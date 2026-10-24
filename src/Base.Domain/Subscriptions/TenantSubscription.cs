@@ -30,11 +30,43 @@ public enum BillingCycle
     Annual = 1,
 }
 
-/// <summary>Raised on every status change, so handlers can notify the tenant or tell a billing system.</summary>
 /// <summary>Raised once per trial, a few days before it ends.</summary>
 public sealed record SubscriptionTrialEnding(Guid TenantId, Guid SubscriptionId, Guid PlanId, DateTimeOffset EndsAt) : IDomainEvent;
 
+/// <summary>Raised on every status change, so handlers can notify the tenant or tell a billing system.</summary>
 public sealed record SubscriptionStatusChanged(Guid TenantId, Guid SubscriptionId, SubscriptionStatus From, SubscriptionStatus To, string? Reason) : IDomainEvent;
+
+/// <summary>Who or what changed the plan.</summary>
+public enum PlanChangeSource
+{
+    /// <summary>The platform's operator.</summary>
+    Operator = 0,
+
+    /// <summary>The organisation itself, without paying (a downgrade, a change of period, an upgrade with nothing to pay).</summary>
+    Tenant = 1,
+
+    /// <summary>A payment for another plan or period: it replaces what an automatic renewal paid for.</summary>
+    Payment = 2,
+
+    /// <summary>A change scheduled for the end of the period, taking effect.</summary>
+    Schedule = 3,
+
+    /// <summary>The difference for an upgrade, paid.</summary>
+    Upgrade = 4,
+}
+
+/// <summary>Raised when the plan or billing cycle changes now, so renewals and notices can follow.</summary>
+public sealed record SubscriptionPlanChanged(
+    Guid TenantId, Guid SubscriptionId, Guid FromPlanId, BillingCycle FromCycle, Guid ToPlanId, BillingCycle ToCycle, PlanChangeSource Source, string? Reason)
+    : IDomainEvent;
+
+/// <summary>
+/// Raised when a change is scheduled for the end of the period (<paramref name="ToPlanId"/> set) or the scheduled change
+/// is withdrawn (null).
+/// </summary>
+public sealed record SubscriptionChangeScheduled(
+    Guid TenantId, Guid SubscriptionId, Guid? ToPlanId, BillingCycle? ToCycle, DateTimeOffset? At, PlanChangeSource Source, string? Reason)
+    : IDomainEvent;
 
 /// <summary>
 /// A tenant's subscription to a plan, and where it is in its lifecycle:
@@ -94,6 +126,19 @@ public sealed class TenantSubscription : EntityBase, ITenantOwned
     /// <summary>The billing system's id for this subscription, if one is used.</summary>
     public string? ExternalReference { get; private set; }
 
+    /// <summary>The plan it moves to at <see cref="ScheduledChangeAt"/> (a downgrade or change of period waits for the paid period to end).</summary>
+    public Guid? ScheduledPlanId { get; private set; }
+
+    public BillingCycle? ScheduledBillingCycle { get; private set; }
+
+    /// <summary>When the scheduled change takes effect: the end of the period that was running when it was scheduled.</summary>
+    public DateTimeOffset? ScheduledChangeAt { get; private set; }
+
+    public bool HasScheduledChange => ScheduledPlanId is not null;
+
+    /// <summary>Whether a paid period is running, so a change can wait for its end and an upgrade can be charged pro rata.</summary>
+    public bool IsInPaidPeriod(DateTimeOffset now) => Status == SubscriptionStatus.Active && CurrentPeriodEnd > now;
+
     /// <summary>Whether the tenant can use the application (trialing, active, or past due within grace).</summary>
     public bool HasAccess => Status is SubscriptionStatus.Trialing or SubscriptionStatus.Active or SubscriptionStatus.PastDue;
 
@@ -112,18 +157,78 @@ public sealed class TenantSubscription : EntityBase, ITenantOwned
         return new TenantSubscription(tenantId, plan, cycle, SubscriptionStatus.Active, now, NextPeriodEnd(now, cycle));
     }
 
-    public void ChangePlan(Plan plan, BillingCycle cycle)
+    /// <summary>Switches plan and cycle now, keeping the period; any scheduled change is dropped.</summary>
+    public void ChangePlan(Plan plan, BillingCycle cycle, PlanChangeSource source, string? reason = null)
     {
         ArgumentNullException.ThrowIfNull(plan);
+        DropScheduledChange(source, reason);
+        if (plan.Id == PlanId && cycle == BillingCycle)
+        {
+            return;
+        }
+
+        var (fromPlan, fromCycle) = (PlanId, BillingCycle);
         PlanId = plan.Id;
         BillingCycle = cycle;
+        Raise(new SubscriptionPlanChanged(TenantId, Id, fromPlan, fromCycle, plan.Id, cycle, source, Trim(reason)));
     }
 
-    /// <summary>A payment for the next period: active until one cycle past the later of now and the current period end.</summary>
+    /// <summary>
+    /// Moves to <paramref name="plan"/> and <paramref name="cycle"/> when the running period (or trial) ends. Choosing the
+    /// current plan and cycle withdraws a scheduled change.
+    /// </summary>
+    public void ScheduleChange(Plan plan, BillingCycle cycle, DateTimeOffset now, PlanChangeSource source, string? reason = null)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        if (!HasAccess || CurrentPeriodEnd <= now)
+        {
+            throw new InvalidOperationException("A change can only wait for a period that is still running.");
+        }
+
+        if (CancelAtPeriodEnd)
+        {
+            throw new InvalidOperationException("The subscription ends with this period; there is nothing to change to.");
+        }
+
+        if (plan.Id == PlanId && cycle == BillingCycle)
+        {
+            DropScheduledChange(source, reason);
+            return;
+        }
+
+        ScheduledPlanId = plan.Id;
+        ScheduledBillingCycle = cycle;
+        ScheduledChangeAt = CurrentPeriodEnd;
+        Raise(new SubscriptionChangeScheduled(TenantId, Id, plan.Id, cycle, ScheduledChangeAt, source, Trim(reason)));
+    }
+
+    /// <summary>Keeps the current plan after all.</summary>
+    public void CancelScheduledChange(PlanChangeSource source, string? reason = null) => DropScheduledChange(source, reason);
+
+    /// <summary>
+    /// An upgrade paid for (or with nothing to pay) part-way through a period: the new plan applies now and the period
+    /// stays as it was.
+    /// </summary>
+    public void Upgrade(Plan plan, PlanChangeSource source, string? externalReference = null)
+    {
+        ChangePlan(plan, BillingCycle, source, "Upgraded");
+        if (!string.IsNullOrWhiteSpace(externalReference))
+        {
+            ExternalReference = externalReference.Trim();
+        }
+    }
+
+    /// <summary>
+    /// A payment for the next period (by the operator, or charged by an automatic renewal): active until one cycle past
+    /// the later of now and the current period end. A scheduled change still happens when it is due: the period paid
+    /// for after it is on the scheduled plan and cycle.
+    /// </summary>
     public void RecordPayment(DateTimeOffset now, string? externalReference = null)
     {
+        ApplyDueChange(now);
         var from = CurrentPeriodEnd > now && Status is SubscriptionStatus.Active ? CurrentPeriodEnd : now;
-        CurrentPeriodEnd = NextPeriodEnd(from, BillingCycle);
+        var cycle = HasScheduledChange && ScheduledChangeAt <= from ? ScheduledBillingCycle!.Value : BillingCycle;
+        CurrentPeriodEnd = NextPeriodEnd(from, cycle);
         TrialEndsAt = Status == SubscriptionStatus.Trialing ? now : TrialEndsAt;
         CancelAtPeriodEnd = false;
         EndedAt = null;
@@ -136,16 +241,17 @@ public sealed class TenantSubscription : EntityBase, ITenantOwned
     }
 
     /// <summary>
-    /// A payment through a gateway for <paramref name="plan"/> and <paramref name="cycle"/>. The same plan and cycle
-    /// extend the subscription like <see cref="RecordPayment"/>; a different one switches to it with a fresh period from
-    /// <paramref name="now"/>.
+    /// A payment the organisation made for <paramref name="plan"/> and <paramref name="cycle"/>: it chose what it pays
+    /// for, so a scheduled change is dropped. The same plan and cycle extend the subscription like
+    /// <see cref="RecordPayment"/>; a different one switches to it with a fresh period from <paramref name="now"/>.
     /// </summary>
     public void ApplyPayment(Plan plan, BillingCycle cycle, DateTimeOffset now, string reference)
     {
         ArgumentNullException.ThrowIfNull(plan);
+        DropScheduledChange(PlanChangeSource.Payment, null);
         if (plan.Id != PlanId || cycle != BillingCycle)
         {
-            ChangePlan(plan, cycle);
+            ChangePlan(plan, cycle, PlanChangeSource.Payment);
             CurrentPeriodEnd = now;
         }
 
@@ -216,6 +322,7 @@ public sealed class TenantSubscription : EntityBase, ITenantOwned
             return;
         }
 
+        DropScheduledChange(PlanChangeSource.Tenant, "The subscription is cancelled");
         if (atPeriodEnd && HasAccess)
         {
             CancelAtPeriodEnd = true;
@@ -247,6 +354,11 @@ public sealed class TenantSubscription : EntityBase, ITenantOwned
     /// </summary>
     public bool Advance(DateTimeOffset now, TimeSpan gracePeriod)
     {
+        if (ApplyDueChange(now))
+        {
+            return true;
+        }
+
         switch (Status)
         {
             case SubscriptionStatus.Trialing when CurrentPeriodEnd <= now:
@@ -286,8 +398,51 @@ public sealed class TenantSubscription : EntityBase, ITenantOwned
         }
     }
 
+    /// <summary>The start of the running period: one cycle before its end.</summary>
+    public DateTimeOffset CurrentPeriodStart => BillingCycle == BillingCycle.Annual ? CurrentPeriodEnd.AddYears(-1) : CurrentPeriodEnd.AddMonths(-1);
+
     private static DateTimeOffset NextPeriodEnd(DateTimeOffset from, BillingCycle cycle) =>
         cycle == BillingCycle.Annual ? from.AddYears(1) : from.AddMonths(1);
+
+    private static string? Trim(string? reason)
+    {
+        var trimmed = reason?.Trim();
+        return string.IsNullOrEmpty(trimmed) ? null : trimmed.Length > ReasonMaxLength ? trimmed[..ReasonMaxLength] : trimmed;
+    }
+
+    /// <summary>Makes a scheduled change whose time has come. Returns whether it did.</summary>
+    private bool ApplyDueChange(DateTimeOffset now)
+    {
+        if (ScheduledPlanId is not { } planId || ScheduledChangeAt > now)
+        {
+            return false;
+        }
+
+        var (fromPlan, fromCycle) = (PlanId, BillingCycle);
+        PlanId = planId;
+        BillingCycle = ScheduledBillingCycle ?? BillingCycle;
+        ClearSchedule();
+        Raise(new SubscriptionPlanChanged(TenantId, Id, fromPlan, fromCycle, PlanId, BillingCycle, PlanChangeSource.Schedule, "Scheduled change"));
+        return true;
+    }
+
+    private void DropScheduledChange(PlanChangeSource source, string? reason)
+    {
+        if (!HasScheduledChange)
+        {
+            return;
+        }
+
+        ClearSchedule();
+        Raise(new SubscriptionChangeScheduled(TenantId, Id, null, null, null, source, Trim(reason)));
+    }
+
+    private void ClearSchedule()
+    {
+        ScheduledPlanId = null;
+        ScheduledBillingCycle = null;
+        ScheduledChangeAt = null;
+    }
 
     private void MoveTo(SubscriptionStatus status, DateTimeOffset now, string reason)
     {

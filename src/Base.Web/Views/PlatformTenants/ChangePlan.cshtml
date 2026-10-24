@@ -1,0 +1,127 @@
+@model OperatorPlanChangeViewModel
+@{
+    var t = Model.Tenant.Tenant;
+    var c = Model.Change;
+    ViewData["Title"] = "Change plan: " + t.Name;
+    var price = c.ToPrice - c.FromPrice;
+}
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+    <a asp-action="Index">Tenants</a><icon name="chevron-right" class="icon-sm" />
+    <a asp-action="Details" asp-route-id="@t.Id">@t.Name</a><icon name="chevron-right" class="icon-sm" />
+    <span aria-current="page">Change plan</span>
+</nav>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Move @t.Name to @c.To.Name</h1>
+        <p class="page-subtitle">What the change does, when it happens, and why. The tenant's contact is emailed the change and your reason.</p>
+    </div>
+</div>
+
+<form method="post" asp-action="ChangePlan" asp-route-id="@t.Id" class="stack plan-change">
+    <input type="hidden" name="planId" value="@c.To.Id" />
+    <input type="hidden" name="billingCycle" value="@c.ToCycle" />
+
+    <section class="panel" aria-labelledby="impact-title">
+        <div class="panel-header"><h2 class="panel-title" id="impact-title">Impact</h2></div>
+        <div class="panel-body stack">
+            <div class="plan-move">
+                <div class="plan-move-side">
+                    <div class="plan-move-label">Now</div>
+                    <div class="plan-move-name">@c.From.Name</div>
+                    <div class="plan-move-meta">@Display.Money(c.FromPrice, c.From.Currency)@Display.PerCycle(c.FromCycle)</div>
+                </div>
+                <icon name="arrow-right" />
+                <div class="plan-move-side is-next">
+                    <div class="plan-move-label">New</div>
+                    <div class="plan-move-name">@c.To.Name</div>
+                    <div class="plan-move-meta">@Display.Money(c.ToPrice, c.To.Currency)@Display.PerCycle(c.ToCycle)</div>
+                </div>
+            </div>
+
+            @if (c.IsCurrent)
+            {
+                <div class="status-callout"><icon name="info" /><div>That's already the tenant's plan and billing cycle.@(c.Scheduled is not null ? " To keep it, withdraw the waiting change on the tenant's page." : "")</div></div>
+            }
+
+            @if (c.IsBlocked)
+            {
+                <div class="status-callout is-danger" role="alert">
+                    <icon name="circle-alert" />
+                    <div>
+                        <div class="status-callout-title">The tenant uses more than @c.To.Name allows</div>
+                        <ul class="mb-0 ps-3">@foreach (var over in c.OverLimits) {<li>@over.Describe()</li>}</ul>
+                        <div class="small mt-1">If you change anyway, nothing is removed: the tenant just can't add more until it is under the limits.</div>
+                    </div>
+                </div>
+            }
+
+            <dl class="kv mb-0">
+                <dt>Price</dt>
+                <dd>@(price == 0 ? "No change" : (price > 0 ? "+" : "−") + Display.Money(Math.Abs(price), c.Currency) + Display.PerCycle(c.ToCycle))@(c.ToCycle != c.FromCycle ? $" (billed {c.ToCycle.ToString().ToLowerInvariant()})" : "")</dd>
+                <dt>Paid up to</dt>
+                <dd><local-time value="c.PeriodEnd" format="d MMMM yyyy" />. Changing plan doesn't charge or refund anything; record a payment separately if one is due.</dd>
+                @if (c.FeaturesGained.Count > 0)
+                {
+                    <dt>Gains</dt>
+                    <dd><span class="chip-group">@foreach (var f in c.FeaturesGained) {<span class="chip"><icon name="plus" /> @f</span>}</span></dd>
+                }
+                @if (c.FeaturesLost.Count > 0)
+                {
+                    <dt>Loses</dt>
+                    <dd><span class="chip-group">@foreach (var f in c.FeaturesLost) {<span class="chip"><icon name="minus" /> @f</span>}</span> <span class="text-muted small">(its data is kept, hidden)</span></dd>
+                }
+                @if (c.RenewsAutomatically)
+                {
+                    <dt>Renewal</dt>
+                    <dd>Automatic renewal is on: it is changed to charge @Display.Money(c.ToPrice, c.To.Currency)@Display.PerCycle(c.ToCycle) from its next charge, or turned off (and the tenant told) if the payment provider can't change it.</dd>
+                }
+                @if (c.Scheduled is { } waiting)
+                {
+                    <dt>Waiting</dt>
+                    <dd>A move to @waiting.PlanName on <local-time value="waiting.At" format="d MMMM yyyy" /> is waiting; this replaces it.</dd>
+                }
+            </dl>
+        </div>
+    </section>
+
+    @if (!c.IsCurrent)
+    {
+        <section class="panel" aria-labelledby="confirm-title">
+            <div class="panel-header"><h2 class="panel-title" id="confirm-title">Confirm</h2></div>
+            <div class="panel-body stack">
+                <div>
+                    <div class="form-label">When</div>
+                    <div class="choice-grid" role="radiogroup" aria-label="When">
+                        <label class="choice-card">
+                            <input type="radio" name="when" value="@PlanChangeTiming.Now" checked="@(Model.When == PlanChangeTiming.Now || !c.CanWaitForPeriodEnd)" />
+                            <span class="choice-check"><icon name="check" /></span>
+                            <span class="choice-title">Now</span>
+                            <span class="choice-desc">The new plan applies at once; the paid-up date stays <local-time value="c.PeriodEnd" format="d MMM yyyy" />.</span>
+                        </label>
+                        <label class="choice-card">
+                            <input type="radio" name="when" value="@PlanChangeTiming.AtPeriodEnd" checked="@(Model.When == PlanChangeTiming.AtPeriodEnd && c.CanWaitForPeriodEnd)" disabled="@(!c.CanWaitForPeriodEnd)" />
+                            <span class="choice-check"><icon name="check" /></span>
+                            <span class="choice-title">When the period ends</span>
+                            <span class="choice-desc">@(c.CanWaitForPeriodEnd ? "The tenant keeps what it has until " : "No running period to wait for.") @if (c.CanWaitForPeriodEnd) {<local-time value="c.PeriodEnd" format="d MMM yyyy" />}</span>
+                        </label>
+                    </div>
+                </div>
+                <div>
+                    <label class="form-label" for="change-reason">Reason</label>
+                    <textarea class="form-control" id="change-reason" name="reason" rows="2" maxlength="500" required placeholder="Shown to the tenant and kept in the audit trail">@Model.Reason</textarea>
+                </div>
+                @if (c.IsBlocked)
+                {
+                    <label class="form-check mb-0">
+                        <input class="form-check-input" type="checkbox" name="allowOverLimits" value="true" />
+                        <span class="form-check-label">Change anyway, although the tenant is over the new plan's limits</span>
+                    </label>
+                }
+            </div>
+            <div class="panel-footer d-flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-primary">Change plan</button>
+                <a class="btn btn-ghost" asp-action="Details" asp-route-id="@t.Id">Cancel</a>
+            </div>
+        </section>
+    }
+</form>

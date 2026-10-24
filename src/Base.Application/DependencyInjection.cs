@@ -78,10 +78,15 @@ public static class DependencyInjection
         services.AddScoped<IDomainEventHandler<PaymentSucceeded>>(sp => sp.GetRequiredService<RecurringPaymentLifecycle>());
         services.AddScoped<IDomainEventHandler<SubscriptionStatusChanged>>(sp => sp.GetRequiredService<RecurringPaymentLifecycle>());
         services.AddScoped<IDomainEventHandler<RecurringPaymentStoppedByGateway>>(sp => sp.GetRequiredService<RecurringPaymentLifecycle>());
+        services.AddScoped<RenewalFollowsPlan>();
+        services.AddScoped<IDomainEventHandler<SubscriptionPlanChanged>>(sp => sp.GetRequiredService<RenewalFollowsPlan>());
+        services.AddScoped<IDomainEventHandler<SubscriptionChangeScheduled>>(sp => sp.GetRequiredService<RenewalFollowsPlan>());
         services.AddScoped<IScheduledJob, PaymentExpiryJob>();
         services.AddScoped<SubscriptionNotices>();
         services.AddScoped<IDomainEventHandler<SubscriptionStatusChanged>>(sp => sp.GetRequiredService<SubscriptionNotices>());
         services.AddScoped<IDomainEventHandler<SubscriptionTrialEnding>>(sp => sp.GetRequiredService<SubscriptionNotices>());
+        services.AddScoped<IDomainEventHandler<SubscriptionPlanChanged>>(sp => sp.GetRequiredService<SubscriptionNotices>());
+        services.AddScoped<IDomainEventHandler<SubscriptionChangeScheduled>>(sp => sp.GetRequiredService<SubscriptionNotices>());
         services.AddScoped<ExportService>();
         services.AddScoped<IExportService>(sp => sp.GetRequiredService<ExportService>());
         services.AddScoped<ImportService>();

@@ -109,6 +109,14 @@ public sealed class Payment : EntityBase, ITenantOwned
     /// <summary>Charged by the gateway under an automatic renewal, not started by a person.</summary>
     public bool IsRenewal { get; private set; }
 
+    /// <summary>
+    /// The difference for moving up to <see cref="PlanId"/> for the rest of the running period: applying it changes the
+    /// plan and leaves the period as it is.
+    /// </summary>
+    public bool IsUpgrade { get; private set; }
+
+    public void PaysForUpgrade() => IsUpgrade = true;
+
     /// <summary>The first payment of an automatic renewal.</summary>
     public void SetsUp(RecurringPayment recurring)
     {

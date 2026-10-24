@@ -43,7 +43,8 @@ cross-cutting feature or adding a package:
   (its `ModuleCodes` module, `Since` version and, for a feature, suggested `FeatureTier`; a new module also gets a
   `Modules` entry) and enforcement (`[RequiresFeature]` + `asp-feature`, or `ITenantEntitlements.EnsureWithinLimitAsync` before the
   action). Never check plan codes or prices in code. Tenants are created through `ITenantAdministration`,
-  subscriptions changed through `ISubscriptionService`. Online payments go through `IPaymentService` and a hosted
+  subscriptions changed through `ISubscriptionService` (plan changes follow `PlanChangeRules`: upgrades now pro rata,
+  downgrades at period end, never past the new plan's limits; the operator gives a reason). Online payments go through `IPaymentService` and a hosted
   `IPaymentGateway` (adapter + `Payments:Gateways:{Code}` config; credentials are deployment secrets). Card data never
   touches the app; only the gateway's verified notification marks a payment paid, never the return page (ADR 0026).
 - New setting = constant in `SettingCodes` + `SettingCatalog` entry (no migration); it appears on Administration →

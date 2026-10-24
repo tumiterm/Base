@@ -100,6 +100,18 @@ public sealed class RecurringPayment : EntityBase, ITenantOwned
         Raise(new RecurringPaymentActivated(TenantId, Id));
     }
 
+    /// <summary>The gateway agreed to charge another amount or cycle from the next charge, for another plan.</summary>
+    public void Follow(Guid planId, BillingCycle cycle, decimal amount)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(amount);
+        PlanId = planId;
+        BillingCycle = cycle;
+        Amount = decimal.Round(amount, 2);
+    }
+
+    public bool Matches(Guid planId, BillingCycle cycle, decimal amount) =>
+        PlanId == planId && BillingCycle == cycle && Amount == decimal.Round(amount, 2);
+
     public void Charged(DateTimeOffset now)
     {
         LastChargedAt = now;

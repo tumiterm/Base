@@ -1406,6 +1406,9 @@ namespace Base.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsRenewal")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsUpgrade")
+                        .HasColumnType("bit");
+
                     b.Property<Guid>("PlanId")
                         .HasColumnType("uniqueidentifier");
 
@@ -2005,6 +2008,16 @@ namespace Base.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
 
+                    b.Property<string>("ScheduledBillingCycle")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTimeOffset?>("ScheduledChangeAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ScheduledPlanId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTimeOffset>("StartedAt")
                         .HasColumnType("datetimeoffset");
 
@@ -2044,6 +2057,8 @@ namespace Base.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("PlanId");
+
+                    b.HasIndex("ScheduledPlanId");
 
                     b.HasIndex("TenantId")
                         .IsUnique()
@@ -2846,6 +2861,11 @@ namespace Base.Infrastructure.Persistence.Migrations
                         .HasForeignKey("PlanId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("Base.Domain.Subscriptions.Plan", null)
+                        .WithMany()
+                        .HasForeignKey("ScheduledPlanId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Base.Domain.Tenancy.Tenant", null)
                         .WithMany()

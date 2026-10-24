@@ -2,11 +2,11 @@
 Automatic renewal stopped for {{PlanName}}
 --- email.html
 <p>Hello,</p>
-<p>{{Gateway}} has stopped the automatic renewal of your organisation's {{PlanName}} subscription ({{Amount}} each period), so it won't be charged again.</p>
+<p>The automatic renewal of your organisation's {{PlanName}} subscription ({{Amount}} each period) through {{Gateway}} has stopped, so it won't be charged again: {{Reason}}.</p>
 <p>To keep your subscription going, pay before the current period ends, and switch automatic renewal on again if you like, at <a href="{{PublicBaseUrl}}/subscription">{{PublicBaseUrl}}/subscription</a>.</p>
 --- email.text
 Hello,
 
-{{Gateway}} has stopped the automatic renewal of your organisation's {{PlanName}} subscription ({{Amount}} each period), so it won't be charged again.
+The automatic renewal of your organisation's {{PlanName}} subscription ({{Amount}} each period) through {{Gateway}} has stopped, so it won't be charged again: {{Reason}}.
 
 To keep your subscription going, pay before the current period ends, and switch automatic renewal on again if you like: {{PublicBaseUrl}}/subscription

@@ -25,6 +25,7 @@ public static class NotificationTemplates
         public const string StatusChanged = "Subscriptions.StatusChanged";
         public const string PaymentReceived = "Subscriptions.PaymentReceived";
         public const string AutoRenewalStopped = "Subscriptions.AutoRenewalStopped";
+        public const string PlanChanged = "Subscriptions.PlanChanged";
     }
 
     public static class Tenancy
@@ -132,8 +133,11 @@ public static class NotificationCatalog
             "A receipt for an online payment for the subscription, to the person who paid and the organisation's contact.",
             [NotificationChannel.Email], ["PlanName", "Amount", "Reference", "PaidUntil", "Gateway"], IsMandatory: true),
         new(NotificationTemplates.Subscriptions.AutoRenewalStopped, "Automatic renewal stopped", NotificationCategories.Billing,
-            "Tells the organisation's contact that the payment provider stopped the automatic renewal, so they pay before the period ends.",
-            [NotificationChannel.Email], ["PlanName", "Gateway", "Amount"], IsMandatory: true),
+            "Tells the organisation's contact that the automatic renewal stopped (at the payment provider, or because it couldn't follow a change of plan), so they pay before the period ends.",
+            [NotificationChannel.Email], ["PlanName", "Gateway", "Amount", "Reason"], IsMandatory: true),
+        new(NotificationTemplates.Subscriptions.PlanChanged, "Plan changed", NotificationCategories.Billing,
+            "Tells the organisation's contact that the platform changed its plan, now or from the end of the period, and why.",
+            [NotificationChannel.Email], ["PlanName", "PreviousPlanName", "Price", "When", "Reason"], IsMandatory: true),
         new(NotificationTemplates.Communications.Message, "Message from a person", NotificationCategories.Announcements,
             "Messages written and sent from Messages, alone or in bulk. Each one brings its own wording; this file is only the fallback.",
             [NotificationChannel.Email, NotificationChannel.InApp], []),

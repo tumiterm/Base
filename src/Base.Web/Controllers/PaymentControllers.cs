@@ -4,6 +4,7 @@ using Base.Application.Security;
 using Base.Application.Settings;
 using Base.Application.Subscriptions;
 using Base.Domain.Payments;
+using Base.Domain.Subscriptions;
 using Base.Web.Results;
 using Base.Web.Security;
 using Base.Web.ViewModels;
@@ -76,6 +77,62 @@ public sealed class SubscriptionController(
         return sameSite || redirect.PaymentReference is null
             ? Redirect(redirect.Url.AbsoluteUri)
             : View("GatewayRedirect", new CheckoutRedirect(new Uri(await PublicBaseAsync(cancellationToken) + "/payments/go/" + redirect.PaymentReference)));
+    }
+
+    /// <summary>
+    /// The pay-or-change form lands here first. Paying for a fresh period or another period of the same plan goes
+    /// straight to payment; an upgrade, a downgrade, a change of cycle or a plan the organisation is too big for is shown
+    /// for review first: what changes, when, and what is due.
+    /// </summary>
+    [HttpPost("change/review")]
+    [HasPermission(PermissionCodes.Subscription.Pay)]
+    public async Task<IActionResult> Review(PayForm form, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(form);
+        var preview = await subscriptions.PreviewMineAsync(form.PlanId, form.BillingCycle, cancellationToken);
+        if (preview.ErrorType is Application.Common.Results.ErrorType.NotFound)
+        {
+            return await Pay(form, cancellationToken);
+        }
+
+        if (preview.IsError)
+        {
+            this.Flash(preview);
+            return RedirectToAction(nameof(Index), null, null, "pay");
+        }
+
+        var change = preview.Data!;
+        if (!change.IsBlocked && change.Kind is PlanChangeKind.Start or PlanChangeKind.Extend)
+        {
+            return await Pay(form, cancellationToken);
+        }
+
+        var all = payments.Gateways(change.Currency);
+        var nothingToPay = change.Kind == PlanChangeKind.Upgrade && (all.Count == 0 || change.AmountDueNow < all.Min(g => g.MinimumCharge));
+        return View("Change", new PlanChangeViewModel(
+            change,
+            all.Where(g => g.MinimumCharge <= change.AmountDueNow).ToList(),
+            form.Gateway,
+            nothingToPay,
+            currentUser.HasPermission(PermissionCodes.Users.Manage)));
+    }
+
+    /// <summary>Confirms a change that needs no payment: a downgrade or change of cycle, or an upgrade with nothing to pay.</summary>
+    [HttpPost("change")]
+    [HasPermission(PermissionCodes.Subscription.Pay)]
+    public async Task<IActionResult> Change(Guid planId, BillingCycle billingCycle, CancellationToken cancellationToken)
+    {
+        this.Flash(await subscriptions.ChangeMineAsync(planId, billingCycle, cancellationToken));
+        return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>Keeps the current plan: withdraws the change waiting for the end of the period.</summary>
+    [HttpPost("change/keep")]
+    [HasPermission(PermissionCodes.Subscription.Pay)]
+    public async Task<IActionResult> KeepPlan(CancellationToken cancellationToken)
+    {
+        this.Flash(await subscriptions.KeepMyPlanAsync(cancellationToken));
+        return RedirectToAction(nameof(Index));
     }
 
     /// <summary>Turns automatic renewal off, at the gateway too.</summary>

@@ -1,0 +1,143 @@
+@model PlanChangeViewModel
+@{
+    var c = Model.Change;
+    ViewData["Title"] = "Change plan";
+    var upgrade = c.Kind == PlanChangeKind.Upgrade;
+    var waits = c.Kind == PlanChangeKind.AtPeriodEnd;
+    var selected = Model.Gateways.FirstOrDefault(g => g.Code == Model.Gateway) ?? Model.Gateways.FirstOrDefault();
+}
+<nav class="breadcrumbs" aria-label="Breadcrumb"><a asp-action="Index">Subscription</a><icon name="chevron-right" class="icon-sm" /><span aria-current="page">Change plan</span></nav>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">@(upgrade ? "Upgrade" : waits ? "Change plan" : "Choose a plan") to @c.To.Name</h1>
+        <p class="page-subtitle">Check what changes, and when, before you confirm.</p>
+    </div>
+</div>
+
+<div class="stack plan-change">
+    <section class="panel" aria-labelledby="move-title">
+        <div class="panel-header"><h2 class="panel-title" id="move-title">The change</h2></div>
+        <div class="panel-body stack">
+            <div class="plan-move">
+                <div class="plan-move-side">
+                    <div class="plan-move-label">Now</div>
+                    <div class="plan-move-name">@c.From.Name</div>
+                    <div class="plan-move-meta">@Display.Money(c.FromPrice, c.From.Currency)@Display.PerCycle(c.FromCycle)</div>
+                </div>
+                <icon name="arrow-right" />
+                <div class="plan-move-side is-next">
+                    <div class="plan-move-label">@if (waits) {<text>From <local-time value="c.EffectiveAt" format="d MMM yyyy" /></text>} else {<text>From today</text>}</div>
+                    <div class="plan-move-name">@c.To.Name</div>
+                    <div class="plan-move-meta">@Display.Money(c.ToPrice, c.To.Currency)@Display.PerCycle(c.ToCycle)</div>
+                </div>
+            </div>
+
+            @if (c.IsBlocked)
+            {
+                <div class="status-callout is-danger" role="alert">
+                    <icon name="circle-alert" />
+                    <div>
+                        <div class="status-callout-title">Your organisation is bigger than @c.To.Name allows</div>
+                        <ul class="mb-0 ps-3">
+                            @foreach (var over in c.OverLimits) {<li>@over.Describe()</li>}
+                        </ul>
+                        @if (Model.CanManageUsers && c.OverLimits.Any(o => o.Code == LimitCodes.Users))
+                        {
+                            <a class="btn btn-secondary btn-sm mt-2" asp-controller="UserAdmin" asp-action="Index"><icon name="users" class="icon-sm" /> Manage users</a>
+                        }
+                    </div>
+                </div>
+            }
+            else if (upgrade)
+            {
+                <p class="mb-0">You move to @c.To.Name straight away. You pay only the difference for the time you've already paid for, up to <local-time value="c.PeriodEnd" format="d MMMM yyyy" />; after that it renews at @Display.Money(c.ToPrice, c.To.Currency)@Display.PerCycle(c.ToCycle).</p>
+                <div class="amount-due">
+                    <span class="text-muted">Due now</span>
+                    <span class="amount-due-value">@Display.Money(Model.NothingToPay ? 0 : c.AmountDueNow, c.Currency)</span>
+                </div>
+            }
+            else if (waits)
+            {
+                <p class="mb-0">
+                    You keep @c.From.Name, with everything it includes, until <local-time value="c.EffectiveAt" format="d MMMM yyyy" />: you've paid for it.
+                    Then you move to @c.To.Name @(c.ToCycle != c.FromCycle ? (c.ToCycle == BillingCycle.Annual ? "billed yearly" : "billed monthly") : string.Empty)
+                    and the next payment is @Display.Money(c.ToPrice, c.To.Currency). Nothing is paid now, and you can change your mind until then.
+                </p>
+                @if (c.OverLimits.Count == 0)
+                {
+                    <p class="text-muted small mb-0">Until the change, you can't add more than @c.To.Name allows (so the change can go ahead).</p>
+                }
+            }
+
+            @if (c.FeaturesLost.Count > 0 || c.FeaturesGained.Count > 0)
+            {
+                <dl class="kv mb-0">
+                    @if (c.FeaturesGained.Count > 0)
+                    {
+                        <dt>You gain</dt>
+                        <dd><span class="chip-group">@foreach (var f in c.FeaturesGained) {<span class="chip"><icon name="plus" /> @f</span>}</span></dd>
+                    }
+                    @if (c.FeaturesLost.Count > 0)
+                    {
+                        <dt>You lose</dt>
+                        <dd>
+                            <span class="chip-group">@foreach (var f in c.FeaturesLost) {<span class="chip"><icon name="minus" /> @f</span>}</span>
+                            <div class="text-muted small mt-1">What you made with them is kept, just hidden, and comes back if you move up again.</div>
+                        </dd>
+                    }
+                </dl>
+            }
+
+            @if (c.RenewsAutomatically && !c.IsBlocked)
+            {
+                <p class="text-muted small mb-0"><icon name="refresh-cw" class="icon-sm" /> Your automatic renewal follows the change: it charges @Display.Money(c.ToPrice, c.To.Currency)@Display.PerCycle(c.ToCycle) from the next renewal.</p>
+            }
+        </div>
+
+        @if (!c.IsBlocked)
+        {
+            if (upgrade && !Model.NothingToPay && selected is not null)
+            {
+                <form method="post" asp-action="Pay" class="panel-footer stack">
+                    <input type="hidden" name="PlanId" value="@c.To.Id" />
+                    <input type="hidden" name="BillingCycle" value="@c.ToCycle" />
+                    <div>
+                        <div class="form-label">Pay with</div>
+                        <div class="choice-grid" role="radiogroup" aria-label="Payment provider">
+                            @foreach (var g in Model.Gateways)
+                            {
+                                <label class="choice-card">
+                                    <input type="radio" name="Gateway" value="@g.Code" checked="@(g == selected)" />
+                                    <span class="choice-check"><icon name="check" /></span>
+                                    <span class="choice-title"><icon name="credit-card" class="icon-sm" /> @g.Name</span>
+                                    <span class="chip-group">@foreach (var m in g.Methods) {<span class="chip">@m</span>}</span>
+                                </label>
+                            }
+                        </div>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="submit" class="btn btn-primary"><icon name="lock" class="icon-sm" /> Pay @Display.Money(c.AmountDueNow, c.Currency)</button>
+                        <a class="btn btn-ghost" asp-action="Index">Cancel</a>
+                    </div>
+                </form>
+            }
+            else if (upgrade && !Model.NothingToPay)
+            {
+                <div class="panel-footer"><p class="text-muted mb-0">None of the payment options here can take @Display.Money(c.AmountDueNow, c.Currency). Contact us to upgrade.</p></div>
+            }
+            else
+            {
+                <form method="post" asp-action="Change" class="panel-footer d-flex flex-wrap gap-2">
+                    <input type="hidden" name="planId" value="@c.To.Id" />
+                    <input type="hidden" name="billingCycle" value="@c.ToCycle" />
+                    <button type="submit" class="btn btn-primary">Move to @c.To.Name @if (upgrade) {<text>now</text>} else {<text>on <local-time value="c.EffectiveAt" format="d MMM yyyy" /></text>}</button>
+                    <a class="btn btn-ghost" asp-action="Index">Cancel</a>
+                </form>
+            }
+        }
+        else
+        {
+            <div class="panel-footer"><a class="btn btn-secondary" asp-action="Index">Back to subscription</a></div>
+        }
+    </section>
+</div>

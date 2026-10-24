@@ -179,8 +179,8 @@ page) and **Turn off**.
 There is at most one renewal per organisation, for the plan it pays for. It is stopped, at the gateway first:
 
 - when the organisation turns it off;
-- when a newer renewal is set up, or a one-off payment is made for another plan or period (one for the same plan
-  and period just pays ahead);
+- when a newer renewal is set up, or a one-off payment starts another plan afresh (one for the same plan and period
+  just pays ahead);
 - when the subscription is cancelled or expires.
 
 If the gateway stops it by itself (the payer cancels at Payfast...), the organisation's contact is emailed. If the
@@ -193,8 +193,47 @@ API (`PUT https://api.payfast.co.za/subscriptions/{token}/cancel`, `?testing=tru
 the merchant ID, version and timestamp headers sorted alphabetically). Check the cancel once against your sandbox
 before going live; if Payfast changes it, the renewal shows why it couldn't be stopped.
 
+A **change of plan** doesn't stop it: the renewal follows the plan and cycle of the next period (see below). Payfast
+is asked to change the amount and frequency (`PATCH https://api.payfast.co.za/subscriptions/{token}/update` with
+`amount` in cents and `frequency`, signed like the cancel); the next charge date stays. If the gateway can't change
+it, the renewal is stopped there and the organisation's contact told, so it is never charged the wrong amount. Check
+the update once against your sandbox before going live, as for the cancel.
+
 **Test gateway**: the renewal panel has **Simulate the next charge**, which sends the notification a real gateway
 would at the end of the period.
+
+## Changing plan
+
+Subscription → **Pay ahead or change plan** → **Continue** shows what a change does before anything is paid or
+confirmed. The rules (`PlanChangeRules`):
+
+| The organisation chooses | While a paid period runs | Otherwise (trial, past due, suspended) |
+| --- | --- | --- |
+| The same plan and period | Pays for another period after the current one | Pays for a fresh period from today |
+| A plan that costs at least as much | **Now**, paying only the difference for the time already paid for (half a month left: half the monthly difference; three months paid ahead: three times it). The paid-up date stays | Fresh period from today |
+| A cheaper plan, or another billing cycle | **At the end of the paid period**, with nothing to pay now; it can be undone until then (**Keep my plan**) | Fresh period from today |
+
+- **Limits come first.** A plan whose limits the organisation is over (users, storage) can't be chosen or paid for:
+  the page lists what to remove first. Monthly limits (messages) don't count; they start again. Locked users don't
+  take a seat, so locking people frees seats without deleting them; unlocking one needs a free seat.
+- **While a downgrade waits**, the stricter of the two plans' limits applies, so nobody can outgrow the plan the
+  organisation is moving to. Features stay until the change.
+- **Lost features** are blocked from the change on, but what was made with them is kept and comes back on a bigger
+  plan.
+- An upgrade whose difference is below every provider's minimum (Payfast R5.00, Yoco R2.00) applies without payment.
+  Plans in different currencies can't be pro-rated: a fresh period starts.
+- The scheduled change is made by the hourly *Subscription lifecycle* job (or by the renewal charge that pays for the
+  next period). The next period is then on the new plan; on manual payment it is past due until paid, like any
+  renewal.
+
+**The operator** changes a plan from Platform → Tenants → the tenant → **Change plan**, which opens a review: price
+difference, limits the tenant is over, features gained and lost, the automatic renewal, and any waiting change.
+Choose **now** (the paid-up date stays; nothing is charged or refunded, record a payment separately if one is due) or
+**when the period ends**, and give a reason: the tenant's contact is emailed the change and the reason, and it is in
+the audit trail. Moving a tenant below its usage needs **Change anyway**; nothing is removed, it just can't add more.
+A waiting change can be withdrawn from the tenant's page. API: `GET
+/api/platform/tenants/{id}/subscription/plan/preview?planId=&billingCycle=`, `PUT .../subscription/plan` with
+`when`, `reason` (required) and `allowOverLimits`, and `DELETE .../subscription/plan/scheduled`.
 
 ## Not yet
 

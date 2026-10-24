@@ -11,8 +11,9 @@ using Base.Domain.Tenancy;
 namespace Base.Application.Subscriptions;
 
 /// <summary>
-/// Moves subscriptions on as time passes: trial reminders, ended trials and unpaid renewals to past due, past due
-/// beyond the grace period to suspended, and cancel-at-period-end to cancelled. Runs hourly in system scope.
+/// Moves subscriptions on as time passes: trial reminders, changes of plan scheduled for the end of the period, ended
+/// trials and unpaid renewals to past due, past due beyond the grace period to suspended, and cancel-at-period-end to
+/// cancelled. Runs hourly in system scope.
 /// </summary>
 internal sealed class SubscriptionLifecycleJob(
     IUnitOfWork unitOfWork,
@@ -24,7 +25,7 @@ internal sealed class SubscriptionLifecycleJob(
 
     public string Name => "Subscription lifecycle";
 
-    public string Description => "Sends trial reminders, marks unpaid subscriptions past due and suspends them after the grace period.";
+    public string Description => "Sends trial reminders, makes scheduled changes of plan, marks unpaid subscriptions past due and suspends them after the grace period.";
 
     public TimeSpan Interval => TimeSpan.FromHours(1);
 
@@ -36,8 +37,9 @@ internal sealed class SubscriptionLifecycleJob(
         var horizon = now + notice;
 
         var due = await unitOfWork.Repository<TenantSubscription>().GetAllAsync(
-            s => (s.Status == SubscriptionStatus.Trialing || s.Status == SubscriptionStatus.Active || s.Status == SubscriptionStatus.PastDue)
-                && (s.CurrentPeriodEnd <= horizon || s.Status == SubscriptionStatus.PastDue),
+            s => ((s.Status == SubscriptionStatus.Trialing || s.Status == SubscriptionStatus.Active || s.Status == SubscriptionStatus.PastDue)
+                    && (s.CurrentPeriodEnd <= horizon || s.Status == SubscriptionStatus.PastDue))
+                || s.ScheduledChangeAt <= now,
             includeProperties: null,
             cancellationToken: cancellationToken);
 
@@ -50,9 +52,9 @@ internal sealed class SubscriptionLifecycleJob(
                 reminded++;
             }
 
-            // A trial that ended long ago can pass through past due to suspended in one run.
+            // A trial that ended long ago can change plan and pass through past due to suspended in one run.
             var steps = 0;
-            while (steps < 3 && subscription.Advance(now, grace))
+            while (steps < 4 && subscription.Advance(now, grace))
             {
                 steps++;
             }
@@ -75,8 +77,39 @@ internal sealed class SubscriptionNotices(
     IUnitOfWork unitOfWork,
     ITenantContext tenant,
     INotificationService notifications)
-    : IDomainEventHandler<SubscriptionStatusChanged>, IDomainEventHandler<SubscriptionTrialEnding>
+    : IDomainEventHandler<SubscriptionStatusChanged>,
+      IDomainEventHandler<SubscriptionTrialEnding>,
+      IDomainEventHandler<SubscriptionPlanChanged>,
+      IDomainEventHandler<SubscriptionChangeScheduled>
 {
+    /// <summary>The operator changed the plan now: the organisation hears what and why.</summary>
+    public async Task HandleAsync(SubscriptionPlanChanged domainEvent, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(domainEvent);
+        if (domainEvent.Source == PlanChangeSource.Operator)
+        {
+            await TellPlanChangeAsync(domainEvent.TenantId, domainEvent.FromPlanId, domainEvent.ToPlanId, domainEvent.ToCycle, "today", domainEvent.Reason, cancellationToken);
+        }
+    }
+
+    /// <summary>The operator scheduled a change for the end of the period.</summary>
+    public async Task HandleAsync(SubscriptionChangeScheduled domainEvent, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(domainEvent);
+        if (domainEvent.Source != PlanChangeSource.Operator || domainEvent is not { ToPlanId: { } to, ToCycle: { } cycle, At: { } at })
+        {
+            return;
+        }
+
+        Guid from;
+        using (tenant.BeginSystemScope())
+        {
+            from = await unitOfWork.Repository<TenantSubscription>().GetAsync(s => s.Id == domainEvent.SubscriptionId, s => s.PlanId, cancellationToken);
+        }
+
+        await TellPlanChangeAsync(domainEvent.TenantId, from, to, cycle, "on " + at.ToString("d MMMM yyyy", CultureInfo.InvariantCulture), domainEvent.Reason, cancellationToken);
+    }
+
     public async Task HandleAsync(SubscriptionTrialEnding domainEvent, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(domainEvent);
@@ -108,6 +141,25 @@ internal sealed class SubscriptionNotices(
             PlanName = plan,
             Status = SubscriptionStatusText.Describe(domainEvent.To).ToLowerInvariant(),
             Reason = domainEvent.Reason ?? "no reason given",
+        }, cancellationToken);
+    }
+
+    private async Task TellPlanChangeAsync(Guid tenantId, Guid fromPlanId, Guid toPlanId, BillingCycle cycle, string when, string? reason, CancellationToken cancellationToken)
+    {
+        var previous = await unitOfWork.Repository<Plan>().GetByIdAsync(fromPlanId, cancellationToken);
+        var next = await unitOfWork.Repository<Plan>().GetByIdAsync(toPlanId, cancellationToken);
+        if (next is null)
+        {
+            return;
+        }
+
+        await SendAsync(tenantId, toPlanId, NotificationTemplates.Subscriptions.PlanChanged, name => new
+        {
+            PlanName = name,
+            PreviousPlanName = previous?.Name ?? "your current plan",
+            Price = next.Currency + " " + next.PriceFor(cycle).ToString("N2", CultureInfo.InvariantCulture) + (cycle == BillingCycle.Annual ? " a year" : " a month"),
+            When = when,
+            Reason = reason ?? "no reason given",
         }, cancellationToken);
     }
 

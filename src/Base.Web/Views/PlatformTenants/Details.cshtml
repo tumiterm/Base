@@ -159,6 +159,20 @@
                             <li class="is-alert"><div class="timeline-title">@Display.Status(s.Status)</div><div class="timeline-time"><local-time value="s.StatusChangedAt" /></div></li>
                         }
                     </ol>
+                    @if (s.Scheduled is { } next)
+                    {
+                        <div class="status-callout is-warning mt-3">
+                            <icon name="calendar" />
+                            <div class="flex-grow-1">
+                                <div class="status-callout-title">Moves to @next.PlanName on <local-time value="next.At" format="d MMMM yyyy" /></div>
+                                <div class="small">@Display.Money(next.Price, next.Currency)@Display.PerCycle(next.BillingCycle) from then. Until then its limits apply too, so the tenant can't outgrow it.</div>
+                            </div>
+                            @if (canManage)
+                            {
+                                <form method="post" asp-action="WithdrawPlanChange" asp-route-id="@t.Id"><button type="submit" class="btn btn-secondary btn-sm">Withdraw</button></form>
+                            }
+                        </div>
+                    }
                     @if (s.ExternalReference is not null)
                     {
                         <dl class="kv mt-3"><dt>Billing reference</dt><dd class="font-monospace">@s.ExternalReference</dd></dl>
@@ -408,10 +422,10 @@
 
         <div class="modal fade" id="plan-dialog" tabindex="-1" aria-labelledby="plan-title" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered modal-lg">
-                <form class="modal-content" method="post" asp-action="ChangePlan" asp-route-id="@t.Id">
+                <form class="modal-content" method="get" asp-action="ChangePlan" asp-route-id="@t.Id">
                     <div class="modal-header"><h2 class="modal-title" id="plan-title">Change plan</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
                     <div class="modal-body"><partial name="_PlanPicker" model="(plans, (Guid?)s.PlanId, s.BillingCycle)" /></div>
-                    <div class="modal-footer"><button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" type="submit">Change plan</button></div>
+                    <div class="modal-footer"><button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" type="submit">Review the change <icon name="arrow-right" class="icon-sm" /></button></div>
                 </form>
             </div>
         </div>

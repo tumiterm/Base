@@ -59,10 +59,23 @@ public sealed class TenantsApiController(ITenantAdministration tenants, ISubscri
     public async Task<IActionResult> Subscribe(Guid id, StartSubscriptionRequest request, CancellationToken cancellationToken) =>
         (await subscriptions.StartAsync(id, request, cancellationToken)).ToActionResult(this);
 
+    /// <summary>Changes the plan now or at the end of the period, with a reason (the tenant is told).</summary>
     [HttpPut("{id:guid}/subscription/plan")]
     [HasPermission(PermissionCodes.Platform.TenantsManage)]
     public async Task<IActionResult> ChangePlan(Guid id, ChangePlanRequest request, CancellationToken cancellationToken) =>
         (await subscriptions.ChangePlanAsync(id, request, cancellationToken)).ToActionResult(this);
+
+    /// <summary>What changing to a plan and cycle would do: when, what is due, limits it is over, features gained and lost.</summary>
+    [HttpGet("{id:guid}/subscription/plan/preview")]
+    [HasPermission(PermissionCodes.Platform.TenantsManage)]
+    public async Task<IActionResult> PreviewPlanChange(Guid id, Guid planId, BillingCycle billingCycle, CancellationToken cancellationToken) =>
+        (await subscriptions.PreviewChangeAsync(id, planId, billingCycle, cancellationToken)).ToActionResult(this);
+
+    /// <summary>Withdraws a change waiting for the end of the period.</summary>
+    [HttpDelete("{id:guid}/subscription/plan/scheduled")]
+    [HasPermission(PermissionCodes.Platform.TenantsManage)]
+    public async Task<IActionResult> WithdrawPlanChange(Guid id, CancellationToken cancellationToken) =>
+        (await subscriptions.CancelScheduledChangeAsync(id, cancellationToken)).ToActionResult(this);
 
     /// <summary>For a billing integration: a payment for the next period, with the billing system's reference.</summary>
     [HttpPost("{id:guid}/subscription/payments")]

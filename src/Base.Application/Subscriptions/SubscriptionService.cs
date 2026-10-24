@@ -2,6 +2,9 @@ using System.Globalization;
 using Base.Application.Common.Abstractions;
 using Base.Application.Common.Persistence;
 using Base.Application.Common.Results;
+using Base.Application.Payments;
+using Base.Application.Security;
+using Base.Domain.Payments;
 using Base.Domain.Subscriptions;
 using Base.Domain.Tenancy;
 
@@ -10,7 +13,9 @@ namespace Base.Application.Subscriptions;
 /// <summary>
 /// Operates any tenant's subscription (platform: <c>Platform.Tenants.Manage</c>) and shows a tenant its own
 /// (<c>Subscription.View</c>). Payments come in through <see cref="RecordPaymentAsync"/>, from an operator or a billing
-/// integration; nothing here talks to a payment provider.
+/// integration, or online through <see cref="IPaymentService"/>. Changing plan follows <see cref="PlanChangeRules"/>: an
+/// upgrade applies now, a downgrade or change of cycle when the paid period ends, and never to a plan whose limits the
+/// organisation is over (the operator may override that).
 /// </summary>
 public interface ISubscriptionService
 {
@@ -22,7 +27,26 @@ public interface ISubscriptionService
 
     Task<ValidationResponse> StartAsync(Guid tenantId, StartSubscriptionRequest request, CancellationToken cancellationToken = default);
 
+    /// <summary>The operator's change: now or at the end of the period, with a reason; the organisation is told.</summary>
     Task<ValidationResponse> ChangePlanAsync(Guid tenantId, ChangePlanRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>What moving any tenant to a plan and cycle would do.</summary>
+    Task<ValidationResponse<PlanChangePreview>> PreviewChangeAsync(Guid tenantId, Guid planId, BillingCycle cycle, CancellationToken cancellationToken = default);
+
+    /// <summary>What moving this organisation to a plan and cycle would do. Needs <c>Subscription.View</c>.</summary>
+    Task<ValidationResponse<PlanChangePreview>> PreviewMineAsync(Guid planId, BillingCycle cycle, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// This organisation's change that needs no payment: a downgrade or change of cycle (when the period ends), or an
+    /// upgrade with less to pay than any payment provider takes (now). Needs <c>Subscription.Pay</c>.
+    /// </summary>
+    Task<ValidationResponse> ChangeMineAsync(Guid planId, BillingCycle cycle, CancellationToken cancellationToken = default);
+
+    /// <summary>Keeps this organisation's current plan: withdraws the scheduled change. Needs <c>Subscription.Pay</c>.</summary>
+    Task<ValidationResponse> KeepMyPlanAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>The operator withdraws a tenant's scheduled change.</summary>
+    Task<ValidationResponse> CancelScheduledChangeAsync(Guid tenantId, CancellationToken cancellationToken = default);
 
     Task<ValidationResponse> RecordPaymentAsync(Guid tenantId, string? externalReference, CancellationToken cancellationToken = default);
 
@@ -44,6 +68,8 @@ internal sealed class SubscriptionService(
     ITenantUsageReader usage,
     IPlanAdministration plans,
     IPlatformTenant platform,
+    ICurrentUser currentUser,
+    IEnumerable<IPaymentGateway> gateways,
     TimeProvider time) : ISubscriptionService
 {
     public async Task<MySubscription> GetMineAsync(CancellationToken cancellationToken = default)
@@ -74,7 +100,8 @@ internal sealed class SubscriptionService(
         }
 
         var plan = await unitOfWork.Repository<Plan>().GetByIdAsync(subscription.PlanId, cancellationToken);
-        return ToView(subscription, plan);
+        var scheduled = subscription.ScheduledPlanId is { } scheduledId ? await unitOfWork.Repository<Plan>().GetByIdAsync(scheduledId, cancellationToken) : null;
+        return ToView(subscription, plan, scheduled);
     }
 
     public async Task<IReadOnlyList<UsageView>> UsageAsync(Guid tenantId, CancellationToken cancellationToken = default)
@@ -132,23 +159,184 @@ internal sealed class SubscriptionService(
     public async Task<ValidationResponse> ChangePlanAsync(Guid tenantId, ChangePlanRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var plan = await unitOfWork.Repository<Plan>().GetByIdAsync(request.PlanId, cancellationToken);
-        if (plan is null)
+        if (string.IsNullOrWhiteSpace(request.Reason))
         {
-            return ValidationResponse.NotFound("Plan not found.");
+            return ValidationResponse.Failure(new ValidationError(nameof(request.Reason), "Say why: the organisation is told, and it goes in the audit trail.", "required"));
         }
 
+        var preview = await PreviewChangeAsync(tenantId, request.PlanId, request.BillingCycle, cancellationToken);
+        if (preview.IsError)
+        {
+            return preview;
+        }
+
+        var change = preview.Data!;
+        if (change.IsCurrent)
+        {
+            return ValidationResponse.Failure("That's already the tenant's plan and billing cycle.");
+        }
+
+        if (change.IsBlocked && !request.AllowOverLimits)
+        {
+            return ValidationResponse.Failure(
+                $"{change.To.Name} allows less than the tenant uses: {string.Join(" ", change.OverLimits.Select(l => l.Describe()))} Ask them to get under it, or change anyway.",
+                "plan.over-limits");
+        }
+
+        if (request.When == PlanChangeTiming.AtPeriodEnd && !change.CanWaitForPeriodEnd)
+        {
+            return ValidationResponse.Failure("There's no running period to wait for (or the subscription ends with it): change it now instead.");
+        }
+
+        var plan = await unitOfWork.Repository<Plan>().GetByIdAsync(request.PlanId, cancellationToken);
+        var reason = request.Reason.Trim();
         return await ChangeAsync(tenantId, s =>
         {
-            if (!plan.IsActive && plan.Id != s.PlanId)
+            if (!plan!.IsActive && plan.Id != s.PlanId)
             {
                 return ValidationResponse.Failure("That plan is no longer offered.", "plan.unavailable");
             }
 
-            s.ChangePlan(plan, request.BillingCycle);
-            return ValidationResponse.Success($"Moved to {plan.Name}.");
+            if (request.When == PlanChangeTiming.AtPeriodEnd)
+            {
+                s.ScheduleChange(plan, request.BillingCycle, time.GetUtcNow(), PlanChangeSource.Operator, reason);
+                return ValidationResponse.Success(string.Create(CultureInfo.InvariantCulture, $"Moves to {plan.Name} on {s.ScheduledChangeAt:d MMMM yyyy}. The tenant has been told."));
+            }
+
+            s.ChangePlan(plan, request.BillingCycle, PlanChangeSource.Operator, reason);
+            return ValidationResponse.Success($"Moved to {plan.Name}. The tenant has been told.");
         }, cancellationToken);
     }
+
+    public async Task<ValidationResponse<PlanChangePreview>> PreviewChangeAsync(Guid tenantId, Guid planId, BillingCycle cycle, CancellationToken cancellationToken = default)
+    {
+        TenantSubscription? subscription;
+        bool renews;
+        using (tenant.BeginSystemScope())
+        {
+            subscription = await unitOfWork.Repository<TenantSubscription>().GetAsync(s => s.TenantId == tenantId, asNoTracking: true, cancellationToken: cancellationToken);
+            renews = await unitOfWork.Repository<RecurringPayment>().ExistsAsync(r => r.TenantId == tenantId && r.Status == RecurringPaymentStatus.Active, cancellationToken);
+        }
+
+        if (subscription is null)
+        {
+            return ValidationResponse.NotFound("This organisation has no subscription.").As<PlanChangePreview>();
+        }
+
+        var to = await plans.GetAsync(planId, cancellationToken);
+        if (to.IsError)
+        {
+            return ValidationResponse.NotFound("Plan not found.").As<PlanChangePreview>();
+        }
+
+        var from = await plans.GetAsync(subscription.PlanId, cancellationToken);
+        if (from.IsError)
+        {
+            return ValidationResponse.Failure("The current plan no longer exists; the operator has to change it.").As<PlanChangePreview>();
+        }
+
+        var now = time.GetUtcNow();
+        var (kind, effectiveAt, due) = PlanChangeRules.Classify(subscription, from.Data!, to.Data!, cycle, now);
+        var (lost, gained) = PlanChangeRules.Features(from.Data!, to.Data!);
+        var over = planId == subscription.PlanId ? [] : PlanChangeRules.OverLimits(to.Data!, await usage.MeasureAsync(tenantId, cancellationToken));
+        ScheduledChangeView? scheduled = null;
+        if (subscription.ScheduledPlanId is { } scheduledId && (await plans.GetAsync(scheduledId, cancellationToken)).Data is { } next)
+        {
+            var nextCycle = subscription.ScheduledBillingCycle ?? subscription.BillingCycle;
+            scheduled = new ScheduledChangeView(next.Id, next.Name, nextCycle, next.PriceFor(nextCycle), next.Currency, subscription.ScheduledChangeAt!.Value);
+        }
+
+        return ValidationResponse.Success(new PlanChangePreview(
+            tenantId,
+            from.Data!,
+            subscription.BillingCycle,
+            to.Data!,
+            cycle,
+            kind,
+            effectiveAt,
+            due,
+            subscription.CurrentPeriodEnd,
+            subscription.HasAccess && subscription.CurrentPeriodEnd > now && !subscription.CancelAtPeriodEnd,
+            over,
+            lost,
+            gained,
+            renews,
+            scheduled));
+    }
+
+    public async Task<ValidationResponse<PlanChangePreview>> PreviewMineAsync(Guid planId, BillingCycle cycle, CancellationToken cancellationToken = default)
+    {
+        if (!currentUser.HasPermission(PermissionCodes.Subscription.View) || !tenant.IsResolved)
+        {
+            return ValidationResponse.Forbidden().As<PlanChangePreview>();
+        }
+
+        var preview = await PreviewChangeAsync(tenant.TenantId, planId, cycle, cancellationToken);
+        return preview.IsSuccess && !preview.Data!.To.IsActive && planId != preview.Data.From.Id
+            ? ValidationResponse.Failure("Choose one of the plans on offer.", "plan.unavailable").As<PlanChangePreview>()
+            : preview;
+    }
+
+    public async Task<ValidationResponse> ChangeMineAsync(Guid planId, BillingCycle cycle, CancellationToken cancellationToken = default)
+    {
+        if (!currentUser.HasPermission(PermissionCodes.Subscription.Pay))
+        {
+            return ValidationResponse.Forbidden();
+        }
+
+        var preview = await PreviewMineAsync(planId, cycle, cancellationToken);
+        if (preview.IsError)
+        {
+            return preview;
+        }
+
+        var change = preview.Data!;
+        if (change.IsCurrent)
+        {
+            return change.Scheduled is null ? ValidationResponse.Failure("That's already your plan.") : await KeepMyPlanAsync(cancellationToken);
+        }
+
+        if (change.IsBlocked)
+        {
+            return ValidationResponse.Failure(
+                $"{change.To.Name} allows less than you use: {string.Join(" ", change.OverLimits.Select(l => l.Describe()))}",
+                "plan.over-limits");
+        }
+
+        var plan = await unitOfWork.Repository<Plan>().GetByIdAsync(planId, cancellationToken);
+        switch (change.Kind)
+        {
+            case PlanChangeKind.AtPeriodEnd:
+                return await ChangeAsync(tenant.TenantId, s =>
+                {
+                    if (s.CancelAtPeriodEnd)
+                    {
+                        return ValidationResponse.Failure("Your subscription is set to end with this period. Keep it renewing first.");
+                    }
+
+                    s.ScheduleChange(plan!, cycle, time.GetUtcNow(), PlanChangeSource.Tenant);
+                    return ValidationResponse.Success(string.Create(CultureInfo.InvariantCulture, $"You'll move to {plan!.Name} on {s.ScheduledChangeAt:d MMMM yyyy}. Until then nothing changes."));
+                }, cancellationToken);
+
+            case PlanChangeKind.Upgrade when change.AmountDueNow < SmallestCharge(change.Currency):
+                return await ChangeAsync(tenant.TenantId, s =>
+                {
+                    s.Upgrade(plan!, PlanChangeSource.Tenant);
+                    return ValidationResponse.Success($"You're on {plan!.Name} now; there was nothing to pay for the rest of this period.");
+                }, cancellationToken);
+
+            default:
+                return ValidationResponse.Failure("This change is paid for: continue to payment.", "plan.payment");
+        }
+    }
+
+    public Task<ValidationResponse> KeepMyPlanAsync(CancellationToken cancellationToken = default) =>
+        !currentUser.HasPermission(PermissionCodes.Subscription.Pay) || !tenant.IsResolved
+            ? Task.FromResult(ValidationResponse.Forbidden())
+            : WithdrawAsync(tenant.TenantId, PlanChangeSource.Tenant, cancellationToken);
+
+    public Task<ValidationResponse> CancelScheduledChangeAsync(Guid tenantId, CancellationToken cancellationToken = default) =>
+        WithdrawAsync(tenantId, PlanChangeSource.Operator, cancellationToken);
 
     public Task<ValidationResponse> RecordPaymentAsync(Guid tenantId, string? externalReference, CancellationToken cancellationToken = default) =>
         ChangeAsync(tenantId, s =>
@@ -232,7 +420,7 @@ internal sealed class SubscriptionService(
             return ValidationResponse.Success("It will renew as usual.");
         }, cancellationToken);
 
-    internal static SubscriptionView ToView(TenantSubscription s, Plan? plan) => new(
+    internal static SubscriptionView ToView(TenantSubscription s, Plan? plan, Plan? scheduled = null) => new(
         s.Id,
         s.TenantId,
         s.PlanId,
@@ -247,7 +435,29 @@ internal sealed class SubscriptionService(
         s.CancelAtPeriodEnd,
         s.StatusChangedAt,
         s.StatusReason,
-        s.ExternalReference);
+        s.ExternalReference,
+        scheduled is null || s.ScheduledChangeAt is not { } at
+            ? null
+            : new ScheduledChangeView(scheduled.Id, scheduled.Name, s.ScheduledBillingCycle ?? s.BillingCycle, scheduled.PriceFor(s.ScheduledBillingCycle ?? s.BillingCycle), scheduled.Currency, at));
+
+    /// <summary>Less than this can't be paid online in <paramref name="currency"/>: no payment provider takes it.</summary>
+    private decimal SmallestCharge(string currency)
+    {
+        var minimums = gateways.Where(g => g.Currencies.Contains(currency, StringComparer.OrdinalIgnoreCase)).Select(g => g.MinimumCharge).ToList();
+        return minimums.Count == 0 ? 0m : minimums.Min();
+    }
+
+    private Task<ValidationResponse> WithdrawAsync(Guid tenantId, PlanChangeSource source, CancellationToken cancellationToken) =>
+        ChangeAsync(tenantId, s =>
+        {
+            if (!s.HasScheduledChange)
+            {
+                return ValidationResponse.Failure("No change of plan is waiting.");
+            }
+
+            s.CancelScheduledChange(source, "Kept the current plan");
+            return ValidationResponse.Success("The plan stays as it is.");
+        }, cancellationToken);
 
     private async Task<ValidationResponse> ChangeAsync(Guid tenantId, Func<TenantSubscription, ValidationResponse> change, CancellationToken cancellationToken)
     {

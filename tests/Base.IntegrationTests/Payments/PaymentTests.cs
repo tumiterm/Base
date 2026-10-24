@@ -19,7 +19,7 @@ using Microsoft.Extensions.Options;
 namespace Base.IntegrationTests.Payments;
 
 /// <summary>Paying for a subscription through the built-in Test gateway and a scripted one, end to end on SQL Server.</summary>
-public sealed class PaymentTests(SqlServerFixture sql) : IAsyncLifetime
+public sealed partial class PaymentTests(SqlServerFixture sql) : IAsyncLifetime
 {
     private static readonly PaymentUrls Urls = new(new Uri("https://acme.example.com/subscription/payments"), new Uri("https://base.example.com/payments/notify"));
 
@@ -38,6 +38,7 @@ public sealed class PaymentTests(SqlServerFixture sql) : IAsyncLifetime
                 services.AddSingleton<ICurrentUser>(_actor);
                 services.AddScoped<IPaymentGateway, ScriptedGateway>();
                 services.AddScoped<IPaymentGateway, LinkedGateway>();
+                services.AddScoped<IPaymentGateway, RigidGateway>();
             },
             new Dictionary<string, string?>(StringComparer.Ordinal) { ["Payments:Gateways:Test:Enabled"] = "true" });
         _starter = await PlanAsync("starter", 100m, 1000m);
@@ -205,15 +206,18 @@ public sealed class PaymentTests(SqlServerFixture sql) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task One_renewal_at_a_time_and_it_stops_when_the_plan_changes_the_subscription_ends_or_someone_turns_it_off()
+    public async Task One_renewal_at_a_time_and_it_stops_when_another_plan_is_paid_for_the_subscription_ends_or_someone_turns_it_off()
     {
-        await PaidRenewingAsync(_pro, BillingCycle.Annual, "evt-a");
+        await PaidRenewingAsync(_starter, BillingCycle.Monthly, "evt-a");
         await PaidRenewingAsync(_starter, BillingCycle.Monthly, "evt-b");
-        (await RenewalsAsync()).ShouldBe(["STARTER Monthly Active", "PRO Annual Cancelled: Replaced by a newer automatic renewal."], ignoreOrder: true);
+        (await RenewalsAsync()).ShouldBe(["STARTER Monthly Active", "STARTER Monthly Cancelled: Replaced by a newer automatic renewal."], ignoreOrder: true);
 
-        // A one-off payment for the same plan pays ahead and keeps it; for another plan it replaces it.
+        // A one-off payment for the same plan pays ahead and keeps it.
         await PaidAsync(new PayRequest(_starter, BillingCycle.Monthly, "Test"), "evt-c");
         (await RenewalsAsync()).ShouldContain("STARTER Monthly Active");
+
+        // Once the paid period is over, paying for another plan starts it afresh and replaces the renewal.
+        _app.Time.Advance(TimeSpan.FromDays(100));
         await PaidAsync(new PayRequest(_pro, BillingCycle.Monthly, "Test"), "evt-d");
         (await RenewalsAsync()).ShouldContain("STARTER Monthly Cancelled: Replaced by a payment for another plan or period.");
 

@@ -19,6 +19,8 @@ public sealed record PlanSummary(
     public long? ValueOf(string code) =>
         Entitlements.TryGetValue(code, out var value) ? value : EntitlementCatalog.Get(code).DefaultValue;
 
+    public decimal PriceFor(BillingCycle cycle) => cycle == BillingCycle.Annual ? AnnualPrice : MonthlyPrice;
+
     /// <summary>False for a feature or limit added since the plan was last saved: it follows its suggestion until then.</summary>
     public bool HasDecided(string code) => Entitlements.ContainsKey(code);
 
@@ -56,7 +58,8 @@ public sealed record SubscriptionView(
     bool CancelAtPeriodEnd,
     DateTimeOffset StatusChangedAt,
     string? StatusReason,
-    string? ExternalReference)
+    string? ExternalReference,
+    ScheduledChangeView? Scheduled = null)
 {
     public bool HasAccess => Status is SubscriptionStatus.Trialing or SubscriptionStatus.Active or SubscriptionStatus.PastDue;
 
@@ -75,7 +78,11 @@ public sealed record MySubscription(SubscriptionView? Subscription, IReadOnlyLis
 
 public sealed record StartSubscriptionRequest(Guid PlanId, BillingCycle BillingCycle, bool WithTrial = true);
 
-public sealed record ChangePlanRequest(Guid PlanId, BillingCycle BillingCycle);
+/// <summary>The operator's change of plan.</summary>
+/// <param name="When">Now (the period stays as it is), or when the running period ends.</param>
+/// <param name="Reason">Why: required; it goes to the organisation and the audit trail.</param>
+/// <param name="AllowOverLimits">Change even though the organisation uses more than the new plan allows (it then can't add more).</param>
+public sealed record ChangePlanRequest(Guid PlanId, BillingCycle BillingCycle, PlanChangeTiming When = PlanChangeTiming.Now, string? Reason = null, bool AllowOverLimits = false);
 
 public static class SubscriptionStatusText
 {

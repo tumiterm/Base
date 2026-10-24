@@ -16,6 +16,17 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ### Added
 
+- **Changing plan properly** (docs/payments.md, Changing plan).
+  - An upgrade applies at once and the organisation pays only the difference for the time already paid for. A
+    downgrade or change of billing cycle waits for the end of the paid period, with nothing to pay now, and can be
+    undone until then. Every change is shown for review first.
+  - A plan whose limits the organisation is over can't be chosen; the page says what to remove first. While a
+    downgrade waits, the smaller plan's limits apply. Locked users no longer take a seat; unlocking needs one.
+  - The operator's **Change plan** opens a review (impact, timing now or at period end, a required reason, an explicit
+    override for limits); the tenant is emailed (template `Subscriptions.PlanChanged`). Waiting changes can be
+    withdrawn. API: plan-change preview and withdraw endpoints.
+  - Automatic renewals follow a change of plan (Payfast's subscription update), or are stopped and the organisation
+    told when the gateway can't change them.
 - **Go-live guide** (`docs/go-live.md`): hosting, secrets, database, tenancy, keys, services, monitoring, live
   payments and a launch checklist.
 - **Online payments** for subscriptions (ADR 0026).
@@ -86,6 +97,9 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ### Changed
 
+- `PUT /api/platform/tenants/{id}/subscription/plan` needs a `reason` and refuses a plan the tenant is over the
+  limits of unless `allowOverLimits` is set; `when` (`Now` or `AtPeriodEnd`) defaults to now. Paying online for a
+  cheaper plan or another cycle during a paid period is refused: it is scheduled instead.
 - The administration log of sent notifications is now called **Delivery log** in the navigation.
 - The sidebar is shorter: administration links sit in three collapsible groups (Access, Configuration, Activity)
   that open on the current page and remember how they were left; the icon rail still shows every link.
@@ -97,6 +111,8 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ### Fixed
 
+- An automatic renewal charge no longer moves the subscription back to the plan the renewal was set up for after the
+  plan changed; renewal charges only pay for the next period.
 - Domain fields accept a pasted address (`https://mtn.dev.localhost:7262`) and keep the host name, with a clearer
   message when it isn't one; tenant addresses and links keep the platform address's port.
 - Invitation links for another organisation's users open that organisation (its verified domain) instead of the

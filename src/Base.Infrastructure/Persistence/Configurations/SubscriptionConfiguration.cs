@@ -38,6 +38,8 @@ internal sealed class TenantSubscriptionConfiguration : IEntityTypeConfiguration
         builder.Property(s => s.ExternalReference).HasMaxLength(TenantSubscription.ExternalReferenceMaxLength);
         builder.HasOne<Domain.Tenancy.Tenant>().WithMany().HasForeignKey(s => s.TenantId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Plan>().WithMany().HasForeignKey(s => s.PlanId).OnDelete(DeleteBehavior.Restrict);
+        builder.Property(s => s.ScheduledBillingCycle).HasConversion<string>().HasMaxLength(20);
+        builder.HasOne<Plan>().WithMany().HasForeignKey(s => s.ScheduledPlanId).OnDelete(DeleteBehavior.Restrict);
 
         // One live subscription per tenant; the lifecycle job scans by status and date.
         builder.HasIndex(s => s.TenantId).IsUnique().HasFilter("[IsDeleted] = 0").HasDatabaseName("IX_TenantSubscriptions_TenantId_Live");

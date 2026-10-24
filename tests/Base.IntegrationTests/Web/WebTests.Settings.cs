@@ -202,6 +202,63 @@ public sealed partial class WebTests
     }
 
     [Fact]
+    public async Task The_operator_reviews_a_change_of_plan_and_confirms_it_with_a_reason()
+    {
+        var client = Client();
+        await SignInAsync(client);
+        var token = await GetMetaTokenAsync(client);
+        var big = await CreatePlanAsync(client, token, "move-big", 400, users: 10);
+        var small = await CreatePlanAsync(client, token, "move-small", 100, users: 1);
+        using var create = new HttpRequestMessage(HttpMethod.Post, "/api/platform/tenants")
+        {
+            Content = JsonContent.Create(new { name = "Movers", code = "movers", adminEmail = "owner@movers.test", adminName = "Owner", planId = big, billingCycle = "Monthly", withTrial = false }),
+        };
+        create.Headers.Add("X-CSRF-TOKEN", token);
+        var created = await client.SendAsync(create, TestContext.Current.CancellationToken);
+        created.StatusCode.ShouldBe(HttpStatusCode.Created, await created.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        var id = (await created.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken)).GetProperty("id").GetString();
+
+        var review = await client.GetStringAsync($"/platform/tenants/{id}/subscription/plan?planId={small}&billingCycle=Monthly", TestContext.Current.CancellationToken);
+        review.ShouldContain("Move Movers to MOVE-SMALL");
+        review.ShouldContain("When the period ends");
+        review.ShouldContain("name=\"reason\"");
+        var preview = await client.GetFromJsonAsync<JsonElement>($"/api/platform/tenants/{id}/subscription/plan/preview?planId={small}&billingCycle=Monthly", TestContext.Current.CancellationToken);
+        preview.GetProperty("kind").GetString().ShouldBe("AtPeriodEnd");
+
+        var formToken = FormToken().Match(review).Groups["value"].Value;
+        var noReason = await PostFormAsync(client, $"/platform/tenants/{id}/subscription/plan", formToken, ("planId", small), ("billingCycle", "Monthly"), ("when", "AtPeriodEnd"));
+        noReason.Headers.Location!.ToString().ShouldContain("/subscription/plan?", customMessage: "back to the review, to say why");
+
+        var done = await PostFormAsync(client, $"/platform/tenants/{id}/subscription/plan", formToken, ("planId", small), ("billingCycle", "Monthly"), ("when", "AtPeriodEnd"), ("reason", "Downsizing"));
+        done.Headers.Location!.ToString().ShouldBe($"/platform/tenants/{id}");
+        var details = await client.GetStringAsync($"/platform/tenants/{id}", TestContext.Current.CancellationToken);
+        details.ShouldContain("Moves to MOVE-SMALL on");
+        details.ShouldContain("Withdraw");
+    }
+
+    private static async Task<string> CreatePlanAsync(HttpClient client, string token, string code, decimal monthly, long users)
+    {
+        using var create = new HttpRequestMessage(HttpMethod.Post, "/api/platform/plans")
+        {
+            Content = JsonContent.Create(new
+            {
+                code,
+                name = code.ToUpperInvariant(),
+                currency = "ZAR",
+                monthlyPrice = monthly,
+                annualPrice = monthly * 10,
+                trialDays = 0,
+                sortOrder = 0,
+                entitlements = new Dictionary<string, long?> { [LimitCodes.Users] = users },
+            }),
+        };
+        create.Headers.Add("X-CSRF-TOKEN", token);
+        var created = await client.SendAsync(create, TestContext.Current.CancellationToken);
+        created.StatusCode.ShouldBe(HttpStatusCode.Created, await created.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        return (await created.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken)).GetProperty("id").GetString()!;
+    }
+
+    [Fact]
     public async Task Messages_can_be_written_previewed_and_sent_from_the_pages()
     {
         var client = Client();

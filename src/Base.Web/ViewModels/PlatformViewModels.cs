@@ -130,6 +130,19 @@ public sealed class PayForm
     public bool RenewAutomatically { get; set; }
 }
 
+/// <summary>The organisation's review of a change of plan before it pays or confirms.</summary>
+/// <param name="Gateways">The payment providers that can take <see cref="PlanChangePreview.AmountDueNow"/>.</param>
+/// <param name="NothingToPay">An upgrade with less to pay than any provider takes: it is confirmed without paying.</param>
+public sealed record PlanChangeViewModel(
+    PlanChangePreview Change,
+    IReadOnlyList<Base.Application.Payments.PaymentGatewayView> Gateways,
+    string? Gateway,
+    bool NothingToPay,
+    bool CanManageUsers);
+
+/// <summary>The operator's review of a change of plan: impact, timing, reason.</summary>
+public sealed record OperatorPlanChangeViewModel(TenantDetails Tenant, PlanChangePreview Change, PlanChangeTiming When, string? Reason);
+
 public sealed record PlatformPaymentsViewModel(
     PagedResult<Base.Application.Payments.PaymentView> Payments,
     Base.Application.Payments.PaymentTotals Totals,

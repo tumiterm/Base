@@ -30,6 +30,19 @@ public interface IPaymentGateway
     Task<GatewayResult> CancelRecurringAsync(string token, CancellationToken cancellationToken) =>
         Task.FromResult(GatewayResult.Failed($"{Name} has no automatic renewals to stop."));
 
+    /// <summary>The smallest amount it takes in one payment (Payfast R5.00, Yoco R2.00).</summary>
+    decimal MinimumCharge => 0m;
+
+    /// <summary>Whether <see cref="UpdateRecurringAsync"/> can change what an automatic renewal charges.</summary>
+    bool SupportsRecurringUpdate => false;
+
+    /// <summary>
+    /// Changes what an automatic renewal charges from its next charge on: the amount and how often (after a change of
+    /// plan or billing cycle). The next charge date stays as it is.
+    /// </summary>
+    Task<GatewayResult> UpdateRecurringAsync(string token, decimal amount, Base.Domain.Subscriptions.BillingCycle cycle, CancellationToken cancellationToken) =>
+        Task.FromResult(GatewayResult.Failed($"{Name} can't change an automatic renewal."));
+
     /// <summary>Whether <see cref="UpdateCardUrl"/> gives a page where the payer changes the card a renewal charges.</summary>
     bool SupportsCardUpdate => false;
 

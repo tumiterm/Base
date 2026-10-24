@@ -117,10 +117,44 @@ public sealed class PlatformTenantsController(ITenantAdministration tenants, ISu
     public Task<IActionResult> Subscribe(Guid id, Guid planId, BillingCycle billingCycle, bool withTrial, CancellationToken cancellationToken) =>
         Run(id, subscriptions.StartAsync(id, new StartSubscriptionRequest(planId, billingCycle, withTrial), cancellationToken));
 
+    /// <summary>What a change of plan would do to the tenant, with the timing and reason to confirm it.</summary>
+    [HttpGet("{id:guid}/subscription/plan")]
+    [HasPermission(PermissionCodes.Platform.TenantsManage)]
+    public async Task<IActionResult> ChangePlan(Guid id, Guid planId, BillingCycle billingCycle, PlanChangeTiming? when, string? reason, CancellationToken cancellationToken)
+    {
+        var tenant = await tenants.GetAsync(id, cancellationToken);
+        if (tenant.IsError)
+        {
+            return NotFound();
+        }
+
+        var preview = await subscriptions.PreviewChangeAsync(id, planId, billingCycle, cancellationToken);
+        if (preview.IsError)
+        {
+            this.Flash(preview);
+            return RedirectToAction(nameof(Details), new { id });
+        }
+
+        var change = preview.Data!;
+        var timing = when ?? (change.CanWaitForPeriodEnd && change.Kind == PlanChangeKind.AtPeriodEnd ? PlanChangeTiming.AtPeriodEnd : PlanChangeTiming.Now);
+        return View("ChangePlan", new OperatorPlanChangeViewModel(tenant.Data!, change, timing, reason));
+    }
+
     [HttpPost("{id:guid}/subscription/plan")]
     [HasPermission(PermissionCodes.Platform.TenantsManage)]
-    public Task<IActionResult> ChangePlan(Guid id, Guid planId, BillingCycle billingCycle, CancellationToken cancellationToken) =>
-        Run(id, subscriptions.ChangePlanAsync(id, new ChangePlanRequest(planId, billingCycle), cancellationToken));
+    public async Task<IActionResult> ChangePlan(Guid id, Guid planId, BillingCycle billingCycle, PlanChangeTiming when, string? reason, bool allowOverLimits, CancellationToken cancellationToken)
+    {
+        var result = await subscriptions.ChangePlanAsync(id, new ChangePlanRequest(planId, billingCycle, when, reason, allowOverLimits), cancellationToken);
+        this.Flash(result.IsSuccess || result.Errors.Count == 0 ? result : ValidationResponse.Failure(string.Join(" ", result.Errors.Select(e => e.Message))));
+        return result.IsSuccess
+            ? RedirectToAction(nameof(Details), new { id })
+            : RedirectToAction(nameof(ChangePlan), new { id, planId, billingCycle, when, reason });
+    }
+
+    [HttpPost("{id:guid}/subscription/plan/withdraw")]
+    [HasPermission(PermissionCodes.Platform.TenantsManage)]
+    public Task<IActionResult> WithdrawPlanChange(Guid id, CancellationToken cancellationToken) =>
+        Run(id, subscriptions.CancelScheduledChangeAsync(id, cancellationToken));
 
     [HttpPost("{id:guid}/subscription/payment")]
     [HasPermission(PermissionCodes.Platform.TenantsManage)]

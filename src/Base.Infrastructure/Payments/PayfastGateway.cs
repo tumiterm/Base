@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Base.Application.Payments;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -246,37 +247,73 @@ internal sealed partial class PayfastGateway(IOptions<PayfastOptions> options, I
     /// Cancels a Payfast subscription through Payfast's API: <c>PUT /subscriptions/{token}/cancel</c>, signed with the
     /// merchant ID, version and timestamp headers (<c>?testing=true</c> against the sandbox).
     /// </summary>
-    public async Task<GatewayResult> CancelRecurringAsync(string token, CancellationToken cancellationToken)
+    public decimal MinimumCharge => MinimumAmount;
+
+    public bool SupportsRecurringUpdate => true;
+
+    public Task<GatewayResult> CancelRecurringAsync(string token, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(token);
+        return CallSubscriptionApiAsync(HttpMethod.Put, token, "cancel", new Dictionary<string, long>(StringComparer.Ordinal), cancellationToken);
+    }
+
+    /// <summary>
+    /// Payfast's subscription update: the amount (in cents) and frequency charged from the next run on; the run date
+    /// stays as Payfast has it.
+    /// </summary>
+    public Task<GatewayResult> UpdateRecurringAsync(string token, decimal amount, Domain.Subscriptions.BillingCycle cycle, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(token);
+        var body = new Dictionary<string, long>(StringComparer.Ordinal)
+        {
+            ["amount"] = (long)decimal.Round(amount * 100m, 0, MidpointRounding.AwayFromZero),
+            ["frequency"] = cycle == Domain.Subscriptions.BillingCycle.Annual ? 6 : 3,
+        };
+        return CallSubscriptionApiAsync(HttpMethod.Patch, token, "update", body, cancellationToken);
+    }
+
+    /// <summary>One call to Payfast's subscriptions API, signed over the headers and body values.</summary>
+    private async Task<GatewayResult> CallSubscriptionApiAsync(HttpMethod method, string token, string action, Dictionary<string, long> body, CancellationToken cancellationToken)
+    {
         var headers = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["merchant-id"] = _options.MerchantId,
             ["version"] = "v1",
             ["timestamp"] = time.GetUtcNow().ToString("yyyy-MM-dd'T'HH:mm:sszzz", CultureInfo.InvariantCulture),
         };
-        using var request = new HttpRequestMessage(HttpMethod.Put, new Uri($"https://api.payfast.co.za/subscriptions/{Uri.EscapeDataString(token)}/cancel{(_options.Sandbox ? "?testing=true" : string.Empty)}"));
+        using var request = new HttpRequestMessage(method, new Uri($"https://api.payfast.co.za/subscriptions/{Uri.EscapeDataString(token)}/{action}{(_options.Sandbox ? "?testing=true" : string.Empty)}"));
         foreach (var header in headers)
         {
             request.Headers.TryAddWithoutValidation(header.Key, header.Value);
         }
 
-        request.Headers.TryAddWithoutValidation("signature", PayfastSignature.ForApi(headers, _options.Passphrase));
+        if (body.Count > 0)
+        {
+            request.Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+        }
+
+        var signed = new Dictionary<string, string>(headers, StringComparer.Ordinal);
+        foreach (var value in body)
+        {
+            signed[value.Key] = value.Value.ToString(CultureInfo.InvariantCulture);
+        }
+
+        request.Headers.TryAddWithoutValidation("signature", PayfastSignature.ForApi(signed, _options.Passphrase));
         try
         {
             using var response = await httpClients.CreateClient(HttpClientName).SendAsync(request, cancellationToken);
-            var body = await response.Content.ReadAsStringAsync(cancellationToken);
-            if (response.IsSuccessStatusCode && body.Contains("\"success\"", StringComparison.OrdinalIgnoreCase))
+            var answer = await response.Content.ReadAsStringAsync(cancellationToken);
+            if (response.IsSuccessStatusCode && answer.Contains("\"success\"", StringComparison.OrdinalIgnoreCase))
             {
                 return GatewayResult.Ok();
             }
 
-            LogCancelRefused(logger, (int)response.StatusCode, body.Length > 300 ? body[..300] : body);
+            LogApiRefused(logger, action, (int)response.StatusCode, answer.Length > 300 ? answer[..300] : answer);
             return GatewayResult.Failed($"Payfast answered {(int)response.StatusCode}.");
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
-            LogCancelUnreachable(logger, ex);
+            LogApiUnreachable(logger, action, ex);
             return GatewayResult.Failed("Payfast couldn't be reached.");
         }
     }
@@ -375,11 +412,11 @@ internal sealed partial class PayfastGateway(IOptions<PayfastOptions> options, I
     [LoggerMessage(Level = LogLevel.Warning, Message = "Couldn't reach Payfast to confirm an ITN; it will be retried")]
     private static partial void LogConfirmationFailed(ILogger logger, Exception exception);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Payfast refused to cancel a subscription: {Status} {Body}")]
-    private static partial void LogCancelRefused(ILogger logger, int status, string body);
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Payfast refused the subscription {Action}: {Status} {Body}")]
+    private static partial void LogApiRefused(ILogger logger, string action, int status, string body);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Couldn't reach Payfast to cancel a subscription")]
-    private static partial void LogCancelUnreachable(ILogger logger, Exception exception);
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Couldn't reach Payfast for the subscription {Action}")]
+    private static partial void LogApiUnreachable(ILogger logger, string action, Exception exception);
 }
 
 /// <summary>Payfast's site answers. Degraded, not unhealthy: only online payments wait for it.</summary>

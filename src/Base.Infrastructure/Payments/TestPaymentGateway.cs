@@ -41,6 +41,10 @@ internal sealed class TestPaymentGateway(IDataProtectionProvider protection) : I
 
     public Task<GatewayResult> CancelRecurringAsync(string token, CancellationToken cancellationToken) => Task.FromResult(GatewayResult.Ok());
 
+    public bool SupportsRecurringUpdate => true;
+
+    public Task<GatewayResult> UpdateRecurringAsync(string token, decimal amount, Base.Domain.Subscriptions.BillingCycle cycle, CancellationToken cancellationToken) => Task.FromResult(GatewayResult.Ok());
+
     public Task<CheckoutStart> StartCheckoutAsync(CheckoutRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);

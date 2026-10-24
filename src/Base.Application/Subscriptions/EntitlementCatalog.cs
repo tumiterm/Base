@@ -63,6 +63,7 @@ public sealed record PlanModule(string Code, string Name, string Description, st
 /// <param name="Since">The version it arrived in (shown as "Added in 1.1").</param>
 /// <param name="DefaultValue">For a plan that hasn't decided: a feature's 1/0 (from its tier), a limit's maximum (null = unlimited).</param>
 /// <param name="UnitSize">How many units of measured usage one unit of the limit is (bytes per MB for storage).</param>
+/// <param name="ResetsMonthly">A limit on what is used up each month (messages), not on what is kept (users, storage).</param>
 public sealed record EntitlementDefinition(
     string Code,
     string Name,
@@ -72,7 +73,8 @@ public sealed record EntitlementDefinition(
     string Module,
     string Since,
     string? Unit = null,
-    long UnitSize = 1)
+    long UnitSize = 1,
+    bool ResetsMonthly = false)
 {
     /// <summary>The suggested tier of a feature; null for a limit.</summary>
     public FeatureTier? Tier => Kind == EntitlementKind.Feature ? (DefaultValue == 1 ? FeatureTier.Standard : FeatureTier.Premium) : null;
@@ -80,8 +82,9 @@ public sealed record EntitlementDefinition(
     public static EntitlementDefinition Feature(string code, string name, string module, FeatureTier tier, string since, string description) =>
         new(code, name, EntitlementKind.Feature, description, tier == FeatureTier.Standard ? 1 : 0, module, since);
 
-    public static EntitlementDefinition Limit(string code, string name, string module, long? defaultValue, string since, string description, string? unit = null, long unitSize = 1) =>
-        new(code, name, EntitlementKind.Limit, description, defaultValue, module, since, unit, unitSize);
+    public static EntitlementDefinition Limit(
+        string code, string name, string module, long? defaultValue, string since, string description, string? unit = null, long unitSize = 1, bool resetsMonthly = false) =>
+        new(code, name, EntitlementKind.Limit, description, defaultValue, module, since, unit, unitSize, resetsMonthly);
 
     public string Format(long? value) => Kind == EntitlementKind.Feature
         ? (value == 1 ? "Included" : "Not included")
@@ -106,7 +109,7 @@ public static class EntitlementCatalog
 
     public static IReadOnlyList<EntitlementDefinition> All { get; } =
     [
-        EntitlementDefinition.Limit(LimitCodes.Users, "Users", ModuleCodes.Organisation, 5, "1.0", "User accounts, invited or active."),
+        EntitlementDefinition.Limit(LimitCodes.Users, "Users", ModuleCodes.Organisation, 5, "1.0", "User accounts, invited or active. Locked accounts don't count."),
         EntitlementDefinition.Feature(FeatureCodes.Documents, "Documents", ModuleCodes.Documents, FeatureTier.Standard, "1.0", "Upload, version, preview and link documents."),
         EntitlementDefinition.Feature(FeatureCodes.DocumentGeneration, "Documents from templates", ModuleCodes.Documents, FeatureTier.Premium, "1.1", "Generate letters and forms from templates, as PDF or HTML."),
         EntitlementDefinition.Limit(LimitCodes.StorageMb, "File storage", ModuleCodes.Documents, 1024, "1.0", "Total size of stored files.", "MB", 1024L * 1024L),
@@ -114,7 +117,7 @@ public static class EntitlementCatalog
         EntitlementDefinition.Feature(FeatureCodes.CustomBranding, "Custom branding", ModuleCodes.Branding, FeatureTier.Premium, "1.0", "Own accent colour, logo and default theme."),
         EntitlementDefinition.Feature(FeatureCodes.Messaging, "Send messages", ModuleCodes.Messaging, FeatureTier.Standard, "1.1", "Write to chosen people by email, SMS, WhatsApp or in-app, now or at a set time, with saved templates."),
         EntitlementDefinition.Feature(FeatureCodes.BulkMessaging, "Bulk messages", ModuleCodes.Messaging, FeatureTier.Premium, "1.1", "Send to everyone a filter matches (a department, a role) or to a pasted list."),
-        EntitlementDefinition.Limit(LimitCodes.MessagesPerMonth, "Messages per month", ModuleCodes.Messaging, 1000, "1.1", "Messages sent from Messages each month, one per person per channel."),
+        EntitlementDefinition.Limit(LimitCodes.MessagesPerMonth, "Messages per month", ModuleCodes.Messaging, 1000, "1.1", "Messages sent from Messages each month, one per person per channel.", resetsMonthly: true),
         EntitlementDefinition.Feature(FeatureCodes.Api, "API access", ModuleCodes.Integrations, FeatureTier.Premium, "1.0", "Other systems can call the API with API keys."),
     ];
 

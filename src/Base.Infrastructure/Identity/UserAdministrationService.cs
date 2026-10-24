@@ -224,6 +224,16 @@ internal sealed partial class UserAdministrationService(
             return manageable;
         }
 
+        // A locked account doesn't take a seat on the plan, so unlocking one needs a free seat.
+        if (user.IsLockedOut(time.GetUtcNow()))
+        {
+            var seat = await entitlements.EnsureWithinLimitAsync(LimitCodes.Users, 1, cancellationToken);
+            if (seat.IsError)
+            {
+                return seat;
+            }
+        }
+
         var result = await RunAsync(async _ =>
         {
             IdentityOperationException.ThrowIfFailed(await users.SetLockoutEndDateAsync(user, null));
