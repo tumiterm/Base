@@ -14,6 +14,11 @@ Add a line under **Unreleased** with every change. A release moves those lines u
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-26
+
+Payments and subscriptions end to end (Payfast, Yoco, automatic renewal, plan changes, billing history, invoices),
+messaging, feature flags, release adoption, plan modules, and branded emails that organisations can reword.
+
 ### Added
 
 - **A modern layout for every email**: the sender's logo, a card with the heading and message, the details set out in
